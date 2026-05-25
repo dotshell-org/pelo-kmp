@@ -39,7 +39,7 @@ class LyonTransportApi(private val baseUrl: String) : TransportApi {
 
     interface UserStopAlertsEndpoint {
         @Headers("Cache-Control: no-cache", "Pragma: no-cache")
-        @GET("pelo/v1/app/users-alerts/stops")
+        @GET("pelo/v1/users-alerts/stops")
         suspend fun getUserStopAlerts(
             @Query("stopIds") stopIds: List<String>,
             @Query("_ts") timestampMs: Long

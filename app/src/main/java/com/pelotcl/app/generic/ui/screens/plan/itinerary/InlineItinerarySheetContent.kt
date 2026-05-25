@@ -384,12 +384,21 @@ fun InlineItinerarySheetContent(
 
                 val seenAvoidedSignatures = mutableSetOf<String>()
                 val label = buildAvoidedLabel(problematicDetails)
-                val nextAvoided = avoidedJourneys
+                val recalculatedAvoided = avoidedJourneys
                     .filter { !journeyTouchesProblematicStop(it, problematicStops) }
                     .filter {
                         val sig = journeySignature(it)
                         seenAvoidedSignatures.add(sig)
                     }
+
+                val baselineAvoided = journeysSnapshot
+                    .filter { !journeyTouchesProblematicStop(it, problematicStops) }
+                    .filter {
+                        val sig = journeySignature(it)
+                        seenAvoidedSignatures.add(sig)
+                    }
+
+                val nextAvoided = (recalculatedAvoided + baselineAvoided)
                     .map { AvoidedJourneyUi(journey = it, label = label) }
 
                 if (currentVersion != recalcVersion) return@launch

@@ -272,8 +272,8 @@ fun AlertReportBottomSheet(
                                 scope.launch {
                                     val result = submitUserAlert(
                                         alertTypeId = alertType.id,
-                                        stopId = selectedStop?.stopId,
-                                        stopNameFallback = selectedStop?.stopName,
+                                        stopName = selectedStop?.stopName,
+                                        stopIdFallback = selectedStop?.stopId,
                                         lineId = selectedLine?.lineName
                                     )
                                     if (result.isSuccess) {

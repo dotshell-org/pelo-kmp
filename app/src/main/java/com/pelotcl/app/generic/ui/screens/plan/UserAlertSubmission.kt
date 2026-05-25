@@ -18,17 +18,17 @@ private val userAlertSubmissionHttpClient = OkHttpClient()
 
 internal suspend fun submitUserAlert(
     alertTypeId: String,
-    stopId: Int?,
-    stopNameFallback: String?,
+    stopName: String?,
+    stopIdFallback: Int?,
     lineId: String?
 ): UserAlertSubmissionResult = withContext(Dispatchers.IO) {
     try {
-        val url = "https://api.dotshell.eu/pelo/v1/app/users-alerts"
+        val url = "https://api.dotshell.eu/pelo/v1/users-alerts"
         val json = JSONObject().apply {
             put("type", alertTypeId)
             when {
-                stopId != null -> put("stopId", stopId.toString())
-                !stopNameFallback.isNullOrBlank() -> put("stopId", stopNameFallback)
+                !stopName.isNullOrBlank() -> put("stopId", stopName)
+                stopIdFallback != null -> put("stopId", stopIdFallback.toString())
             }
             if (!lineId.isNullOrBlank()) {
                 put("lineId", lineId)

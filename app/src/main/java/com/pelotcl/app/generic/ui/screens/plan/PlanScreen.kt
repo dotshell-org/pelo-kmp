@@ -1971,10 +1971,10 @@ fun PlanScreen(
 
                 if (isJourneyAlertsLoaded) return@LaunchedEffect
 
-                val allStopIds = journey.legs
-                    .flatMap { leg -> listOf(leg.fromStopId, leg.toStopId) }
+                val allStopNames = journey.legs
+                    .flatMap { leg -> listOf(leg.fromStopName, leg.toStopName) }
                     .distinct()
-                cachedJourneyAlerts = viewModel.userStopAlertsRepository.getUserStopAlerts(allStopIds)
+                cachedJourneyAlerts = viewModel.userStopAlertsRepository.getUserStopAlerts(allStopNames)
                 isJourneyAlertsLoaded = true
             }
 
@@ -2028,12 +2028,12 @@ fun PlanScreen(
                 )
 
                 if (approachingStop != null &&
-                    alerts.containsKey(approachingStop.toStopId) &&
-                    approachingStop.toStopId !in answeredAlertStopsInSession
+                    alerts.containsKey(approachingStop.toStopName) &&
+                    approachingStop.toStopName !in answeredAlertStopsInSession
                 ) {
                     currentAlertPrompt = buildNavigationAlertPrompt(
                         alerts = alerts,
-                        stopId = approachingStop.toStopId
+                        stopName = approachingStop.toStopName
                     )
                     if (currentAlertPrompt == null) return@LaunchedEffect
                     currentAlertStop = approachingStop
@@ -2201,8 +2201,8 @@ fun PlanScreen(
             if (showAlertDialog && currentAlertStop != null && currentAlertPrompt != null) {
                 AlertDialog(
                     onDismissRequest = {
-                        currentAlertStop?.toStopId?.let { stopId ->
-                            answeredAlertStopsInSession = answeredAlertStopsInSession + stopId
+                        currentAlertStop?.toStopName?.let { stopName ->
+                            answeredAlertStopsInSession = answeredAlertStopsInSession + stopName
                         }
                         isSubmittingNavigationAlert = false
                         currentAlertPrompt = null
@@ -2228,8 +2228,8 @@ fun PlanScreen(
                                 scope.launch {
                                     val result = submitUserAlert(
                                         alertTypeId = prompt.alertTypeId,
-                                        stopId = stop.toStopId.toIntOrNull(),
-                                        stopNameFallback = stop.toStopName,
+                                        stopName = stop.toStopName,
+                                        stopIdFallback = stop.toStopId.toIntOrNull(),
                                         lineId = null
                                     )
                                     if (result.isSuccess) {
@@ -2247,7 +2247,7 @@ fun PlanScreen(
                                         ).show()
                                     }
                                     answeredAlertStopsInSession =
-                                        answeredAlertStopsInSession + stop.toStopId
+                                        answeredAlertStopsInSession + stop.toStopName
                                     currentAlertPrompt = null
                                     showAlertDialog = false
                                     isSubmittingNavigationAlert = false
@@ -2259,8 +2259,8 @@ fun PlanScreen(
                     },
                     dismissButton = {
                         TextButton(onClick = {
-                            currentAlertStop?.toStopId?.let { stopId ->
-                                answeredAlertStopsInSession = answeredAlertStopsInSession + stopId
+                            currentAlertStop?.toStopName?.let { stopName ->
+                                answeredAlertStopsInSession = answeredAlertStopsInSession + stopName
                             }
                             isSubmittingNavigationAlert = false
                             currentAlertPrompt = null

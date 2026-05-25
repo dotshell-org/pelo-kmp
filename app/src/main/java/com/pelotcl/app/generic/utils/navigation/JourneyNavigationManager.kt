@@ -97,9 +97,9 @@ object JourneyNavigationManager {
 
     fun buildNavigationAlertPrompt(
         alerts: UserStopAlertsResponse,
-        stopId: String?
+        stopName: String?
     ): NavigationAlertPrompt? {
-        val status = stopId?.let(alerts::get) ?: return null
+        val status = stopName?.let(alerts::get) ?: return null
 
         val highKarmaAlert = status.karmaAtOrAboveThreshold.maxByOrNull { it.karma }
         if (highKarmaAlert != null) {
