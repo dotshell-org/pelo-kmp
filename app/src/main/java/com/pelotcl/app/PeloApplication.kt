@@ -53,7 +53,7 @@ class PeloApplication : Application(), Configuration.Provider {
             if (!assetsAvailable) {
                 Log.e(TAG, "CRITICAL: Raptor assets are missing!")
                 Log.e(TAG, "This will cause bus stops to disappear from search and map functionality.")
-                Log.e(TAG, "Required assets: holidays.json, stops_*.bin, routes_*.bin")
+                Log.e(TAG, "Required assets: holidays.json, raptor/stops_*.bin, raptor/routes_*.bin")
                 Log.e(TAG, "Please try: File > Invalidate Caches / Restart in Android Studio")
                 Log.e(TAG, "Then clean build: ./gradlew clean assembleDebug")
             } else {

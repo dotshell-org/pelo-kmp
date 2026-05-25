@@ -164,10 +164,10 @@ class RaptorRepository private constructor(private val context: Context) {
                 // Verify all required assets exist before attempting to load them
                 val requiredAssets = listOf(
                     "holidays.json",
-                    "stops_saturday.bin", "routes_saturday.bin",
-                    "stops_sunday.bin", "routes_sunday.bin",
-                    "stops_school_on_weekdays.bin", "routes_school_on_weekdays.bin",
-                    "stops_school_off_weekdays.bin", "routes_school_off_weekdays.bin"
+                    "raptor/stops_saturday.bin", "raptor/routes_saturday.bin",
+                    "raptor/stops_sunday.bin", "raptor/routes_sunday.bin",
+                    "raptor/stops_school_on_weekdays.bin", "raptor/routes_school_on_weekdays.bin",
+                    "raptor/stops_school_off_weekdays.bin", "raptor/routes_school_off_weekdays.bin"
                 )
 
                 val missingAssets = requiredAssets.filter { assetName ->
@@ -197,10 +197,10 @@ class RaptorRepository private constructor(private val context: Context) {
                     PeriodData(
                         periodId = periodId,
                         stopsInputStream = BufferedInputStream(
-                            context.assets.open("stops_$periodId.bin"), 8192
+                            context.assets.open("raptor/stops_$periodId.bin"), 8192
                         ),
                         routesInputStream = BufferedInputStream(
-                            context.assets.open("routes_$periodId.bin"), 8192
+                            context.assets.open("raptor/routes_$periodId.bin"), 8192
                         )
                     )
                 }
@@ -327,7 +327,7 @@ class RaptorRepository private constructor(private val context: Context) {
 
     private fun getRoutesForPeriod(periodId: String): List<Route> {
         return routesByPeriod.getOrPut(periodId) {
-            context.assets.open("routes_$periodId.bin").use { input ->
+            context.assets.open("raptor/routes_$periodId.bin").use { input ->
                 NetworkLoader.loadRoutes(BufferedInputStream(input, 8192))
             }
         }
@@ -335,7 +335,7 @@ class RaptorRepository private constructor(private val context: Context) {
 
     private fun getStopsForPeriod(periodId: String): List<Stop> {
         return stopsByPeriod.getOrPut(periodId) {
-            context.assets.open("stops_$periodId.bin").use { input ->
+            context.assets.open("raptor/stops_$periodId.bin").use { input ->
                 NetworkLoader.loadStops(BufferedInputStream(input, 8192))
             }
         }
@@ -515,10 +515,10 @@ class RaptorRepository private constructor(private val context: Context) {
         val result = runCatching {
             val requiredAssets = listOf(
                 "holidays.json",
-                "stops_saturday.bin", "routes_saturday.bin",
-                "stops_sunday.bin", "routes_sunday.bin",
-                "stops_school_on_weekdays.bin", "routes_school_on_weekdays.bin",
-                "stops_school_off_weekdays.bin", "routes_school_off_weekdays.bin"
+                "raptor/stops_saturday.bin", "raptor/routes_saturday.bin",
+                "raptor/stops_sunday.bin", "raptor/routes_sunday.bin",
+                "raptor/stops_school_on_weekdays.bin", "raptor/routes_school_on_weekdays.bin",
+                "raptor/stops_school_off_weekdays.bin", "raptor/routes_school_off_weekdays.bin"
             )
 
             requiredAssets.all { assetName ->
