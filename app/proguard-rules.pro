@@ -117,6 +117,11 @@
     kotlinx.serialization.KSerializer serializer(...);
 }
 
+# Telemetry sealed class hierarchy and DTOs — kept whole because polymorphic
+# kotlinx.serialization needs the subclass list at runtime.
+-keep class com.pelotcl.app.generic.data.telemetry.** { *; }
+-keep class com.pelotcl.app.generic.data.local_history.** { *; }
+
 # ==================== OkHttp ====================
 -dontwarn okhttp3.internal.platform.**
 -dontwarn org.conscrypt.**

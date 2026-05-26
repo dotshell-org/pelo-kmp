@@ -141,6 +141,9 @@ dependencies {
     // YAML parsing for config.yml
     implementation(libs.snakeyaml)
 
+    // Encrypted SharedPreferences for telemetry daily_id
+    implementation(libs.androidx.security.crypto)
+
     // WorkManager for background tasks
     implementation(libs.androidx.work.runtime.ktx)
 

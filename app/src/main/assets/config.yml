@@ -263,3 +263,31 @@ rules:
     - prefix: "T"
       marker: "TRAM"
   defaultVehicleMarker: "BUS"
+
+telemetry:
+  enabled: true
+  endpointUrl: "https://api.dotshell.eu/v1/telemetry/daily"
+  schemaVersion: 1
+  networkCode: "lyon-tcl"
+  closeDebounceSeconds: 60
+  tripSamplingSeconds: 30
+  tripSnapRadiusMeters: 100
+  profileWindowDays: 30
+  disclosure:
+    title: "Aidez-nous à améliorer le réseau"
+    body: |
+      Pour mieux comprendre vos besoins et améliorer le réseau de transport, nous aimerions collecter de manière anonyme :
+    items:
+      - "Vos heures d'ouverture de l'app (sans aucune donnée d'identification)"
+      - "Vos recherches d'arrêts et de lignes"
+      - "Les itinéraires que vous calculez et choisissez"
+      - "Les arrêts que vous franchissez pendant une navigation"
+      - "Vos clics sur les lignes et arrêts"
+      - "Les alertes officielles que vous lisez"
+      - "Les alertes que vous signalez"
+      - "Un profil d'usage anonyme (occasionnel / régulier / intensif + vos 5 lignes habituelles)"
+    localOnly:
+      - "Vos arrêts favoris (jamais envoyés)"
+      - "L'historique détaillé de vos trajets (jamais envoyé)"
+    privacyNote: |
+      Aucune coordonnée GPS brute n'est envoyée — uniquement les arrêts franchis. L'identifiant change chaque jour, il n'est pas possible de vous suivre dans la durée. Vous pouvez désactiver ce partage à tout moment depuis les réglages.

@@ -10,7 +10,8 @@ data class AppConfig(
     @SerializedName("mapStyles") val mapStyles: MapStylesData,
     @SerializedName("lineColors") val lineColors: LineColorsData,
     @SerializedName("cache") val cache: CacheConfigData,
-    @SerializedName("itinerarySettings") val itinerarySettings: ItinerarySettingsData
+    @SerializedName("itinerarySettings") val itinerarySettings: ItinerarySettingsData,
+    @SerializedName("telemetry") val telemetry: TelemetryConfigData? = null
 )
 
 data class TransportConfigData(
@@ -158,4 +159,24 @@ data class ItineraryOptionData(
     val title: String,
     val subtitle: String,
     val defaultEnabled: Boolean = true
+)
+
+data class TelemetryConfigData(
+    val enabled: Boolean = true,
+    val endpointUrl: String,
+    val schemaVersion: Int = 1,
+    val networkCode: String,
+    val closeDebounceSeconds: Long = 60,
+    val tripSamplingSeconds: Long = 30,
+    val tripSnapRadiusMeters: Int = 100,
+    val profileWindowDays: Int = 30,
+    val disclosure: TelemetryDisclosureData = TelemetryDisclosureData()
+)
+
+data class TelemetryDisclosureData(
+    val title: String = "Aidez-nous à améliorer le réseau",
+    val body: String = "",
+    val items: List<String> = emptyList(),
+    val localOnly: List<String> = emptyList(),
+    val privacyNote: String = ""
 )
