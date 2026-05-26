@@ -218,6 +218,14 @@ fun LineDetailsBottomSheet(
                     e
                 )
             }
+            com.pelotcl.app.generic.data.telemetry.TelemetryEmitter.emit(
+                com.pelotcl.app.generic.data.telemetry.TelemetryEvent.LineClicked(
+                    eventId = java.util.UUID.randomUUID().toString(),
+                    at = java.time.Instant.now().toString(),
+                    lineId = lineInfo.lineName,
+                    context = "bottom_sheet"
+                )
+            )
         }
     }
 

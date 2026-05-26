@@ -69,6 +69,18 @@ fun StationBottomSheet(
     val departuresInset = 20.dp
     val actionsInset = 8.dp
 
+    androidx.compose.runtime.LaunchedEffect(stationInfo?.nom) {
+        val stop = stationInfo ?: return@LaunchedEffect
+        com.pelotcl.app.generic.data.telemetry.TelemetryEmitter.emit(
+            com.pelotcl.app.generic.data.telemetry.TelemetryEvent.StopClicked(
+                eventId = java.util.UUID.randomUUID().toString(),
+                at = java.time.Instant.now().toString(),
+                stopId = stop.nom,
+                context = "bottom_sheet"
+            )
+        )
+    }
+
     if (stationInfo != null) {
         val allStopLines by produceState(
             initialValue = stationInfo.lignes,

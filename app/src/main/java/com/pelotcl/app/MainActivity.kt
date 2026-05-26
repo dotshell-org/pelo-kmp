@@ -62,6 +62,7 @@ import com.pelotcl.app.generic.data.models.search.StationSearchResult
 import com.pelotcl.app.generic.data.repository.offline.search.SearchHistoryItem
 import com.pelotcl.app.generic.data.repository.offline.search.SearchType
 import com.pelotcl.app.generic.data.repository.offline.mapstyle.MapStyleCompat
+import com.pelotcl.app.generic.ui.screens.onboarding.TelemetryOptInGate
 import com.pelotcl.app.generic.ui.screens.settings.about.AboutScreen
 import com.pelotcl.app.generic.ui.screens.settings.about.ContactScreen
 import com.pelotcl.app.generic.ui.screens.settings.about.CreditsScreen
@@ -70,6 +71,8 @@ import com.pelotcl.app.generic.ui.screens.plan.PlanScreen
 import com.pelotcl.app.generic.ui.screens.settings.ItinerarySettingsScreen
 import com.pelotcl.app.generic.ui.screens.settings.OfflineSettingsScreen
 import com.pelotcl.app.generic.ui.screens.settings.SettingsScreen
+import com.pelotcl.app.generic.ui.screens.settings.TelemetryPreviewScreen
+import com.pelotcl.app.generic.ui.screens.settings.TelemetrySettingsScreen
 import com.pelotcl.app.generic.ui.theme.PeloTheme
 import com.pelotcl.app.generic.ui.theme.AccentColor
 import com.pelotcl.app.generic.ui.viewmodel.TransportViewModel
@@ -140,6 +143,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             PeloTheme {
+                TelemetryOptInGate {
                 NavBar(
                     modifier = Modifier.fillMaxSize(),
                     onNavigationModeChangedExternal = { active ->
@@ -158,6 +162,7 @@ class MainActivity : ComponentActivity() {
                         setNavigationLockScreenBehavior(active)
                     }
                 )
+                }
             }
         }
 
@@ -675,7 +680,28 @@ private fun AppNavHost(
                 },
                 onApiHealthClick = {
                     navController.navigate(Destination.API_HEALTH)
+                },
+                onTelemetryClick = {
+                    navController.navigate(Destination.TELEMETRY_SETTINGS)
                 }
+            )
+        }
+        composable(Destination.TELEMETRY_SETTINGS) {
+            TelemetrySettingsScreen(
+                onBackClick = { navController.popBackStack() },
+                onSystemBack = { navController.popBackStack() },
+                onShowCollectedData = {
+                    navController.navigate(Destination.TELEMETRY_PREVIEW)
+                },
+                onLegalClick = {
+                    navController.navigate(Destination.LEGAL)
+                }
+            )
+        }
+        composable(Destination.TELEMETRY_PREVIEW) {
+            TelemetryPreviewScreen(
+                onBackClick = { navController.popBackStack() },
+                onSystemBack = { navController.popBackStack() }
             )
         }
         composable(Destination.ITINERARY_SETTINGS) {

@@ -7,9 +7,11 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import com.pelotcl.app.generic.data.cache.journey.JourneyCache
+import com.pelotcl.app.generic.data.config.AppConfigLoader
 import com.pelotcl.app.generic.data.network.RetrofitInstance
 import com.pelotcl.app.generic.data.repository.itinerary.itinerary.RaptorRepository
 import com.pelotcl.app.generic.data.repository.offline.SchedulesRepository
+import com.pelotcl.app.generic.data.telemetry.TelemetryService
 import com.pelotcl.app.generic.service.TransportServiceProvider
 import com.pelotcl.app.generic.utils.graphics.BusIconHelper
 import com.pelotcl.app.generic.worker.TrafficAlertsWorker
@@ -39,6 +41,16 @@ class PeloApplication : Application(), Configuration.Provider {
         TransportServiceProvider.initialize(this)
         RetrofitInstance.initialize(this, TransportServiceProvider.getTransportConfig())
         scheduleTrafficAlertsWork()
+        initializeTelemetry()
+    }
+
+    private fun initializeTelemetry() {
+        try {
+            val telemetryConfig = AppConfigLoader.getConfig().telemetry ?: return
+            TelemetryService.initialize(this, telemetryConfig)
+        } catch (e: Exception) {
+            Log.w(TAG, "Telemetry init skipped", e)
+        }
     }
 
     /**

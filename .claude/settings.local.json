@@ -15,7 +15,9 @@
       "WebFetch(domain:medium.com)",
       "Bash(./gradlew compileReleaseKotlin)",
       "Bash(xxd)",
-      "Bash(./gradlew compileDebugKotlin)"
+      "Bash(./gradlew compileDebugKotlin)",
+      "Bash(./gradlew compileDebugKotlin --console=plain)",
+      "Bash(echo \"EXIT=$?\")"
     ]
   }
 }

@@ -172,7 +172,7 @@ about:
         Pelo est conçue selon le principe de la protection des données dès la conception.
 
         5.1. Stockage Local Exclusif
-        L'intégralité de vos données d'usage (historique de recherche, paramètres de l'application, préférences d'affichage) est stockée exclusivement en local sur votre appareil. Dotshell ne dispose d'aucun accès à ces informations.
+        Vos arrêts favoris et l'historique détaillé de vos trajets sont stockés exclusivement en local sur votre appareil. Dotshell ne dispose d'aucun accès à ces informations. Vous pouvez supprimer cet historique à tout moment depuis l'écran « Confidentialité ».
 
         5.2. Cas particulier des Favoris (Connexion Socket)
         Pour permettre la mise à jour en temps réel de vos lignes et arrêts favoris, une connexion technique temporaire (socket) est établie à l'ouverture de l'application et rompue dès sa fermeture.
@@ -180,8 +180,23 @@ about:
         • Aucune donnée permettant de vous identifier n'est transmise ou enregistrée sur un serveur externe.
         • Ce flux sert uniquement à la synchronisation technique des données de transport durant votre session de navigation.
 
-        5.3. Absence de revente
-        Dotshell ne collecte, ne vend, ni ne commercialise aucune donnée personnelle. Les requêtes réseau effectuées servent uniquement à interroger les API de transport nécessaires au service (voir page « Crédits »).
+        5.3. Partage de données pour améliorer le réseau (optionnel, opt-in)
+        Si vous l'acceptez explicitement au premier démarrage ou depuis l'écran « Confidentialité », l'Application peut transmettre à Dotshell, à chaque fermeture, un message anonyme rattaché à un identifiant qui change toutes les 24 heures. Ce message contient :
+        • Vos heures d'ouverture et de fermeture de l'app
+        • Vos recherches d'arrêts et de lignes
+        • Les itinéraires que vous calculez et choisissez
+        • Les arrêts franchis pendant une navigation (jamais les coordonnées GPS brutes)
+        • Vos clics sur les lignes et arrêts
+        • Les alertes officielles que vous avez lues
+        • Les alertes de trafic que vous avez signalées
+        • Un profil d'usage anonyme calculé localement (occasionnel / régulier / intensif + jusqu'à 5 lignes habituelles)
+
+        L'identifiant journalier est généré aléatoirement, ne contient aucun lien avec votre téléphone et est régénéré chaque jour : il est impossible de vous suivre dans la durée. Le partage peut être désactivé à tout moment depuis l'écran « Confidentialité » ; les données déjà transmises ne pourront pas être retrouvées et seront automatiquement purgées après 90 jours.
+
+        Vos arrêts favoris, l'historique détaillé de vos trajets, et le contenu textuel de vos saisies libres (adresses) ne sont **jamais** transmis. Les adresses utilisées dans un calcul d'itinéraire sont transformées localement en un identifiant de zone géographique d'environ 460 m avant tout envoi.
+
+        5.4. Absence de revente à des annonceurs
+        Dotshell ne vend pas vos données à des annonceurs ou à des courtiers en données. Les données agrégées et anonymes peuvent être utilisées ou partagées avec des Autorités Organisatrices de la Mobilité dans une finalité d'amélioration du service de transport public.
     - title: "Responsabilité"
       content: |
         Les informations (horaires, perturbations) sont fournies à titre indicatif. Dotshell décline toute responsabilité en cas d’inexactitude des données provenant de tiers ou d’indisponibilité du réseau de transport.
