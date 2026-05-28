@@ -51,6 +51,26 @@ class TelemetryUploadWorker(
         val optIn = TelemetryEmitter.optInManager()
         if (optIn == null || !optIn.isOptedIn) return Result.success()
 
+        // Ensure repository is initialized. On process restart WorkManager may start the
+        // worker before the app's async repository.initFor has completed, leaving
+        // repo.state.value == null and making snapshotPendingForUpload return null.
+        if (repo.state.value == null) {
+            val provider = TelemetryEmitter.dailyIdProvider()
+            val dailyId = provider?.peek()
+            val day = provider?.peekDay()
+            if (dailyId != null && day != null) {
+                try {
+                    repo.initFor(dailyId, day)
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to init telemetry repo for upload", e)
+                    return Result.retry()
+                }
+            } else {
+                Log.i(TAG, "No daily id available; nothing to upload")
+                return Result.success()
+            }
+        }
+
         val snapshot = repo.snapshotPendingForUpload() ?: return Result.success()
         val localHistory = TelemetryEmitter.localHistory()
         val profile = if (localHistory != null) {
