@@ -1,6 +1,7 @@
 package com.pelotcl.app.platform
 
 import com.pelotcl.app.generic.data.config.LineColorsData
+import com.pelotcl.app.generic.data.network.mapstyle.MapStyleConfig
 import com.pelotcl.app.generic.data.network.transport.TransportLineRules
 
 actual fun provideLineColors(): LineColorsData {
@@ -8,5 +9,9 @@ actual fun provideLineColors(): LineColorsData {
 }
 
 actual fun provideTransportLineRules(): TransportLineRules {
+    throw UnsupportedOperationException("Config not available on iOS")
+}
+
+actual fun provideMapStyleConfig(): MapStyleConfig {
     throw UnsupportedOperationException("Config not available on iOS")
 }

@@ -22,7 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.pelotcl.app.generic.data.network.mapstyle.MapStyleData
-import com.pelotcl.app.generic.service.TransportServiceProvider
+import com.pelotcl.app.platform.provideMapStyleConfig
 import com.pelotcl.app.generic.ui.theme.PrimaryColor
 import com.pelotcl.app.generic.ui.theme.SecondaryColor
 import com.pelotcl.app.generic.utils.map.MapStyleUtils.mapStyleLabel
@@ -36,7 +36,7 @@ fun MapStyleSelectionSheet(
     onDismiss: () -> Unit,
     onStyleSelected: (MapStyleData) -> Unit
 ) {
-    val mapStyleConfig = TransportServiceProvider.getMapStyleConfig()
+    val mapStyleConfig = provideMapStyleConfig()
     val standardStyles = remember { mapStyleConfig.getStandardMapStyles() }
     val satelliteStyle = remember { mapStyleConfig.getSatelliteMapStyle() }
     val allStyles = remember { standardStyles + satelliteStyle }
