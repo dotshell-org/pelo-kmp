@@ -34,7 +34,6 @@ kamelImage = "1.0.5"
 retrofit = "2.11.0"
 okhttp = "4.12.0"
 gson = "2.11.0"
-glance = "1.2.0-rc01"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -75,8 +74,6 @@ retrofit-converter-gson = { group = "com.squareup.retrofit2", name = "converter-
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 okhttp-sse = { group = "com.squareup.okhttp3", name = "okhttp-sse", version.ref = "okhttp" }
-androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
-androidx-glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "glance" }
 
 # Ktor (replaces Retrofit/OkHttp/Gson)
 ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }

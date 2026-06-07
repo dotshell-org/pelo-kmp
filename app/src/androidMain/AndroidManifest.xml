@@ -12,15 +12,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"
         tools:ignore="ForegroundServicesPolicy" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    <!-- Exact alarm permissions for widget scheduling -->
-    <!-- Required for real-time public transport information updates -->
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" 
-        tools:ignore="UnusedAttribute" />
-    <uses-permission android:name="android.permission.USE_EXACT_ALARM" 
-        android:maxSdkVersion="32"
-        tools:ignore="ExactAlarmPolicy,UnusedAttribute" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-
     <!-- Foreground service types required for Android 14+ -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
@@ -54,80 +45,6 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
-        <!-- Widget configuration activity -->
-        <activity
-            android:name="com.pelotcl.app.generic.widget.ui.WidgetConfigActivity"
-            android:exported="true"
-            android:theme="@style/Theme.Pelo">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
-            </intent-filter>
-        </activity>
-
-        <!-- Reschedule widget alarms after device reboot -->
-        <receiver
-            android:name="com.pelotcl.app.generic.widget.receiver.WidgetBootReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
-
-        <!-- Widget alarm refresh receiver -->
-        <receiver
-            android:name="com.pelotcl.app.generic.widget.receiver.WidgetAlarmReceiver"
-            android:exported="false" />
-
-
-
-        <!-- Widget receiver -->
-        <receiver
-            android:name="com.pelotcl.app.generic.widget.receiver.PeloWidgetReceiver"
-            android:label="@string/widget_label_all_lines_minutes"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/pelo_widget_all_lines_minutes_info" />
-        </receiver>
-
-        <receiver
-            android:name="com.pelotcl.app.generic.widget.receiver.PeloWidgetClockAllLinesReceiver"
-            android:label="@string/widget_label_all_lines_clock"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/pelo_widget_all_lines_clock_info" />
-        </receiver>
-
-        <receiver
-            android:name="com.pelotcl.app.generic.widget.receiver.PeloWidgetLineMinutesReceiver"
-            android:label="@string/widget_label_line_minutes"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/pelo_widget_line_minutes_info" />
-        </receiver>
-
-        <receiver
-            android:name="com.pelotcl.app.generic.widget.receiver.PeloWidgetLineClockReceiver"
-            android:label="@string/widget_label_line_clock"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/pelo_widget_line_clock_info" />
-        </receiver>
     </application>
 
 </manifest>

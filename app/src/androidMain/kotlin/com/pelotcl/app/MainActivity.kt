@@ -91,7 +91,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import org.maplibre.android.geometry.LatLng
 
 class MainActivity : ComponentActivity() {
@@ -195,19 +194,6 @@ class MainActivity : ComponentActivity() {
                 raptorRepo.preloadJourneyCache()
             } catch (e: Exception) {
                 android.util.Log.w("MainActivity", "Raptor preload failed: ${e.message}")
-            }
-
-            // Refresh home screen widgets with fresh schedule data
-            delay(3000)
-            try {
-                val widget = com.pelotcl.app.generic.widget.PeloWidget()
-                val manager = androidx.glance.appwidget.GlanceAppWidgetManager(applicationContext)
-                val glanceIds = manager.getGlanceIds(widget.javaClass)
-                for (glanceId in glanceIds) {
-                    widget.update(applicationContext, glanceId)
-                }
-            } catch (e: Exception) {
-                android.util.Log.w("MainActivity", "Widget refresh failed: ${e.message}")
             }
         }
     }
