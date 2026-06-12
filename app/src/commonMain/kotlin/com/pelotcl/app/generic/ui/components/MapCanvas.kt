@@ -55,9 +55,11 @@ fun MapCanvas(
     stops: StopCollection? = null,
     itineraryGeoJson: String? = null,
     userLocation: Position? = null,
+    vehiclesGeoJson: String? = null,
     interactive: Boolean = true,
     onStopClick: (stopName: String) -> Unit = {},
     onLineClick: (lineName: String) -> Unit = {},
+    onVehicleClick: (lineName: String) -> Unit = {},
     centerOn: Position? = null,
 ) {
     LaunchedEffect(centerOn) {
@@ -121,6 +123,28 @@ fun MapCanvas(
                 source = itinerarySource,
                 color = feature["color"].convertToColor(),
                 width = const(6.dp),
+            )
+        }
+
+        if (vehiclesGeoJson != null) {
+            // Live vehicles rendered as line-coloured dots (data-driven `color` per feature).
+            // The legacy bus/tram glyph markers can be reintroduced once named-image
+            // registration in maplibre-compose is settled.
+            val vehicleSource = rememberGeoJsonSource(data = GeoJsonData.JsonString(vehiclesGeoJson))
+            CircleLayer(
+                id = "vehicles",
+                source = vehicleSource,
+                radius = const(7.dp),
+                color = feature["color"].convertToColor(),
+                onClick = { features ->
+                    val lineName = features.firstOrNull()?.properties?.get("lineName")?.jsonPrimitive?.contentOrNull
+                    if (lineName != null) {
+                        onVehicleClick(lineName)
+                        ClickResult.Consume
+                    } else {
+                        ClickResult.Pass
+                    }
+                },
             )
         }
 
