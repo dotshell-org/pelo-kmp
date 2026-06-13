@@ -1,8 +1,8 @@
 package com.pelotcl.app.generic.data.repository.itinerary.itinerary
 
-import android.content.Context
-import android.util.LruCache
 import com.pelotcl.app.platform.Log
+import com.pelotcl.app.platform.PlatformContext
+import com.pelotcl.app.platform.FileSystem
 import com.pelotcl.app.generic.data.cache.journey.JourneyCache
 import com.pelotcl.app.generic.data.repository.itinerary.holiday.HolidayPeriod
 import com.pelotcl.app.generic.data.repository.itinerary.holiday.HolidaysData
@@ -17,16 +17,16 @@ import io.raptor.data.NetworkLoader
 import io.raptor.model.Route
 import io.raptor.model.Stop
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
-import java.io.BufferedInputStream
 import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
-import java.util.concurrent.ConcurrentHashMap
+import kotlin.concurrent.Volatile
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -51,35 +51,14 @@ import kotlin.math.sqrt
  * - Reusable StringBuilder for cache key building (reduces GC pressure)
  * - Pre-allocated ArrayLists for result mapping (avoids resizing)
  */
-class RaptorRepository private constructor(private val context: Context) {
+class RaptorRepository private constructor(private val context: PlatformContext) {
+
+    // Cross-platform asset access (reads `.bin`/JSON from composeResources via okio/AssetManager).
+    private val fileSystem = FileSystem(context)
 
     private var raptorLibrary: RaptorLibrary? = null
     private var stopsCache: List<Stop> = emptyList()
     private val mutex = Mutex()
-
-    /**
-     * Bundled `.bin`/JSON assets now live under `commonMain/composeResources/files/`, which
-     * Compose Resources packs into the APK at `assets/composeResources/<resourcePackage>/files/`,
-     * not the assets root. Resolve there (discovering the package directory at runtime) with a
-     * fallback to the raw root. Mirrors `FileSystem.android`.
-     */
-    private val composeResourcesAssetPrefix: String? by lazy {
-        runCatching {
-            context.assets.list("composeResources")?.firstOrNull { it.isNotBlank() }
-        }.getOrNull()?.let { "composeResources/$it/files/" }
-    }
-
-    private fun openAsset(name: String): java.io.InputStream {
-        val prefix = composeResourcesAssetPrefix
-        if (prefix != null) {
-            try {
-                return context.assets.open("$prefix$name")
-            } catch (_: Exception) {
-                // fall through to the raw assets root
-            }
-        }
-        return context.assets.open(name)
-    }
 
     // Generic holiday detector
     private var holidayDetector: HolidayDetector? = null
@@ -93,12 +72,13 @@ class RaptorRepository private constructor(private val context: Context) {
     // Performance: Cache of normalized stop names to avoid repeated normalization during search
     private var normalizedStopNames: Map<Stop, String> = emptyMap()
     private var stopIdsByNormalizedName: Map<String, List<Int>> = emptyMap()
-    // Lazy-loaded per period to avoid reading all 8 binary files at startup
-    private val routesByPeriod = ConcurrentHashMap<String, List<Route>>()
-    private val stopsByPeriod = ConcurrentHashMap<String, List<Stop>>()
-
-    // Performance: Reusable StringBuilder for cache key building (ThreadLocal for thread safety)
-    private val cacheKeyBuilder = ThreadLocal.withInitial { StringBuilder(64) }
+    // Lazy-loaded per period to avoid reading all 8 binary files at startup.
+    // Copy-on-write @Volatile maps (no ConcurrentHashMap in commonMain): reads are lock-free;
+    // a write replaces the whole immutable map. A benign race just re-loads a period (idempotent).
+    @Volatile
+    private var routesByPeriod: Map<String, List<Route>> = emptyMap()
+    @Volatile
+    private var stopsByPeriod: Map<String, List<Stop>> = emptyMap()
 
     // Performance: Cached result of checkAssetsAvailable() to avoid repeated file I/O
     @Volatile
@@ -120,32 +100,21 @@ class RaptorRepository private constructor(private val context: Context) {
         private const val PERIOD_SCHOOL_ON_WEEKDAYS = "school_on_weekdays"
         private const val PERIOD_SCHOOL_OFF_WEEKDAYS = "school_off_weekdays"
 
-        // LRU Cache for journey results: key = "origin|dest|time"
-        // Level 1 cache: 50 entries in memory with 30-minute validity
-        private val journeyCache = LruCache<String, List<JourneyResult>>(50)
+        // In-memory journey caching is handled by [journeyDiskCache] (JourneyCache), which has
+        // its own 30-min memory LRU on top of the daily disk cache — so no separate L1 here.
 
-        // Cache validity: 30 minutes (increased from 5min for better hit rate)
-        private const val JOURNEY_CACHE_VALIDITY_MS = 30 * 60 * 1000L
-        private val journeyCacheTimestamps = mutableMapOf<String, Long>()
-
-        // Singleton instance - uses applicationContext so no memory leak
-        // StaticFieldLeak is safe here because we only store applicationContext (not Activity context)
-        // The instance lifecycle matches the application lifecycle, and applicationContext doesn't
-        // hold references to any Activity, preventing memory leaks
         @Suppress("StaticFieldLeak")
         @Volatile
         private var INSTANCE: RaptorRepository? = null
 
         /**
          * Get singleton instance of RaptorRepository.
-         * Creates instance on first call, returns existing instance on subsequent calls.
+         * No `synchronized` in commonMain — a @Volatile double-check suffices for a startup
+         * singleton (a rare race would only create a discarded extra instance). Callers pass an
+         * application-scoped context.
          */
-        fun getInstance(context: Context): RaptorRepository {
-            return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: RaptorRepository(context.applicationContext).also {
-                    INSTANCE = it
-                }
-            }
+        fun getInstance(context: PlatformContext): RaptorRepository {
+            return INSTANCE ?: RaptorRepository(context).also { INSTANCE = it }
         }
 
 
@@ -183,7 +152,7 @@ class RaptorRepository private constructor(private val context: Context) {
             isInitializing = true
 
             try {
-                val startTime = System.currentTimeMillis()
+                val startTime = Clock.System.now().toEpochMilliseconds()
 
                 // Verify all required assets exist before attempting to load them
                 val requiredAssets = listOf(
@@ -195,7 +164,7 @@ class RaptorRepository private constructor(private val context: Context) {
                 )
 
                 val missingAssets = requiredAssets.filter { assetName ->
-                    runCatching { openAsset(assetName).close() }.isFailure
+                    !fileSystem.assetExists(assetName)
                 }
 
                 if (missingAssets.isNotEmpty()) {
@@ -220,12 +189,8 @@ class RaptorRepository private constructor(private val context: Context) {
                 ).map { periodId ->
                     PeriodData(
                         periodId = periodId,
-                        stopsInputStream = BufferedInputStream(
-                            openAsset("raptor/stops_$periodId.bin"), 8192
-                        ),
-                        routesInputStream = BufferedInputStream(
-                            openAsset("raptor/routes_$periodId.bin"), 8192
-                        )
+                        stopsBytes = fileSystem.readAssetBytes("raptor/stops_$periodId.bin"),
+                        routesBytes = fileSystem.readAssetBytes("raptor/routes_$periodId.bin")
                     )
                 }
 
@@ -256,7 +221,7 @@ class RaptorRepository private constructor(private val context: Context) {
 
                 Log.i(
                     TAG,
-                    "Raptor initialized in ${System.currentTimeMillis() - startTime}ms with ${periods.size} periods, current: ${raptorLibrary?.getCurrentPeriod()}"
+                    "Raptor initialized in ${Clock.System.now().toEpochMilliseconds() - startTime}ms with ${periods.size} periods, current: ${raptorLibrary?.getCurrentPeriod()}"
                 )
 
                 Result.success(Unit)
@@ -350,19 +315,17 @@ class RaptorRepository private constructor(private val context: Context) {
     }
 
     private fun getRoutesForPeriod(periodId: String): List<Route> {
-        return routesByPeriod.getOrPut(periodId) {
-            openAsset("raptor/routes_$periodId.bin").use { input ->
-                NetworkLoader.loadRoutes(BufferedInputStream(input, 8192))
-            }
-        }
+        routesByPeriod[periodId]?.let { return it }
+        val loaded = NetworkLoader.loadRoutes(fileSystem.readAssetBytes("raptor/routes_$periodId.bin"))
+        routesByPeriod = routesByPeriod + (periodId to loaded)
+        return loaded
     }
 
     private fun getStopsForPeriod(periodId: String): List<Stop> {
-        return stopsByPeriod.getOrPut(periodId) {
-            openAsset("raptor/stops_$periodId.bin").use { input ->
-                NetworkLoader.loadStops(BufferedInputStream(input, 8192))
-            }
-        }
+        stopsByPeriod[periodId]?.let { return it }
+        val loaded = NetworkLoader.loadStops(fileSystem.readAssetBytes("raptor/stops_$periodId.bin"))
+        stopsByPeriod = stopsByPeriod + (periodId to loaded)
+        return loaded
     }
 
     private data class RouteVariant(
@@ -546,7 +509,7 @@ class RaptorRepository private constructor(private val context: Context) {
             )
 
             requiredAssets.all { assetName ->
-                runCatching { openAsset(assetName).close() }.isSuccess
+                fileSystem.assetExists(assetName)
             }
         }.getOrDefault(false)
         cachedAssetsAvailable = result
@@ -653,24 +616,10 @@ class RaptorRepository private constructor(private val context: Context) {
                 blockedRouteNames
             )
 
-            // Level 1: Check in-memory LRU cache
-            val memoryCached = journeyCache.get(cacheKey)
-            val cacheTimestamp = journeyCacheTimestamps[cacheKey]
-
-            if (memoryCached != null && cacheTimestamp != null) {
-                val cacheAge = System.currentTimeMillis() - cacheTimestamp
-                if (cacheAge < JOURNEY_CACHE_VALIDITY_MS) {
-                    return@withContext memoryCached
-                }
-            }
-
-            // Level 2: Check disk cache (daily validity)
-            val diskCached = journeyDiskCache.get(cacheKey)
-            if (diskCached != null) {
-                // Promote to memory cache
-                journeyCache.put(cacheKey, diskCached)
-                journeyCacheTimestamps[cacheKey] = System.currentTimeMillis()
-                return@withContext diskCached
+            // Cached (memory + disk) via JourneyCache, which owns its own 30-min memory LRU.
+            val cached = journeyDiskCache.get(cacheKey)
+            if (cached != null) {
+                return@withContext cached
             }
 
             // Note: Empty checks already handled above, no need to check again
@@ -768,13 +717,8 @@ class RaptorRepository private constructor(private val context: Context) {
                 )
             }
 
-            // Store results in both memory and disk cache
+            // Cache (memory + disk) via JourneyCache.
             if (results.isNotEmpty()) {
-                // Level 1: Memory cache
-                journeyCache.put(cacheKey, results)
-                journeyCacheTimestamps[cacheKey] = System.currentTimeMillis()
-
-                // Level 2: Disk cache (async, fire and forget)
                 journeyDiskCache.put(cacheKey, results)
             }
 
@@ -939,8 +883,7 @@ class RaptorRepository private constructor(private val context: Context) {
         date: LocalDate,
         blockedRouteNames: Set<String>
     ): String {
-        val sb = cacheKeyBuilder.get()!!
-        sb.setLength(0) // Clear without allocation
+        val sb = StringBuilder(64)
 
         // Sort and append origin IDs
         val sortedOrigin = originIds.sorted()
