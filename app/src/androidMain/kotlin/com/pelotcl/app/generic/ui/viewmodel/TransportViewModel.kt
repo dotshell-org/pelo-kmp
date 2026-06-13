@@ -188,16 +188,18 @@ class TransportViewModel(private val context: Context) : ViewModel(), TransportV
                 try {
                     val result = transportRepository.getAllLines()
                     result.onSuccess { lines ->
+                        val strongFeatures = lines.features.orEmpty()
                         _linesState.value = TransportLinesState.Success(lines)
-                        _uiState.value = TransportLinesUiState.Success(lines.features.orEmpty())
+                        // Show the strong lines (metro/tram/RX) immediately.
+                        _uiState.value = TransportLinesUiState.Success(strongFeatures)
 
                         // Save lines to cache for future use
                         val cache = transportCache
-                        val metroLines = lines.features.filter {
+                        val metroLines = strongFeatures.filter {
                             it.properties.transportType == "METRO" ||
                                 it.properties.transportType == "FUNICULAR"
                         }
-                        val tramLines = lines.features.filter {
+                        val tramLines = strongFeatures.filter {
                             it.properties.transportType == "TRAM"
                         }
 
@@ -206,6 +208,22 @@ class TransportViewModel(private val context: Context) : ViewModel(), TransportV
                         }
                         if (tramLines.isNotEmpty()) {
                             cache.saveTramLines(tramLines)
+                        }
+
+                        // Then load bus (incl. trambus, which lives in the bus typename) and
+                        // navigone, and merge them in so every line trace shows on the map.
+                        // Best-effort: a failure here keeps the strong lines displayed.
+                        val lineService = TransportServiceProvider.getTransportLineService()
+                        val busFeatures = runCatching {
+                            lineService.getBusLines().features.orEmpty()
+                        }.getOrElse { emptyList() }
+                        val navigoneFeatures = runCatching {
+                            lineService.getNavigoneLines().features.orEmpty()
+                        }.getOrElse { emptyList() }
+                        if (busFeatures.isNotEmpty() || navigoneFeatures.isNotEmpty()) {
+                            val allFeatures = strongFeatures + busFeatures + navigoneFeatures
+                            _linesState.value = TransportLinesState.Success(lines.copy(features = allFeatures))
+                            _uiState.value = TransportLinesUiState.Success(allFeatures)
                         }
                         return@launch // Success — stop retrying
                     }.onFailure { error ->

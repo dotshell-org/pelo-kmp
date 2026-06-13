@@ -98,6 +98,16 @@ object TransportServiceProvider {
     }
 
     /**
+     * Gets the transport line service (per-type line geometry loading: bus, navigone, …).
+     */
+    fun getTransportLineService(): TransportLineService {
+        if (!::transportLineService.isInitialized) {
+            error("TransportServiceProvider not initialized. Call initialize() first.")
+        }
+        return transportLineService
+    }
+
+    /**
      * Gets the map style configuration
      */
     fun getMapStyleConfig(): MapStyleConfig {
