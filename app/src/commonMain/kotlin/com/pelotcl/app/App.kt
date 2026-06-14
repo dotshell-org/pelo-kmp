@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -125,11 +126,14 @@ fun App() {
 @Composable
 private fun RootScaffold(viewModel: TransportViewModel) {
     var selectedTab by remember { mutableStateOf(Destination.PLAN) }
+    var showLinesSheet by remember { mutableStateOf(false) }
     var selectedLine by remember { mutableStateOf<LineInfo?>(null) }
     var lineDirection by remember { mutableIntStateOf(0) }
     var allSchedules by remember { mutableStateOf<AllSchedulesInfo?>(null) }
     val availableDirections by viewModel.availableDirections.collectAsState(initial = emptyList())
     val headsigns by viewModel.headsigns.collectAsState(initial = emptyMap())
+    val linesUiState by viewModel.uiState.collectAsState()
+    val stopsUiState by viewModel.stopsUiState.collectAsState()
     // Shared across tabs: tapping a line (map, search, or Lignes list) opens its details sheet.
     val onShowLineDetails: (String) -> Unit = { lineName ->
         viewModel.selectLine(lineName)
@@ -142,8 +146,18 @@ private fun RootScaffold(viewModel: TransportViewModel) {
             NavigationBar(containerColor = PrimaryColor) {
                 Destination.entries.forEach { destination ->
                     NavigationBarItem(
-                        selected = selectedTab == destination,
-                        onClick = { selectedTab = destination },
+                        selected = when (destination) {
+                            Destination.LINES -> showLinesSheet
+                            Destination.PLAN -> selectedTab == Destination.PLAN && !showLinesSheet
+                            Destination.SETTINGS -> selectedTab == Destination.SETTINGS
+                        },
+                        onClick = {
+                            when (destination) {
+                                Destination.LINES -> { selectedTab = Destination.PLAN; showLinesSheet = true }
+                                Destination.PLAN -> { selectedTab = Destination.PLAN; showLinesSheet = false }
+                                Destination.SETTINGS -> { selectedTab = Destination.SETTINGS; showLinesSheet = false }
+                            }
+                        },
                         icon = { Icon(destination.icon, contentDescription = destination.contentDescription) },
                         label = { Text(destination.label) },
                         colors = NavigationBarItemDefaults.colors(
@@ -162,9 +176,24 @@ private fun RootScaffold(viewModel: TransportViewModel) {
             .fillMaxSize()
             .padding(bottom = innerPadding.calculateBottomPadding())
         when (selectedTab) {
-            Destination.PLAN -> PlanContent(viewModel, contentModifier, onShowLineDetails)
-            Destination.LINES -> LinesTab(viewModel, contentModifier, onShowLineDetails)
-            Destination.SETTINGS -> SettingsTab(viewModel, contentModifier) { selectedTab = Destination.PLAN }
+            Destination.SETTINGS -> SettingsTab(viewModel, Modifier.fillMaxSize()) { selectedTab = Destination.PLAN }
+            else -> PlanContent(viewModel, contentModifier, onShowLineDetails)
+        }
+    }
+
+    // Lignes: a blocking modal sheet over the map (the one sheet meant to be blocking).
+    if (showLinesSheet) {
+        val linesSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        val allLines = remember(linesUiState, stopsUiState) { viewModel.getAllAvailableLines() }
+        ModalBottomSheet(onDismissRequest = { showLinesSheet = false }, sheetState = linesSheetState) {
+            LinesBottomSheet(
+                allLines = allLines,
+                onLineClick = { lineName ->
+                    showLinesSheet = false
+                    onShowLineDetails(lineName)
+                },
+                viewModel = viewModel,
+            )
         }
     }
 
@@ -308,16 +337,21 @@ private fun PlanContent(
                         onFavoriteClick = { fav -> tappedStopName = fav.stopName },
                         onRemoveFavoriteClick = { fav -> viewModel.removeUserFavorite(fav.id) },
                     )
+                    // Map-style button, below the favorites row (right-aligned).
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, end = 8.dp),
+                        contentAlignment = Alignment.CenterEnd,
+                    ) {
+                        FloatingActionButton(
+                            onClick = { showStyleSheet = true },
+                            modifier = Modifier.size(48.dp),
+                            containerColor = PrimaryColor,
+                        ) {
+                            Icon(Icons.Filled.Layers, contentDescription = "Style de carte", tint = SecondaryColor)
+                        }
+                    }
                 }
             }
-        }
-
-        FloatingActionButton(
-            onClick = { showStyleSheet = true },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-            containerColor = PrimaryColor,
-        ) {
-            Icon(Icons.Filled.Layers, contentDescription = "Style de carte", tint = SecondaryColor)
         }
     }
 
@@ -436,29 +470,12 @@ private fun PlanContent(
 }
 
 @Composable
-private fun LinesTab(
-    viewModel: TransportViewModel,
-    modifier: Modifier = Modifier,
-    onShowLineDetails: (String) -> Unit = {},
-) {
-    val linesState by viewModel.uiState.collectAsState()
-    val stopsState by viewModel.stopsUiState.collectAsState()
-    val allLines = remember(linesState, stopsState) { viewModel.getAllAvailableLines() }
-    Box(modifier.windowInsetsPadding(WindowInsets.statusBars)) {
-        LinesBottomSheet(
-            allLines = allLines,
-            onLineClick = { lineName -> onShowLineDetails(lineName) },
-            viewModel = viewModel,
-        )
-    }
-}
-
-@Composable
 private fun SettingsTab(viewModel: TransportViewModel, modifier: Modifier = Modifier, onBack: () -> Unit) {
     val context = LocalPlatformContext.current
     var route by remember { mutableStateOf("root") }
     val backToRoot = { route = "root" }
-    Box(modifier.windowInsetsPadding(WindowInsets.systemBars)) {
+    // Full-screen (no inset padding) so settings covers the whole screen, behind the notch too.
+    Box(modifier) {
         when (route) {
             "legal" -> LegalScreen(
                 legalSections = remember { AppConfigLoader.getConfig().about.legalSections },
