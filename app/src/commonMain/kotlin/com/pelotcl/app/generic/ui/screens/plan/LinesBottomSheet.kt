@@ -170,7 +170,7 @@ fun LinesBottomSheet(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .fillMaxHeight()
+            .fillMaxHeight(0.9f)
             .background(SecondaryColor, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
             .padding(16.dp)
     ) {

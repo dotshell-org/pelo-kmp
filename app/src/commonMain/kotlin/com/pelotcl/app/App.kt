@@ -408,7 +408,11 @@ private fun RootScaffold(viewModel: TransportViewModel) {
         if (showLinesSheet) {
             val linesSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
             val allLines = remember(linesUiState, stopsUiState) { viewModel.getAllAvailableLines() }
-            ModalBottomSheet(onDismissRequest = { showLinesSheet = false }, sheetState = linesSheetState) {
+            ModalBottomSheet(
+                onDismissRequest = { showLinesSheet = false },
+                containerColor = SecondaryColor,
+                sheetState = linesSheetState,
+            ) {
                 LinesBottomSheet(
                     allLines = allLines,
                     onLineClick = { lineName -> showLinesSheet = false; showLine(lineName) },
