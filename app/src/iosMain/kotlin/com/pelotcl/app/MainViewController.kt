@@ -3,9 +3,13 @@
 package com.pelotcl.app
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -32,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.ComposeUIViewController
 import com.pelotcl.app.generic.data.models.geojson.FeatureCollection
@@ -47,6 +52,7 @@ import com.pelotcl.app.generic.ui.theme.AccentColor
 import com.pelotcl.app.generic.ui.theme.PeloTheme
 import com.pelotcl.app.generic.ui.theme.PrimaryColor
 import com.pelotcl.app.generic.ui.theme.SecondaryColor
+import com.pelotcl.app.generic.ui.viewmodel.StopDeparturePreview
 import com.pelotcl.app.generic.ui.viewmodel.TransportLinesUiState
 import com.pelotcl.app.generic.ui.viewmodel.TransportStopsUiState
 import com.pelotcl.app.generic.ui.viewmodel.TransportViewModel
@@ -157,6 +163,7 @@ private fun PlanContent(viewModel: TransportViewModel, modifier: Modifier = Modi
     }
 
     var tappedStopName by remember { mutableStateOf<String?>(null) }
+    var searchExpanded by remember { mutableStateOf(false) }
 
     Box(modifier) {
         MapCanvas(
@@ -172,17 +179,20 @@ private fun PlanContent(viewModel: TransportViewModel, modifier: Modifier = Modi
             onLineClick = { lineName -> viewModel.selectLine(lineName) },
         )
 
-        // Black search zone bleeds behind the status bar / Dynamic Island; the field sits below it.
+        // Only when the search is open does the black zone bleed behind the status bar /
+        // Dynamic Island (so the expanded results panel reaches the top edge). Collapsed, the
+        // map shows through up to the notch.
         Box(
             Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .background(Color.Black)
+                .then(if (searchExpanded) Modifier.background(Color.Black) else Modifier)
                 .windowInsetsPadding(WindowInsets.statusBars)
         ) {
             TransportSearchBar(
                 onSearchStops = { q -> viewModel.searchStops(q) },
                 onSearchLines = { q -> viewModel.searchLines(q) },
+                onExpandedChange = { searchExpanded = it },
                 onStopPrimary = { result -> tappedStopName = result.stopName },
                 onLineSelected = { line -> viewModel.selectLine(line.lineName) },
             )
@@ -196,15 +206,46 @@ private fun PlanContent(viewModel: TransportViewModel, modifier: Modifier = Modi
             .map { it.trim().substringBefore(':').trim() }
             .filter { it.isNotEmpty() }
             .distinct()
+        var departures by remember(nom) { mutableStateOf<List<StopDeparturePreview>?>(null) }
+        LaunchedEffect(nom) {
+            departures = runCatching { viewModel.getNextDeparturesForStop(nom, lignes) }.getOrDefault(emptyList())
+        }
         ModalBottomSheet(onDismissRequest = { tappedStopName = null }) {
             Column(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 40.dp)) {
                 Text(nom, style = MaterialTheme.typography.titleLarge, color = PrimaryColor)
                 if (lignes.isNotEmpty()) {
                     Text(
                         "Lignes : ${lignes.joinToString(", ")}",
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(top = 12.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
                     )
+                }
+                Spacer(Modifier.height(16.dp))
+                when (val deps = departures) {
+                    null -> Text("Chargement des prochains passages…", style = MaterialTheme.typography.bodyMedium)
+                    else -> if (deps.isEmpty()) {
+                        Text("Aucun passage à venir", style = MaterialTheme.typography.bodyMedium)
+                    } else {
+                        deps.forEach { dep ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(
+                                    "${dep.lineName}  →  ${dep.directionName}",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Text(
+                                    dep.nextDeparture,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PrimaryColor,
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
