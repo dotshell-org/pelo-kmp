@@ -9,9 +9,12 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -22,6 +25,8 @@ import com.pelotcl.app.generic.data.repository.offline.mapstyle.MapStyleCompat
 import com.pelotcl.app.generic.service.TransportServiceProvider
 import com.pelotcl.app.generic.ui.components.MapCanvas
 import com.pelotcl.app.generic.ui.components.search.TransportSearchBar
+import com.pelotcl.app.generic.utils.location.LocationProvider
+import org.maplibre.spatialk.geojson.Position
 import com.pelotcl.app.generic.ui.theme.PeloTheme
 import com.pelotcl.app.generic.ui.viewmodel.TransportLinesUiState
 import com.pelotcl.app.generic.ui.viewmodel.TransportStopsUiState
@@ -93,6 +98,15 @@ private fun PlanContent(viewModel: TransportViewModel) {
     }
     val stops = (stopsState as? TransportStopsUiState.Success)?.stops
 
+    var userLocation by remember { mutableStateOf<Position?>(null) }
+    val locationProvider = remember { LocationProvider(IosPlatformContext) }
+    DisposableEffect(Unit) {
+        locationProvider.startUpdates { point ->
+            userLocation = Position(latitude = point.latitude, longitude = point.longitude)
+        }
+        onDispose { locationProvider.stopUpdates() }
+    }
+
     Box(Modifier.fillMaxSize()) {
         MapCanvas(
             modifier = Modifier.fillMaxSize(),
@@ -102,6 +116,7 @@ private fun PlanContent(viewModel: TransportViewModel) {
             initialZoom = 12.0,
             lines = lines?.let { FeatureCollection(features = it) },
             stops = stops?.let { StopCollection(features = it) },
+            userLocation = userLocation,
             onLineClick = { lineName -> viewModel.selectLine(lineName) },
         )
 
