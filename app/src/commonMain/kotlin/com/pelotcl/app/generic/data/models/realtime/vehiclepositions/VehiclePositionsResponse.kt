@@ -8,5 +8,4 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class VehiclePositionsResponse(
     val success: Boolean,
-    val data: SiriData?
-)
+    val data: SiriData? = null)

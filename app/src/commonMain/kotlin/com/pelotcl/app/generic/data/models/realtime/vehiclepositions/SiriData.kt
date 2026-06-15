@@ -6,5 +6,4 @@ import kotlinx.serialization.SerialName
 @Serializable
 data class SiriData(
     @SerialName("Siri")
-    val siri: Siri?
-)
+    val siri: Siri? = null)

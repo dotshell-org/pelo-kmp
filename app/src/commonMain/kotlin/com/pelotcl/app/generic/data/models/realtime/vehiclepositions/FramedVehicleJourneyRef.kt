@@ -7,7 +7,6 @@ import com.pelotcl.app.generic.data.models.realtime.vehiclepositions.RefValue
 @Serializable
 data class FramedVehicleJourneyRef(
     @SerialName("DataFrameRef")
-    val dataFrameRef: RefValue?,
+    val dataFrameRef: RefValue? = null,
     @SerialName("DatedVehicleJourneyRef")
-    val datedVehicleJourneyRef: String?
-)
+    val datedVehicleJourneyRef: String? = null)

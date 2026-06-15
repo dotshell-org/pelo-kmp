@@ -7,5 +7,4 @@ import com.pelotcl.app.generic.data.models.realtime.vehiclepositions.ServiceDeli
 @Serializable
 data class Siri(
     @SerialName("ServiceDelivery")
-    val serviceDelivery: ServiceDelivery?
-)
+    val serviceDelivery: ServiceDelivery? = null)

@@ -6,13 +6,12 @@ import kotlinx.serialization.SerialName
 @Serializable
 data class ServiceDelivery(
     @SerialName("ResponseTimestamp")
-    val responseTimestamp: String?,
+    val responseTimestamp: String? = null,
     @SerialName("ProducerRef")
-    val producerRef: RefValue?,
+    val producerRef: RefValue? = null,
     @SerialName("ResponseMessageIdentifier")
-    val responseMessageIdentifier: RefValue?,
+    val responseMessageIdentifier: RefValue? = null,
     @SerialName("MoreData")
-    val moreData: Boolean?,
+    val moreData: Boolean? = null,
     @SerialName("VehicleMonitoringDelivery")
-    val vehicleMonitoringDelivery: List<VehicleMonitoringDelivery>?
-)
+    val vehicleMonitoringDelivery: List<VehicleMonitoringDelivery>? = null)

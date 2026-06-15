@@ -154,12 +154,14 @@ class AppVehiclePositionsService(
 
     private fun extractLineNameFromRef(lineRef: String): String {
         lineRefPattern?.find(lineRef)?.value?.let { return it }
+        // The line is in the LAST "::" segment: e.g. "ActIV:Line::T7:SYTRAL" and the
+        // double-prefixed "Interpolated:Line::ActIV:Line::T7:SYTRAL" both yield "T7".
         val parts = lineRef.split("::")
         if (parts.size >= 2) {
-            val afterDoubleDots = parts[1]
-            val colonIndex = afterDoubleDots.indexOf(":")
-            if (colonIndex > 0) return afterDoubleDots.take(colonIndex)
-            return afterDoubleDots
+            val lastSegment = parts.last()
+            val colonIndex = lastSegment.indexOf(":")
+            if (colonIndex > 0) return lastSegment.take(colonIndex)
+            return lastSegment
         }
         return ""
     }

@@ -7,9 +7,8 @@ import com.pelotcl.app.generic.data.models.realtime.vehiclepositions.RefValue
 @Serializable
 data class VehicleActivity(
     @SerialName("ValidUntilTime")
-    val validUntilTime: String?,
+    val validUntilTime: String? = null,
     @SerialName("VehicleMonitoringRef")
-    val vehicleMonitoringRef: RefValue?,
+    val vehicleMonitoringRef: RefValue? = null,
     @SerialName("MonitoredVehicleJourney")
-    val monitoredVehicleJourney: MonitoredVehicleJourney?
-)
+    val monitoredVehicleJourney: MonitoredVehicleJourney? = null)

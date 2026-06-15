@@ -4,5 +4,4 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class RefValue(
-    val value: String?
-)
+    val value: String? = null)

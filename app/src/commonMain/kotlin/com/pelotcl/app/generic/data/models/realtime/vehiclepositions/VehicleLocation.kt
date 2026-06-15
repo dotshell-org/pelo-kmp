@@ -6,7 +6,6 @@ import kotlinx.serialization.SerialName
 @Serializable
 data class VehicleLocation(
     @SerialName("Longitude")
-    val longitude: Double?,
+    val longitude: Double? = null,
     @SerialName("Latitude")
-    val latitude: Double?
-)
+    val latitude: Double? = null)

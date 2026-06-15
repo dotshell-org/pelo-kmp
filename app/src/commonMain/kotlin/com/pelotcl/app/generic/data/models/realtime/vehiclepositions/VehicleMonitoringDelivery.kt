@@ -6,5 +6,4 @@ import kotlinx.serialization.SerialName
 @Serializable
 data class VehicleMonitoringDelivery(
     @SerialName("VehicleActivity")
-    val vehicleActivity: List<VehicleActivity>?
-)
+    val vehicleActivity: List<VehicleActivity>? = null)

@@ -8,19 +8,19 @@ import com.pelotcl.app.generic.data.models.TranslatedString
 @Serializable
 data class MonitoredVehicleJourney(
     @SerialName("LineRef")
-    val lineRef: RefValue?,
+    val lineRef: RefValue? = null,
     @SerialName("DirectionRef")
-    val directionRef: RefValue?,
+    val directionRef: RefValue? = null,
     @SerialName("FramedVehicleJourneyRef")
-    val framedVehicleJourneyRef: FramedVehicleJourneyRef?,
+    val framedVehicleJourneyRef: FramedVehicleJourneyRef? = null,
     @SerialName("DestinationRef")
-    val destinationRef: RefValue?,
+    val destinationRef: RefValue? = null,
     @SerialName("DestinationName")
-    val destinationName: List<TranslatedString>?,
+    val destinationName: List<TranslatedString>? = null,
     @SerialName("Bearing")
-    val bearing: Double?,
+    val bearing: Double? = null,
     @SerialName("VehicleLocation")
-    val vehicleLocation: VehicleLocation?,
+    val vehicleLocation: VehicleLocation? = null,
     @SerialName("VehicleStatus")
-    val vehicleStatus: String?
+    val vehicleStatus: String? = null
 )
