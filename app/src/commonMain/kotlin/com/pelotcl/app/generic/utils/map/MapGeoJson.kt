@@ -80,8 +80,12 @@ fun StopCollection.toStopsGeoJson(): String = buildJsonObject {
     }
 }.toString()
 
-/** Result of [toStopsGeoJsonByPriority]: the GeoJSON plus the distinct icon drawable names used. */
-class StopsRenderData(val geoJson: String, val iconNames: Set<String>)
+/**
+ * Result of [toStopsGeoJsonByPriority]: the GeoJSON, the distinct icon drawable names used (to build
+ * an `iconImage` expression), and the largest number of icons stacked on a single stop (so the
+ * caller can create one offset layer per `slot`).
+ */
+class StopsRenderData(val geoJson: String, val iconNames: Set<String>, val maxIcons: Int)
 
 /**
  * Like [toStopsGeoJson], but each feature also carries a `stop_priority` derived from the lines
@@ -99,51 +103,60 @@ fun StopCollection.toStopsGeoJsonByPriority(hasDrawable: (String) -> Boolean): S
     // Merge strong-line stops sharing a name into one point (like Android) so a multi-line station
     // is a single marker rather than a cluster of overlapping platform stops.
     val mergedStops = StopsGeoJsonManager.mergeStopsByName(features)
+    var maxIcons = 1
     val json = buildJsonObject {
         put("type", "FeatureCollection")
         putJsonArray("features") {
             for (stop in mergedStops) {
                 val lines = LineIconResolver.parseDesserte(stop.properties.desserte)
-                var priority = 0
-                var icon: String? = null
-                var iconPriority = -1
+                // One icon per strong line glyph (priority 2 metro/funicular/strong bus, 1 tram) plus
+                // one per unique bus mode (priority 0) — exactly what Android stacks on a stop.
+                val icons = ArrayList<Pair<String, Int>>()
                 for (line in lines) {
                     val upper = line.uppercase()
-                    val p = when {
-                        lineRules.isStrongLine(upper) && !upper.startsWith("T") -> 2
-                        upper.startsWith("T") -> 1
-                        else -> 0
-                    }
-                    if (p > priority) priority = p
-                    val candidate = if (p >= 1) {
-                        LineIconResolver.getDrawableNameForLineName(line)
-                    } else {
-                        lineRules.getModeIcon(line)
-                    }
-                    if (candidate != null && p > iconPriority && hasDrawable(candidate)) {
-                        icon = candidate
-                        iconPriority = p
+                    if (lineRules.isStrongLine(upper)) {
+                        val priority = if (upper.startsWith("T")) 1 else 2
+                        val name = LineIconResolver.getDrawableNameForLineName(line)
+                        if (hasDrawable(name)) icons.add(name to priority)
                     }
                 }
-                if (icon != null) iconNames.add(icon)
-                addJsonObject {
-                    put("type", "Feature")
-                    put("id", stop.id)
-                    putJsonObject("geometry") {
-                        put("type", "Point")
-                        putJsonArray("coordinates") {
-                            for (coordinate in stop.geometry.coordinates) add(coordinate)
+                val uniqueModes = lines
+                    .filterNot { lineRules.isStrongLine(it.uppercase()) }
+                    .mapNotNull { lineRules.getModeIcon(it) }
+                    .distinct()
+                for (mode in uniqueModes) {
+                    if (hasDrawable(mode)) icons.add(mode to 0)
+                }
+                if (icons.isEmpty()) continue
+                val coordinates = stop.geometry.coordinates
+                if (coordinates.size < 2) continue
+                if (icons.size > maxIcons) maxIcons = icons.size
+
+                // Slots spread the icons symmetrically (…, -2, 0, 2, … or …, -1, 1, …).
+                var slot = -(icons.size - 1)
+                for ((iconName, priority) in icons) {
+                    iconNames.add(iconName)
+                    addJsonObject {
+                        put("type", "Feature")
+                        put("id", "${stop.id}_$slot")
+                        putJsonObject("geometry") {
+                            put("type", "Point")
+                            putJsonArray("coordinates") {
+                                for (coordinate in coordinates) add(coordinate)
+                            }
+                        }
+                        putJsonObject("properties") {
+                            put("nom", stop.properties.nom)
+                            put("desserte", stop.properties.desserte)
+                            put("stop_priority", priority)
+                            put("icon", iconName)
+                            put("slot", slot)
                         }
                     }
-                    putJsonObject("properties") {
-                        put("nom", stop.properties.nom)
-                        put("desserte", stop.properties.desserte)
-                        put("stop_priority", priority)
-                        if (icon != null) put("icon", icon)
-                    }
+                    slot += 2
                 }
             }
         }
     }.toString()
-    return StopsRenderData(json, iconNames)
+    return StopsRenderData(json, iconNames, maxIcons)
 }

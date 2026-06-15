@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.isSpecified
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.pelotcl.app.generic.data.models.geojson.FeatureCollection
@@ -20,6 +21,7 @@ import org.maplibre.compose.camera.CameraState
 import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.map.MapOptions
 import org.maplibre.compose.expressions.dsl.Case
+import org.maplibre.compose.expressions.dsl.and
 import org.maplibre.compose.expressions.dsl.case
 import org.maplibre.compose.expressions.dsl.const
 import org.maplibre.compose.expressions.dsl.convertToColor
@@ -137,7 +139,7 @@ fun MapCanvas(
                         } else {
                             1f
                         }
-                        val height = 16f
+                        val height = 19f
                         return DpSize((height * ratio).dp, height.dp)
                     }
                     val cases = ArrayList<Case<StringValue, ImageValue>>(iconNames.size)
@@ -155,38 +157,26 @@ fun MapCanvas(
             }
 
             if (iconImage != null) {
-                // Bus stops: only at street-level zoom.
-                SymbolLayer(
-                    id = "transport-stops-bus",
-                    source = stopsSource,
-                    minZoom = 16f,
-                    filter = feature["stop_priority"].convertToNumber() eq const(0),
-                    iconImage = iconImage,
-                    iconAllowOverlap = const(true),
-                    iconSize = const(0.85f),
-                    onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
-                )
-                // Tram stops: from mid zoom.
-                SymbolLayer(
-                    id = "transport-stops-tram",
-                    source = stopsSource,
-                    minZoom = 13f,
-                    filter = feature["stop_priority"].convertToNumber() eq const(1),
-                    iconImage = iconImage,
-                    iconAllowOverlap = const(true),
-                    iconSize = const(0.9f),
-                    onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
-                )
-                // Metro / funicular stops: always visible.
-                SymbolLayer(
-                    id = "transport-stops-priority",
-                    source = stopsSource,
-                    filter = feature["stop_priority"].convertToNumber() eq const(2),
-                    iconImage = iconImage,
-                    iconAllowOverlap = const(true),
-                    iconSize = const(1f),
-                    onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
-                )
+                // One layer per (priority, slot): priority gates the zoom (metro/funicular always,
+                // tram from z13, bus from z16) via minZoom; slot stacks the icons of a multi-line
+                // stop vertically by offset — reproducing Android's stacked line icons.
+                val slots = (-(render.maxIcons - 1)..(render.maxIcons - 1)).toList()
+                val tiers = listOf(2 to 0f, 1 to 13f, 0 to 16f)
+                for ((priority, minZoom) in tiers) {
+                    for (slot in slots) {
+                        SymbolLayer(
+                            id = "transport-stops-$priority-$slot",
+                            source = stopsSource,
+                            minZoom = minZoom,
+                            filter = (feature["stop_priority"].convertToNumber() eq const(priority)) and
+                                (feature["slot"].convertToNumber() eq const(slot)),
+                            iconImage = iconImage,
+                            iconOffset = const(DpOffset(0.dp, (slot * 10).dp)),
+                            iconAllowOverlap = const(true),
+                            onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
+                        )
+                    }
+                }
             } else {
                 // Fallback: plain dots when no line glyphs are available.
                 CircleLayer(
