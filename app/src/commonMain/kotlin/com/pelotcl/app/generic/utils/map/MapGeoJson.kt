@@ -79,29 +79,49 @@ fun StopCollection.toStopsGeoJson(): String = buildJsonObject {
     }
 }.toString()
 
+/** Result of [toStopsGeoJsonByPriority]: the GeoJSON plus the distinct icon drawable names used. */
+class StopsRenderData(val geoJson: String, val iconNames: Set<String>)
+
 /**
  * Like [toStopsGeoJson], but each feature also carries a `stop_priority` derived from the lines
- * serving the stop (2 = metro/funicular or strong bus, 1 = tram, 0 = ordinary bus). A map can then
- * reveal stops progressively by zoom (metro always, tram from mid-zoom, bus only when zoomed in),
- * matching the Android map. Unlike `StopsGeoJsonManager`, this emits every stop once with no
- * icon-availability gating, so the dots always render even when named map images aren't registered.
+ * serving the stop (2 = metro/funicular or strong bus, 1 = tram, 0 = ordinary bus) and an `icon`
+ * (the drawable name of the highest-priority line that has an available drawable). A map can then
+ * reveal stops progressively by zoom (metro always, tram from mid-zoom, bus only when zoomed in)
+ * and draw the line glyph per stop, matching the Android map. Unlike `StopsGeoJsonManager`, this
+ * emits every stop once with no icon-availability gating on the feature itself, so stops always
+ * render; [hasDrawable] only decides which `icon` name to attach (and is collected for image
+ * registration). Returns the distinct icon names so the caller can build an `iconImage` expression.
  */
-fun StopCollection.toStopsGeoJsonByPriority(): String {
+fun StopCollection.toStopsGeoJsonByPriority(hasDrawable: (String) -> Boolean): StopsRenderData {
     val lineRules = TransportServiceProvider.getTransportLineRules()
-    fun priorityOf(line: String): Int {
-        val upper = line.uppercase()
-        return when {
-            lineRules.isStrongLine(upper) && !upper.startsWith("T") -> 2
-            upper.startsWith("T") -> 1
-            else -> 0
-        }
-    }
-    return buildJsonObject {
+    val iconNames = LinkedHashSet<String>()
+    val json = buildJsonObject {
         put("type", "FeatureCollection")
         putJsonArray("features") {
             for (stop in features) {
                 val lines = LineIconResolver.parseDesserte(stop.properties.desserte)
-                val priority = if (lines.isEmpty()) 0 else lines.maxOf { priorityOf(it) }
+                var priority = 0
+                var icon: String? = null
+                var iconPriority = -1
+                for (line in lines) {
+                    val upper = line.uppercase()
+                    val p = when {
+                        lineRules.isStrongLine(upper) && !upper.startsWith("T") -> 2
+                        upper.startsWith("T") -> 1
+                        else -> 0
+                    }
+                    if (p > priority) priority = p
+                    val candidate = if (p >= 1) {
+                        LineIconResolver.getDrawableNameForLineName(line)
+                    } else {
+                        lineRules.getModeIcon(line)
+                    }
+                    if (candidate != null && p > iconPriority && hasDrawable(candidate)) {
+                        icon = candidate
+                        iconPriority = p
+                    }
+                }
+                if (icon != null) iconNames.add(icon)
                 addJsonObject {
                     put("type", "Feature")
                     put("id", stop.id)
@@ -115,9 +135,11 @@ fun StopCollection.toStopsGeoJsonByPriority(): String {
                         put("nom", stop.properties.nom)
                         put("desserte", stop.properties.desserte)
                         put("stop_priority", priority)
+                        if (icon != null) put("icon", icon)
                     }
                 }
             }
         }
     }.toString()
+    return StopsRenderData(json, iconNames)
 }

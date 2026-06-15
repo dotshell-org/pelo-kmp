@@ -5,22 +5,33 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import com.pelotcl.app.generic.data.models.geojson.FeatureCollection
 import com.pelotcl.app.generic.data.models.geojson.StopCollection
 import com.pelotcl.app.generic.utils.map.toLinesGeoJson
 import com.pelotcl.app.generic.utils.map.toStopsGeoJsonByPriority
+import com.pelotcl.app.platform.DrawableProvider
+import com.pelotcl.app.platform.LocalPlatformContext
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.CameraState
 import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.map.MapOptions
+import org.maplibre.compose.expressions.dsl.Case
+import org.maplibre.compose.expressions.dsl.case
 import org.maplibre.compose.expressions.dsl.const
 import org.maplibre.compose.expressions.dsl.convertToColor
 import org.maplibre.compose.expressions.dsl.convertToNumber
+import org.maplibre.compose.expressions.dsl.convertToString
 import org.maplibre.compose.expressions.dsl.eq
 import org.maplibre.compose.expressions.dsl.feature
+import org.maplibre.compose.expressions.dsl.image
+import org.maplibre.compose.expressions.dsl.switch
+import org.maplibre.compose.expressions.value.ImageValue
+import org.maplibre.compose.expressions.value.StringValue
 import org.maplibre.compose.layers.CircleLayer
 import org.maplibre.compose.layers.LineLayer
+import org.maplibre.compose.layers.SymbolLayer
 import org.maplibre.compose.util.ClickResult
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.sources.GeoJsonData
@@ -99,49 +110,96 @@ fun MapCanvas(
         }
 
         if (stops != null) {
-            // Rich stop GeoJSON (same builder Android uses): each feature carries a `stop_priority`
-            // (2 = metro/funicular, 1 = tram, 0 = bus) so stops can be revealed progressively by zoom,
-            // matching Android (bus stops only when zoomed in, tram from mid-zoom, metro always).
-            val stopsGeoJson = remember(stops) { stops.toStopsGeoJsonByPriority() }
-            val stopsSource = rememberGeoJsonSource(data = GeoJsonData.JsonString(stopsGeoJson))
-            // Bus stops: only at street-level zoom.
-            CircleLayer(
-                id = "transport-stops-bus",
-                source = stopsSource,
-                minZoom = 16f,
-                filter = feature["stop_priority"].convertToNumber() eq const(0),
-                radius = const(3.dp),
-                color = const(Color(0xFF6B7280)),
-                onClick = { features ->
-                    val nom = features.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull
-                    if (nom != null) { onStopClick(nom); ClickResult.Consume } else ClickResult.Pass
-                },
-            )
-            // Tram stops: from mid zoom.
-            CircleLayer(
-                id = "transport-stops-tram",
-                source = stopsSource,
-                minZoom = 13f,
-                filter = feature["stop_priority"].convertToNumber() eq const(1),
-                radius = const(4.dp),
-                color = const(Color(0xFF1F2937)),
-                onClick = { features ->
-                    val nom = features.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull
-                    if (nom != null) { onStopClick(nom); ClickResult.Consume } else ClickResult.Pass
-                },
-            )
-            // Metro / funicular stops: always visible.
-            CircleLayer(
-                id = "transport-stops-priority",
-                source = stopsSource,
-                filter = feature["stop_priority"].convertToNumber() eq const(2),
-                radius = const(5.dp),
-                color = const(Color(0xFF1F2937)),
-                onClick = { features ->
-                    val nom = features.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull
-                    if (nom != null) { onStopClick(nom); ClickResult.Consume } else ClickResult.Pass
-                },
-            )
+            // Stop GeoJSON: each feature carries a `stop_priority` (2 = metro/funicular/strong bus,
+            // 1 = tram, 0 = bus) so stops reveal progressively by zoom, plus an `icon` (line glyph
+            // drawable name) so each stop draws its line icon — matching the Android map.
+            val context = LocalPlatformContext.current
+            val drawableProvider = remember(context) { DrawableProvider(context) }
+            val render = remember(stops) { stops.toStopsGeoJsonByPriority { drawableProvider.hasDrawable(it) } }
+            val stopsSource = rememberGeoJsonSource(data = GeoJsonData.JsonString(render.geoJson))
+
+            // Per-feature icon image: embed each line-glyph painter and select it by the feature's
+            // `icon` name. image(painter) embeds the bitmap directly, so it works without named-image
+            // registration (which maplibre-compose 0.13 can't do on iOS).
+            val iconNames = render.iconNames.toList()
+            val iconImage: org.maplibre.compose.expressions.ast.Expression<ImageValue>? =
+                if (iconNames.isEmpty()) {
+                    null
+                } else {
+                    val cases = ArrayList<Case<StringValue, ImageValue>>(iconNames.size)
+                    for (name in iconNames) {
+                        cases.add(case(name, image(drawableProvider.getPainter(name), DpSize(22.dp, 22.dp))))
+                    }
+                    val fallback = image(drawableProvider.getPainter(iconNames.first()), DpSize(22.dp, 22.dp))
+                    switch(feature["icon"].convertToString(), *cases.toTypedArray(), fallback = fallback)
+                }
+
+            val onStop: (String?) -> ClickResult = { nom ->
+                if (nom != null) { onStopClick(nom); ClickResult.Consume } else ClickResult.Pass
+            }
+
+            if (iconImage != null) {
+                // Bus stops: only at street-level zoom.
+                SymbolLayer(
+                    id = "transport-stops-bus",
+                    source = stopsSource,
+                    minZoom = 16f,
+                    filter = feature["stop_priority"].convertToNumber() eq const(0),
+                    iconImage = iconImage,
+                    iconAllowOverlap = const(true),
+                    iconSize = const(0.85f),
+                    onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
+                )
+                // Tram stops: from mid zoom.
+                SymbolLayer(
+                    id = "transport-stops-tram",
+                    source = stopsSource,
+                    minZoom = 13f,
+                    filter = feature["stop_priority"].convertToNumber() eq const(1),
+                    iconImage = iconImage,
+                    iconAllowOverlap = const(true),
+                    iconSize = const(0.9f),
+                    onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
+                )
+                // Metro / funicular stops: always visible.
+                SymbolLayer(
+                    id = "transport-stops-priority",
+                    source = stopsSource,
+                    filter = feature["stop_priority"].convertToNumber() eq const(2),
+                    iconImage = iconImage,
+                    iconAllowOverlap = const(true),
+                    iconSize = const(1f),
+                    onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
+                )
+            } else {
+                // Fallback: plain dots when no line glyphs are available.
+                CircleLayer(
+                    id = "transport-stops-bus",
+                    source = stopsSource,
+                    minZoom = 16f,
+                    filter = feature["stop_priority"].convertToNumber() eq const(0),
+                    radius = const(3.dp),
+                    color = const(Color(0xFF6B7280)),
+                    onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
+                )
+                CircleLayer(
+                    id = "transport-stops-tram",
+                    source = stopsSource,
+                    minZoom = 13f,
+                    filter = feature["stop_priority"].convertToNumber() eq const(1),
+                    radius = const(4.dp),
+                    color = const(Color(0xFF1F2937)),
+                    onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
+                )
+                CircleLayer(
+                    id = "transport-stops-priority",
+                    source = stopsSource,
+                    filter = feature["stop_priority"].convertToNumber() eq const(2),
+                    radius = const(5.dp),
+                    color = const(Color(0xFF1F2937)),
+                    onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
+                )
+            }
         }
 
         if (itineraryGeoJson != null) {
