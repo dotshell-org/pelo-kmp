@@ -168,6 +168,7 @@ private fun RootScaffold(
 ) {
     val context = LocalPlatformContext.current
     val scope = rememberCoroutineScope()
+    val lineRules = remember { TransportServiceProvider.getTransportLineRules() }
     var selectedTab by remember { mutableStateOf(Destination.PLAN) }
     var showLinesSheet by remember { mutableStateOf(false) }
 
@@ -189,9 +190,10 @@ private fun RootScaffold(
         if (selectedLineName.isNullOrBlank()) {
             stops
         } else {
+            val normSelected = lineRules.normalizeForComparison(selectedLineName)
             stops?.filter { stop ->
                 viewModel.parseLineCodesFromDesserte(stop.properties.desserte)
-                    .any { it.equals(selectedLineName, ignoreCase = true) }
+                    .any { lineRules.normalizeForComparison(it) == normSelected }
             }
         }
     }
@@ -645,7 +647,8 @@ private fun PlanContent(
         if (allLines == null) return@remember null
         val strongs = strongLines ?: emptyList()
         val selected = if (!selectedLineName.isNullOrBlank()) {
-            allLines.firstOrNull { it.properties.lineName.equals(selectedLineName, ignoreCase = true) }
+            val normSelected = lineRules.normalizeForComparison(selectedLineName)
+            allLines.firstOrNull { lineRules.normalizeForComparison(it.properties.lineName) == normSelected }
         } else null
         if (selected != null) {
             listOf(selected)
