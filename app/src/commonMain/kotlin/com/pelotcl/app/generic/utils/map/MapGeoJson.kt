@@ -48,6 +48,9 @@ fun FeatureCollection.toLinesGeoJson(): String = buildJsonObject {
                 putJsonObject("properties") {
                     put("lineName", feature.properties.lineName)
                     put("color", LineColorHelper.getColorForLine(feature))
+                    val lineRules = TransportServiceProvider.getTransportLineRules()
+                    val type = lineRules.getTransportType(feature.properties.lineName)
+                    put("isMetroOrFunicular", if (type == "Métro" || type == "Funiculaire") "yes" else "no")
                 }
             }
         }

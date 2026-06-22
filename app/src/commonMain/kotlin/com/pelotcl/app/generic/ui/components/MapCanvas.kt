@@ -136,7 +136,11 @@ fun MapCanvas(
                 id = "transport-lines",
                 source = lineSource,
                 color = feature["color"].convertToColor(),
-                width = const(3.dp),
+                width = switch(
+                    feature["isMetroOrFunicular"].convertToString(),
+                    case("yes", const(3.dp)),
+                    fallback = const(1.5.dp)
+                ),
                 onClick = { features ->
                     val lineName = features.firstOrNull()?.properties?.get("lineName")?.jsonPrimitive?.contentOrNull
                     if (lineName != null) {
