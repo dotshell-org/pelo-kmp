@@ -1,5 +1,5 @@
-<p style="text-align: center;">
-<img src="pelo-icon.png" alt="Pelo Logo" width="1024" height="1024">
+<p align="center">
+  <img src="pelo-icon.png" alt="Pelo Logo" width="256" height="256" />
 </p>
 
 <h1 style="text-align: center;">Pelo</h1>
