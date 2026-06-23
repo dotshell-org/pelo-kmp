@@ -337,14 +337,16 @@ private fun RootScaffold(
         }
     }
 
-    // Cap the expanded sheet so its top stays just BELOW the top buttons (search/favorites),
-    // and let shorter content size itself naturally so its scroll fills to the bottom.
+    // Cap the expanded sheet so its top stays just BELOW the top buttons (search/favorites/LIVE/LAYERS).
+    // The top elements (search + favorites + LIVE buttons) take up ~180.dp of vertical space.
+    // Since the BottomSheetScaffold is nested inside a Column above the NavigationBar (~80-100.dp),
+    // we use a 320.dp margin to ensure the sheet stays below the LIVE button on iPad and other devices.
     val density = LocalDensity.current
     val windowInfo = LocalWindowInfo.current
     val screenHeightDp = with(density) { windowInfo.containerSize.height.toDp() }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val topMargin = if (itineraryActive) 80.dp else 200.dp
-    val maxSheetHeight = minOf(1600.dp, screenHeightDp - topInset - topMargin).coerceAtLeast(130.dp)
+    val topMargin = if (itineraryActive) 80.dp else 320.dp
+    val maxSheetHeight = minOf(700.dp, screenHeightDp - topInset - topMargin).coerceAtLeast(130.dp)
 
     Box(Modifier.fillMaxSize()) {
         // Column instead of Scaffold(bottomBar) so the content area (and the BottomSheetScaffold's
