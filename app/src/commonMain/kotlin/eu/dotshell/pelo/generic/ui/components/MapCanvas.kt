@@ -60,8 +60,8 @@ import org.maplibre.compose.style.BaseStyle
 import org.maplibre.spatialk.geojson.Position
 
 private const val EMPTY_FEATURE_COLLECTION = """{"type":"FeatureCollection","features":[]}"""
-private const val STOP_RENDER_MIN_ZOOM = 12.5
-private const val BUS_RENDER_MIN_ZOOM = 17.0
+private const val STOP_RENDER_MIN_ZOOM = 12.0
+private const val BUS_RENDER_MIN_ZOOM = 16.0
 
 /**
  * Cross-platform map canvas built on maplibre-compose (declarative).
