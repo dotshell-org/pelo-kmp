@@ -158,9 +158,7 @@ fun MapCanvas(
     // flips — keeping composition quiet while the camera moves freely.
     // ────────────────────────────────────────────────────────────────────────
     var shouldRenderStops by remember(selectedLineName) {
-        // Conservative initial value: show stops if a line is selected; defer zoom
-        // check to the coroutine below so we never block the first composition.
-        mutableStateOf(!selectedLineName.isNullOrBlank())
+        mutableStateOf(!selectedLineName.isNullOrBlank() || cameraState.position.zoom >= STOP_RENDER_MIN_ZOOM)
     }
     LaunchedEffect(cameraState, selectedLineName) {
         snapshotFlow { cameraState.position.zoom }
@@ -169,7 +167,9 @@ fun MapCanvas(
             .collect { shouldRenderStops = it }
     }
 
-    var shouldIncludeBus by remember { mutableStateOf(false) }
+    var shouldIncludeBus by remember {
+        mutableStateOf(cameraState.position.zoom >= BUS_RENDER_MIN_ZOOM)
+    }
     LaunchedEffect(cameraState) {
         snapshotFlow { cameraState.position.zoom }
             .map { zoom -> zoom >= BUS_RENDER_MIN_ZOOM }
@@ -223,6 +223,17 @@ fun MapCanvas(
         val max = currentRender?.maxIcons ?: 1
         (-(max - 1)..(max - 1)).toList()
     }
+    // Pre-load all key/strong-line icons to avoid asynchronous pop-in/loading delay when zooming in.
+    val preloadedIconNames = remember {
+        listOf(
+            "a", "b", "c", "d", "f1", "f2",
+            "t1", "t2", "t3", "t4", "t5", "t6", "t7",
+            "tb11", "tb12", "navi1", "rx", "brtrx", "mode_bus"
+        ).filter { drawableProvider.hasDrawable(it) }
+    }
+    val allIconNamesToLoad = remember(iconNames, preloadedIconNames) {
+        (preloadedIconNames + iconNames).distinct()
+    }
     // Resolve one Painter per icon. getPainter uses painterResource internally which
     // is async. On first composition the painters may be in a loading state — that
     // triggers one extra recomposition per painter per batch, after which they are
@@ -235,8 +246,8 @@ fun MapCanvas(
     // immediately (no state change → no cascade). The cast is safe: the mutable
     // map is only mutated here, in the composition body, never inside a lambda.
     @Suppress("UNCHECKED_CAST")
-    val iconPainters = remember(iconNames) { HashMap<String, Painter>(iconNames.size) }
-    for (name in iconNames) {
+    val iconPainters = remember(allIconNamesToLoad) { HashMap<String, Painter>(allIconNamesToLoad.size) }
+    for (name in allIconNamesToLoad) {
         iconPainters[name] = drawableProvider.getPainter(name)
     }
 
