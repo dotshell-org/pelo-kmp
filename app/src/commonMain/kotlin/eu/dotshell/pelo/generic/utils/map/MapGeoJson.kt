@@ -123,7 +123,7 @@ fun toVehiclesGeoJson(positions: List<SimpleVehiclePosition>): String = buildJso
  * an `iconImage` expression), and the largest number of icons stacked on a single stop (so the
  * caller can create one offset layer per `slot`).
  */
-class StopsRenderData(val geoJson: String, val iconNames: Set<String>, val maxIcons: Int)
+data class StopsRenderData(val geoJson: String, val iconNames: Set<String>, val maxIcons: Int)
 
 /**
  * Like [toStopsGeoJson], but each feature also carries a `stop_priority` derived from the lines
@@ -138,7 +138,8 @@ class StopsRenderData(val geoJson: String, val iconNames: Set<String>, val maxIc
 fun StopCollection.toStopsGeoJsonByPriority(
     selectedLineName: String? = null,
     hasDrawable: (String) -> Boolean,
-    currentZoom: Double = 20.0
+    currentZoom: Double = 20.0,
+    shouldIncludeBus: Boolean = true,
 ): StopsRenderData {
     val lineRules = TransportServiceProvider.getTransportLineRules()
     val iconNames = LinkedHashSet<String>()
@@ -189,7 +190,7 @@ fun StopCollection.toStopsGeoJsonByPriority(
 
                     // 2. Other weak lines/modes — skip bus icons below zoom 17
                     // (they're invisible anyway due to minZoom and just waste CPU/GPU)
-                    if (currentZoom >= 17.0) {
+                    if (shouldIncludeBus) {
                         val uniqueModes = lines
                             .filterNot { lineRules.isStrongLine(it.uppercase()) }
                             .mapNotNull { lineRules.getModeIcon(it) }
@@ -220,7 +221,7 @@ fun StopCollection.toStopsGeoJsonByPriority(
                         putJsonObject("properties") {
                             put("nom", stop.properties.nom)
                             put("desserte", stop.properties.desserte)
-                            put("stop_priority", priority)
+                            put("stop_priority", priority.toString()) // String to match convertToString() filter
                             put("icon", iconName)
                             put("slot", slot)
                         }

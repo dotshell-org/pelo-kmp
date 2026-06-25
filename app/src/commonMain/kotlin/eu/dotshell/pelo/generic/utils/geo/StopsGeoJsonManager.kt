@@ -71,7 +71,7 @@ object StopsGeoJsonManager {
             val lat = coordinates[1]
             val nom = escapeJsonString(stop.properties.nom)
             val desserte = escapeJsonString(stop.properties.desserte)
-            val normalizedNom = stop.properties.nom.filter { it.isLetter() }.lowercase()
+            val normalizedNom = stop.properties.nom.filter { c -> (c in 'a'..'z') || (c in 'A'..'Z') || (c in '0'..'9') || c.code > 127 }.lowercase()
 
             val lignesJsonSb = StringBuilder()
             lignesJsonSb.append("[")
@@ -120,7 +120,7 @@ object StopsGeoJsonManager {
 
     fun mergeStopsByName(stops: List<StopFeature>): List<StopFeature> {
         fun normalizeStopName(name: String): String {
-            return name.filter { it.isLetter() }.lowercase()
+            return name.filter { c -> (c in 'a'..'z') || (c in 'A'..'Z') || (c in '0'..'9') || c.code > 127 }.lowercase()
         }
 
         val strongLineStops = mutableListOf<StopFeature>()

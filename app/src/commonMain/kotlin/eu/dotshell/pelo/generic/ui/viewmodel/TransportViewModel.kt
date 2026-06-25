@@ -398,21 +398,52 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         val ratioNonBlank = nonBlankCount.toDouble() / sampleSize.toDouble()
         val strongStopCount = sampleStops.count { it.properties.desserte.isNotBlank() && hasStrongToken(it.properties.desserte) }
         val unknownCount = sampleStops.count { it.properties.desserte.equals("UNKNOWN", ignoreCase = true) }
+        val arretCount = sampleStops.count { it.properties.nom.startsWith("Arret ") || it.properties.nom.contains("Arrondissement") }
 
         val shouldEnrich = strongStopCount == 0 && ratioNonBlank < 0.1 ||
                          unknownCount > sampleSize * 0.3 ||
-                         (strongStopCount < sampleSize * 0.2 && unknownCount > sampleSize * 0.2)
+                         (strongStopCount < sampleSize * 0.2 && unknownCount > sampleSize * 0.2) ||
+                         arretCount > sampleSize * 0.05
 
         if (!shouldEnrich) return stops
 
+        // Ensure Raptor is initialized before enrichment — getAllStopsWithCoords()
+        // does NOT call ensureInitialized() internally, so without this guard the
+        // spatial name-lookup silently returns empty data during a race with
+        // raptorRepository.initialize() in App.kt.
+        raptorRepository.initialize()
+
+        // Build spatial grid once, reused by Phase 1 name matching and Phase 2 fallback
+        val (raptorGrid, _) = buildRaptorGrid()
+
+        // Phase 1: Fix placeholder names FIRST so desserte lookup can use real names
+        val stopsNeedingNameEnrichment = stops.filter {
+            it.properties.nom.startsWith("Arret ") ||
+            it.properties.nom.contains("Arrondissement")
+        }
+
+        val namedStops = if (stopsNeedingNameEnrichment.isNotEmpty()) {
+            enrichStopNamesByCoordinates(stops, raptorGrid)
+        } else {
+            stops
+        }
+
+        // Phase 2: Fix blank/UNKNOWN dessertes using (now corrected) names
+        // For stops that are still "Arret XXX" after Phase 1 (coordinate match failed),
+        // fall back to using the nearest Raptor stop's name as the lookup key.
         val desserteCache = HashMap<String, String>(1024)
-        val resultStops = stops.toMutableList()
+        val resultStops = namedStops.toMutableList()
 
         for (i in resultStops.indices) {
             val stop = resultStops[i]
-            if (stop.properties.desserte.isBlank()) {
-                val name = stop.properties.nom
-                if (name.isNotBlank()) {
+            val raw = stop.properties.desserte
+            if (raw.isBlank() || raw.equals("UNKNOWN", ignoreCase = true)) {
+                val name = if (stop.properties.nom.startsWith("Arret ")) {
+                    nearestRaptorStopName(stop, raptorGrid)
+                } else {
+                    stop.properties.nom
+                }
+                if (name.isNotBlank() && !name.startsWith("Arret ")) {
                     val cached = desserteCache[name]
                     val desserte = if (cached != null) cached else {
                         val d = schedulesRepository.getDesserteForStop(name).orEmpty()
@@ -420,41 +451,80 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
                         d
                     }
                     if (desserte.isNotBlank()) {
-                        resultStops[i] = stop.copy(properties = stop.properties.copy(desserte = desserte))
+                        resultStops[i] = stop.copy(
+                            properties = stop.properties.copy(
+                                nom = stop.properties.nom,
+                                desserte = desserte
+                            )
+                        )
                     }
                 }
             }
         }
 
-        val enriched = resultStops
+        return resultStops
+    }
 
-        // Phase 2: Enrich stop names by coordinates
-        val stopsNeedingNameEnrichment = enriched.filter {
+    private var cachedGrid: HashMap<Long, MutableList<RaptorStopWithCoords>>? = null
+    private var cachedGridStops: List<RaptorStopWithCoords>? = null
+
+    private suspend fun buildRaptorGrid(): Pair<HashMap<Long, MutableList<RaptorStopWithCoords>>, List<RaptorStopWithCoords>> {
+        cachedGrid?.let { return it to (cachedGridStops ?: emptyList()) }
+        val stops = raptorRepository.getAllStopsWithCoords()
+        val grid = HashMap<Long, MutableList<RaptorStopWithCoords>>()
+        for (rs in stops) {
+            if (rs.lat == 0.0 && rs.lon == 0.0) continue
+            val latBucket = (rs.lat / 0.001).toLong()
+            val lonBucket = (rs.lon / 0.001).toLong()
+            grid.getOrPut(latBucket * 1_000_000L + lonBucket) { mutableListOf() }.add(rs)
+        }
+        cachedGrid = grid
+        cachedGridStops = stops
+        return grid to stops
+    }
+
+    private suspend fun nearestRaptorStopName(stop: StopFeature, grid: HashMap<Long, MutableList<RaptorStopWithCoords>>): String {
+        val coords = stop.geometry.coordinates
+        if (coords.size < 2) return ""
+        val wfsLon = coords[0]; val wfsLat = coords[1]
+        val latBucket = (wfsLat / 0.001).toLong()
+        val lonBucket = (wfsLon / 0.001).toLong()
+
+        var bestStop: String? = null
+        var bestDistSq = Double.MAX_VALUE
+        for (dLat in -2L..2L) {
+            for (dLon in -2L..2L) {
+                val key = (latBucket + dLat) * 1_000_000L + (lonBucket + dLon)
+                val cell = grid[key] ?: continue
+                for (rs in cell) {
+                    val dLat2 = wfsLat - rs.lat
+                    val dLon2 = wfsLon - rs.lon
+                    val d = dLat2 * dLat2 + dLon2 * dLon2
+                    if (d < bestDistSq) { bestDistSq = d; bestStop = rs.name }
+                }
+            }
+        }
+        return if (bestStop != null && bestDistSq < 0.005 * 0.005) bestStop else ""
+    }
+
+    private suspend fun enrichStopNamesByCoordinates(
+        stops: List<StopFeature>,
+        spatialGrid: HashMap<Long, MutableList<RaptorStopWithCoords>>
+    ): List<StopFeature> {
+        val stopsNeedingNameEnrichment = stops.filter {
             it.properties.nom.startsWith("Arret ") ||
             it.properties.nom.contains("Arrondissement")
         }
+        if (stopsNeedingNameEnrichment.isEmpty()) return stops
 
-        if (stopsNeedingNameEnrichment.isEmpty()) return enriched
-
-        val raptorStopsWithCoords = raptorRepository.getAllStopsWithCoords()
-        val gridCellSize = 0.001
-        val spatialGrid = HashMap<Long, MutableList<RaptorStopWithCoords>>()
-        for (raptorStop in raptorStopsWithCoords) {
-            if (raptorStop.lat == 0.0 && raptorStop.lon == 0.0) continue
-            val latBucket = (raptorStop.lat / gridCellSize).toLong()
-            val lonBucket = (raptorStop.lon / gridCellSize).toLong()
-            val key = latBucket * 1_000_000L + lonBucket
-            spatialGrid.getOrPut(key) { mutableListOf() }.add(raptorStop)
-        }
-
-        return enriched.map { stop ->
+        return stops.map { stop ->
             if (stop.properties.nom.startsWith("Arret ") || stop.properties.nom.contains("Arrondissement")) {
                 val coords = stop.geometry.coordinates
                 if (coords.size >= 2) {
                     val wfsLon = coords[0]
                     val wfsLat = coords[1]
-                    val latBucket = (wfsLat / gridCellSize).toLong()
-                    val lonBucket = (wfsLon / gridCellSize).toLong()
+                    val latBucket = (wfsLat / 0.001).toLong()
+                    val lonBucket = (wfsLon / 0.001).toLong()
 
                     var bestStop: RaptorStopWithCoords? = null
                     var bestDistSq = Double.MAX_VALUE
@@ -474,7 +544,7 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
                         }
                     }
 
-                    if (bestStop != null && bestDistSq < 0.0005 * 0.0005) {
+                    if (bestStop != null && bestDistSq < 0.002 * 0.002) {
                         stop.copy(properties = stop.properties.copy(nom = bestStop.name))
                     } else {
                         stop

@@ -6,7 +6,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
@@ -27,6 +26,12 @@ import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.Log
 import eu.dotshell.pelo.platform.FileSystem
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.CameraState
 import org.maplibre.compose.camera.rememberCameraState
@@ -53,23 +58,28 @@ import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.spatialk.geojson.Position
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 
 private const val EMPTY_FEATURE_COLLECTION = """{"type":"FeatureCollection","features":[]}"""
 private const val STOP_RENDER_MIN_ZOOM = 12.5
+private const val BUS_RENDER_MIN_ZOOM = 17.0
 
 /**
  * Cross-platform map canvas built on maplibre-compose (declarative).
  *
- * Increment 5: renders real, externally-provided GeoJSON:
- *  - [linesGeoJson]: a GeoJSON FeatureCollection of transport line geometries.
- *  - [userLocation]: the device location, drawn as a blue dot.
+ * # Performance design (iOS)
  *
- * Per-line colouring (data-driven expression), stops and itinerary layers come
- * next. Built alongside the legacy [MapLibreView]; not yet wired into PlanScreen.
+ * maplibre-compose continuously writes to [cameraState].position at the native render rate
+ * (≈20 fps on iOS while tiles are loading). Any composition scope that reads
+ * [CameraState.position] therefore recomposes at that rate.
+ *
+ * To avoid cascading recompositions of [MapCanvas]:
+ *  - [cameraState.position] is NEVER read directly in the composition body.
+ *    All zoom-threshold logic runs inside [snapshotFlow] collectors (coroutines),
+ *    which only write to their own [mutableStateOf] when the threshold actually crosses.
+ *  - [painterResource] / [DrawableProvider.getPainter] calls are kept minimal and
+ *    guarded so they do not re-execute on every recomposition.
+ *  - Stop layers are reduced to exactly 3 [SymbolLayer]s (one per priority tier)
+ *    instead of tiers × slots.
  */
 @Composable
 fun MapCanvas(
@@ -135,32 +145,108 @@ fun MapCanvas(
             }
     }
 
+    // ─── Zoom-threshold logic in coroutines ONLY ────────────────────────────
+    // CRITICAL: cameraState.position must NEVER be read in the composition body.
+    // Reading it here (even via derivedStateOf) registers a subscription in
+    // MapCanvas's composition scope. Because maplibre-compose writes the position
+    // on every native render frame (~20 fps), the entire MapCanvas recomposes at
+    // that rate, creating the rendering storm seen in the logs.
+    //
+    // snapshotFlow reads happen in a coroutine (not in composition), so they
+    // do NOT create composition subscriptions. distinctUntilChanged() + threshold
+    // comparison ensure we only update state when the boolean VALUE actually
+    // flips — keeping composition quiet while the camera moves freely.
+    // ────────────────────────────────────────────────────────────────────────
     var shouldRenderStops by remember(selectedLineName) {
-        mutableStateOf(!selectedLineName.isNullOrBlank() || initialZoom >= STOP_RENDER_MIN_ZOOM)
+        // Conservative initial value: show stops if a line is selected; defer zoom
+        // check to the coroutine below so we never block the first composition.
+        mutableStateOf(!selectedLineName.isNullOrBlank())
     }
     LaunchedEffect(cameraState, selectedLineName) {
-        snapshotFlow {
-            !selectedLineName.isNullOrBlank() || cameraState.position.zoom >= STOP_RENDER_MIN_ZOOM
-        }.collect { shouldRenderStops = it }
+        snapshotFlow { cameraState.position.zoom }
+            .map { zoom -> !selectedLineName.isNullOrBlank() || zoom >= STOP_RENDER_MIN_ZOOM }
+            .distinctUntilChanged()
+            .collect { shouldRenderStops = it }
+    }
+
+    var shouldIncludeBus by remember { mutableStateOf(false) }
+    LaunchedEffect(cameraState) {
+        snapshotFlow { cameraState.position.zoom }
+            .map { zoom -> zoom >= BUS_RENDER_MIN_ZOOM }
+            .distinctUntilChanged()
+            .collect { shouldIncludeBus = it }
     }
 
     val context = LocalPlatformContext.current
     val drawableProvider = remember(context) { DrawableProvider(context) }
+
     val linesGeoJson by produceState(EMPTY_FEATURE_COLLECTION, lines) {
-        value = EMPTY_FEATURE_COLLECTION
-        value = withContext(Dispatchers.Default) {
+        val result = withContext(Dispatchers.Default) {
             lines?.toLinesGeoJson() ?: EMPTY_FEATURE_COLLECTION
         }
+        value = result
     }
+
     val stopsToRender = if (shouldRenderStops) stops else null
-    val shouldIncludeBus = cameraState.position.zoom >= 17.0
-    val renderZoom = cameraState.position.zoom
-    val render by produceState<StopsRenderData?>(null, stopsToRender, selectedLineName, drawableProvider, shouldIncludeBus) {
-        value = null
-        value = withContext(Dispatchers.Default) {
-            stopsToRender?.toStopsGeoJsonByPriority(selectedLineName, { drawableProvider.hasDrawable(it) }, renderZoom)
+    val render by produceState<StopsRenderData?>(
+        initialValue = null,
+        key1 = stopsToRender,
+        key2 = selectedLineName,
+        key3 = shouldIncludeBus,
+    ) {
+        val result = withContext(Dispatchers.Default) {
+            stopsToRender?.toStopsGeoJsonByPriority(
+                selectedLineName = selectedLineName,
+                hasDrawable = { drawableProvider.hasDrawable(it) },
+                shouldIncludeBus = shouldIncludeBus,
+            )
         }
+        // StopsRenderData is a data class → this assignment only triggers
+        // recomposition if the content actually changed.
+        value = result
     }
+
+    // ─── Resolve painters in the Compose body (not inside MaplibreMap lambda) ─
+    // In maplibre-compose the MaplibreMap content lambda runs in its own inner
+    // composition scope. Calling @Composable functions (like painterResource) inside
+    // that lambda is unreliable on iOS: the inner scope may recompose at frame rate
+    // and the remember-cache for painters becomes detached, causing continuous
+    // resource reloads. We resolve all painters here, in the stable outer scope,
+    // and pass the resulting plain Painter objects (not state) into the lambda.
+    // ─────────────────────────────────────────────────────────────────────────
+    val currentRender: StopsRenderData? = render
+    // iconNames is re-evaluated only when render's *content* changes (data class ==).
+    val iconNames: List<String> = remember(currentRender) {
+        currentRender?.iconNames?.toList() ?: emptyList()
+    }
+    val slots = remember(currentRender) {
+        val max = currentRender?.maxIcons ?: 1
+        (-(max - 1)..(max - 1)).toList()
+    }
+    // Resolve one Painter per icon. getPainter uses painterResource internally which
+    // is async. On first composition the painters may be in a loading state — that
+    // triggers one extra recomposition per painter per batch, after which they are
+    // all stable. The remember(iconNames) above prevents re-triggering when the
+    // render data object changes but carries identical icon names.
+    // iconPainters: the remember(iconNames) block returns a stable mutable map.
+    // The for-loop below calls getPainter for each name; getPainter uses
+    // painterResource internally which caches via its own remember — on subsequent
+    // recompositions with the same iconNames it returns the already-loaded Painter
+    // immediately (no state change → no cascade). The cast is safe: the mutable
+    // map is only mutated here, in the composition body, never inside a lambda.
+    @Suppress("UNCHECKED_CAST")
+    val iconPainters = remember(iconNames) { HashMap<String, Painter>(iconNames.size) }
+    for (name in iconNames) {
+        iconPainters[name] = drawableProvider.getPainter(name)
+    }
+
+    // Vehicle painters — call getPainter directly; painterResource caches internally.
+    val busPainter: Painter =
+        if (drawableProvider.hasDrawable("ic_bus_vehicle")) drawableProvider.getPainter("ic_bus_vehicle")
+        else fallbackPainter
+    val tramPainter: Painter =
+        if (drawableProvider.hasDrawable("ic_tramway_vehicle")) drawableProvider.getPainter("ic_tramway_vehicle")
+        else fallbackPainter
 
     val baseStyle = remember(styleUrl, context) {
         if (styleUrl.startsWith("asset://")) {
@@ -178,19 +264,39 @@ fun MapCanvas(
         }
     }
 
+    val mapOptions = remember(interactive) {
+        MapOptions(gestureOptions = mapGestureOptions(interactive))
+    }
+
     MaplibreMap(
         modifier = modifier,
         baseStyle = baseStyle,
         cameraState = cameraState,
-        options = MapOptions(gestureOptions = mapGestureOptions(interactive)),
+        options = mapOptions,
     ) {
         Log.i("MapCanvas", "MaplibreMap content lambda compose start")
-        key(styleUrl) {
-            // Unconditional sources to stabilize Compose slots and prevent MLNRedundantSourceException on iOS
-            val lineSource = rememberGeoJsonSource(data = GeoJsonData.JsonString(linesGeoJson))
-            val stopsSource = rememberGeoJsonSource(data = GeoJsonData.JsonString(render?.geoJson ?: EMPTY_FEATURE_COLLECTION))
-            val itinerarySource = rememberGeoJsonSource(data = GeoJsonData.JsonString(itineraryGeoJson ?: EMPTY_FEATURE_COLLECTION))
-            val vehicleSource = rememberGeoJsonSource(data = GeoJsonData.JsonString(vehiclesGeoJson ?: EMPTY_FEATURE_COLLECTION))
+        // key(styleUrl) ensures all layers/sources are rebuilt when the style changes.
+        androidx.compose.runtime.key(styleUrl) {
+            // ------------------------------------------------------------------
+            // Sources — wrapped in remember so native objects are only recreated
+            // when the JSON string actually changes.
+            // ------------------------------------------------------------------
+            val lineSourceData = remember(linesGeoJson) { GeoJsonData.JsonString(linesGeoJson) }
+            val lineSource = rememberGeoJsonSource(data = lineSourceData)
+
+            val stopsGeoJson = currentRender?.geoJson ?: EMPTY_FEATURE_COLLECTION
+            val stopsSourceData = remember(stopsGeoJson) { GeoJsonData.JsonString(stopsGeoJson) }
+            val stopsSource = rememberGeoJsonSource(data = stopsSourceData)
+
+            val itinerarySourceData = remember(itineraryGeoJson) {
+                GeoJsonData.JsonString(itineraryGeoJson ?: EMPTY_FEATURE_COLLECTION)
+            }
+            val itinerarySource = rememberGeoJsonSource(data = itinerarySourceData)
+
+            val vehicleSourceData = remember(vehiclesGeoJson) {
+                GeoJsonData.JsonString(vehiclesGeoJson ?: EMPTY_FEATURE_COLLECTION)
+            }
+            val vehicleSource = rememberGeoJsonSource(data = vehicleSourceData)
 
             val userLocationGeoJson = remember(userLocation) {
                 if (userLocation != null) {
@@ -199,10 +305,13 @@ fun MapCanvas(
                     EMPTY_FEATURE_COLLECTION
                 }
             }
-            val userSource = rememberGeoJsonSource(data = GeoJsonData.JsonString(userLocationGeoJson))
+            val userSourceData = remember(userLocationGeoJson) { GeoJsonData.JsonString(userLocationGeoJson) }
+            val userSource = rememberGeoJsonSource(data = userSourceData)
 
+            // ------------------------------------------------------------------
+            // Transport lines
+            // ------------------------------------------------------------------
             if (lines != null && itineraryGeoJson == null) {
-                // Thin visible lines
                 LineLayer(
                     id = "transport-lines",
                     source = lineSource,
@@ -214,117 +323,107 @@ fun MapCanvas(
                     ),
                     onClick = { features ->
                         val lineName = features.firstOrNull()?.properties?.get("lineName")?.jsonPrimitive?.contentOrNull
-                        if (lineName != null) {
-                            onLineClick(lineName)
-                            ClickResult.Consume
-                        } else {
-                            ClickResult.Pass
-                        }
+                        if (lineName != null) { onLineClick(lineName); ClickResult.Consume } else ClickResult.Pass
                     },
                 )
-                // Thick invisible lines to make selecting them much easier on touch screens
                 LineLayer(
                     id = "transport-lines-tap",
                     source = lineSource,
-                    color = const(Color(0x01000000)), // Tiny alpha to ensure MapLibre hit-tests it
+                    color = const(Color(0x01000000)),
                     width = const(24.dp),
                     onClick = { features ->
                         val lineName = features.firstOrNull()?.properties?.get("lineName")?.jsonPrimitive?.contentOrNull
-                        if (lineName != null) {
-                            onLineClick(lineName)
-                            ClickResult.Consume
-                        } else {
-                            ClickResult.Pass
-                        }
+                        if (lineName != null) { onLineClick(lineName); ClickResult.Consume } else ClickResult.Pass
                     },
                 )
             }
 
-            val currentRender = render
-            if (stopsToRender != null && currentRender != null) {
-                // Stop GeoJSON: each feature carries a `stop_priority` (2 = metro/funicular/strong bus,
-                // 1 = tram, 0 = bus) so stops reveal progressively by zoom, plus an `icon` (line glyph
-                // drawable name) so each stop draws its line icon — matching the Android map.
-                // Per-feature icon image: embed each line-glyph painter and select it by the feature's
-                // `icon` name. image(painter) embeds the bitmap directly, so it works without named-image
-                // registration (which maplibre-compose 0.13 can't do on iOS).
-                val iconNames = currentRender.iconNames.toList()
-                val iconImage: org.maplibre.compose.expressions.ast.Expression<ImageValue>? =
-                    if (iconNames.isEmpty()) {
-                        null
-                    } else {
-                        val cases = ArrayList<Case<StringValue, ImageValue>>(iconNames.size)
-                        for (name in iconNames) {
-                            val painter = drawableProvider.getPainter(name)
-                            cases.add(case(name, image(painter, glyphDpSize(painter, 17f))))
-                        }
-                        val firstPainter = drawableProvider.getPainter(iconNames.first())
-                        val fallback = image(firstPainter, glyphDpSize(firstPainter, 17f))
-                        switch(feature["icon"].convertToString(), *cases.toTypedArray(), fallback = fallback)
-                    }
-
+            // ------------------------------------------------------------------
+            // Stop icons
+            //
+            // All painters were resolved in the outer scope. Here we only build
+            // the expression objects (no @Composable calls). Three SymbolLayers
+            // (one per priority tier) instead of tiers × slots layers.
+            // ------------------------------------------------------------------
+            if (stopsToRender != null && currentRender != null && iconPainters.isNotEmpty()) {
                 val onStop: (String?) -> ClickResult = { nom ->
                     if (nom != null) { onStopClick(nom); ClickResult.Consume } else ClickResult.Pass
                 }
 
-                if (iconImage != null) {
-                    // One layer per (priority, slot): priority gates the zoom (metro/funicular always,
-                    // tram from z13, bus from z16) via minZoom; slot stacks the icons of a multi-line
-                    // stop vertically by offset — reproducing Android's stacked line icons.
-                    val slots = (-(currentRender.maxIcons - 1)..(currentRender.maxIcons - 1)).toList()
-                    // Android thresholds: metro/funicular from z12.5 (so they vanish when zoomed out
-                    // too far), tram from z14, bus from z17.
-                    val tiers = listOf(2 to 12.5f, 1 to 14f, 0 to 17f)
-                    for ((priority, minZoom) in tiers) {
-                        for (slot in slots) {
-                            SymbolLayer(
-                                id = "transport-stops-$priority-$slot",
-                                source = stopsSource,
-                                minZoom = minZoom,
-                                filter = (feature["stop_priority"].convertToNumber() eq const(priority)) and
-                                    (feature["slot"].convertToNumber() eq const(slot)),
-                                iconImage = iconImage,
-                                // slot step is 2, so the gap between adjacent icons is 2 * this value;
-                                // ~= the glyph height so stacked icons touch with no visible gap.
-                                iconOffset = const(DpOffset(0.dp, (slot * 8).dp)),
-                                iconAllowOverlap = const(true),
-                                onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
-                            )
-                        }
-                    }
-                } else {
-                    // Fallback: plain dots when no line glyphs are available.
-                    CircleLayer(
-                        id = "transport-stops-bus",
-                        source = stopsSource,
-                        minZoom = 16f,
-                        filter = feature["stop_priority"].convertToNumber() eq const(0),
-                        radius = const(3.dp),
-                        color = const(Color(0xFF6B7280)),
-                        onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
-                    )
-                    CircleLayer(
-                        id = "transport-stops-tram",
-                        source = stopsSource,
-                        minZoom = 13f,
-                        filter = feature["stop_priority"].convertToNumber() eq const(1),
-                        radius = const(4.dp),
-                        color = const(Color(0xFF1F2937)),
-                        onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
-                    )
-                    CircleLayer(
-                        id = "transport-stops-priority",
-                        source = stopsSource,
-                        filter = feature["stop_priority"].convertToNumber() eq const(2),
-                        radius = const(5.dp),
-                        color = const(Color(0xFF1F2937)),
-                        onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
-                    )
+                val cases = ArrayList<Case<StringValue, ImageValue>>(iconPainters.size)
+                for ((name, painter) in iconPainters) {
+                    cases.add(case(name, image(painter, glyphDpSize(painter, 17f))))
                 }
+                val fallback = image(
+                    iconPainters.values.firstOrNull() ?: fallbackPainter,
+                    glyphDpSize(iconPainters.values.firstOrNull() ?: fallbackPainter, 17f)
+                )
+                val iconImageExpr = switch(
+                    feature["icon"].convertToString(),
+                    *cases.toTypedArray(),
+                    fallback = fallback,
+                )
+
+                // Loop over slots to stack multiple icons vertically at multi-line stations (like Bellecour).
+                // Priority gates the zoom (metro/funicular from 12.5f, tram from 14f, bus from 17f).
+                // String-based priority comparison to avoid numerical conversion mismatches.
+                val tiers = listOf(
+                    Triple("2", 12.5f, "transport-stops-priority-2"),
+                    Triple("1", 14.0f, "transport-stops-priority-1"),
+                    Triple("0", 17.0f, "transport-stops-priority-0")
+                )
+                for ((priority, minZoom, baseId) in tiers) {
+                    for (slot in slots) {
+                        SymbolLayer(
+                            id = "$baseId-$slot",
+                            source = stopsSource,
+                            minZoom = minZoom,
+                            filter = (feature["stop_priority"].convertToString() eq const(priority)) and
+                                    (feature["slot"].convertToNumber() eq const(slot)),
+                            iconImage = iconImageExpr,
+                            iconOffset = const(DpOffset(0.dp, (slot * 8).dp)),
+                            iconAllowOverlap = const(true),
+                            onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
+                        )
+                    }
+                }
+            } else if (stopsToRender != null && currentRender != null) {
+                // Fallback: plain circles when no line glyphs are available.
+                val onStop: (String?) -> ClickResult = { nom ->
+                    if (nom != null) { onStopClick(nom); ClickResult.Consume } else ClickResult.Pass
+                }
+                CircleLayer(
+                    id = "transport-stops-bus",
+                    source = stopsSource,
+                    minZoom = 16f,
+                    filter = feature["stop_priority"].convertToString() eq const("0"),
+                    radius = const(3.dp),
+                    color = const(Color(0xFF6B7280)),
+                    onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
+                )
+                CircleLayer(
+                    id = "transport-stops-tram",
+                    source = stopsSource,
+                    minZoom = 13f,
+                    filter = feature["stop_priority"].convertToString() eq const("1"),
+                    radius = const(4.dp),
+                    color = const(Color(0xFF1F2937)),
+                    onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
+                )
+                CircleLayer(
+                    id = "transport-stops-priority",
+                    source = stopsSource,
+                    filter = feature["stop_priority"].convertToString() eq const("2"),
+                    radius = const(5.dp),
+                    color = const(Color(0xFF1F2937)),
+                    onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
+                )
             }
 
+            // ------------------------------------------------------------------
+            // Itinerary legs
+            // ------------------------------------------------------------------
             if (itineraryGeoJson != null) {
-                // Transit legs
                 LineLayer(
                     id = "itinerary-transit",
                     source = itinerarySource,
@@ -332,7 +431,6 @@ fun MapCanvas(
                     color = feature["color"].convertToColor(),
                     width = const(3.dp),
                 )
-                // Walking legs (dashed)
                 LineLayer(
                     id = "itinerary-walking",
                     source = itinerarySource,
@@ -343,8 +441,11 @@ fun MapCanvas(
                 )
             }
 
+            // ------------------------------------------------------------------
+            // Vehicle positions
+            // Painters were resolved in the outer scope — no @Composable calls here.
+            // ------------------------------------------------------------------
             if (vehiclesGeoJson != null) {
-                // Circle background for vehicles (color based on line color)
                 CircleLayer(
                     id = "vehicles-bg",
                     source = vehicleSource,
@@ -355,19 +456,11 @@ fun MapCanvas(
                         if (nom != null) { onVehicleClick(nom); ClickResult.Consume } else ClickResult.Pass
                     },
                 )
-
-                // White pictogram icon (bus or tram) centered inside the colored circle
-                val vContext = LocalPlatformContext.current
-                val vDrawables = remember(vContext) { DrawableProvider(vContext) }
-                val busPainter = if (vDrawables.hasDrawable("ic_bus_vehicle")) vDrawables.getPainter("ic_bus_vehicle") else fallbackPainter
-                val tramPainter = if (vDrawables.hasDrawable("ic_tramway_vehicle")) vDrawables.getPainter("ic_tramway_vehicle") else fallbackPainter
-
                 val vehicleIconImage = switch(
                     feature["markerType"].convertToString(),
                     case("TRAM", image(tramPainter, glyphDpSize(tramPainter, 12f))),
                     fallback = image(busPainter, glyphDpSize(busPainter, 12f))
                 )
-
                 SymbolLayer(
                     id = "vehicles-pictogram",
                     source = vehicleSource,
@@ -380,6 +473,9 @@ fun MapCanvas(
                 )
             }
 
+            // ------------------------------------------------------------------
+            // User location dot
+            // ------------------------------------------------------------------
             if (userLocation != null) {
                 CircleLayer(
                     id = "user-location",

@@ -2,6 +2,7 @@ package eu.dotshell.pelo
 
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.window.ComposeUIViewController
+import eu.dotshell.pelo.generic.service.TransportServiceProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.PlatformContext
 import platform.UIKit.UIViewController
@@ -19,8 +20,11 @@ object IosPlatformContext : PlatformContext()
  * [PlatformContext] and hosts the shared [App] (commonMain). The iosApp Xcode target wraps this
  * UIViewController in SwiftUI.
  */
-fun MainViewController(): UIViewController = ComposeUIViewController {
-    CompositionLocalProvider(LocalPlatformContext provides IosPlatformContext) {
-        App()
+fun MainViewController(): UIViewController {
+    TransportServiceProvider.initialize(IosPlatformContext)
+    return ComposeUIViewController {
+        CompositionLocalProvider(LocalPlatformContext provides IosPlatformContext) {
+            App()
+        }
     }
 }

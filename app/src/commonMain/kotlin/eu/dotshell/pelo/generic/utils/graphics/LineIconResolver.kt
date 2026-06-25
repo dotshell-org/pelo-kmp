@@ -54,46 +54,50 @@ object LineIconResolver {
      *  - "5:A,86:A,JD844:R" -> ["5", "86", "JD844"] (buses with directions)
      *  - "A:A,D:A" -> ["A", "D"] (metros A and D, :A = outbound direction)
      *  - "F1:A,F2:A" -> ["F1", "F2"] (funiculars)
-     *  - "M:A:B" -> ["M", "B"] (bus M with multiple destinations, ignore :A/:R)
-     *  - "C17:22:31" (old format) -> ["C17", "22", "31"]
+     *  - "M:A:B" -> ["A"] (mode prefix M is stripped, A is the actual line)
+     *  - "T:T1:A" -> ["T1"] (tram T1, mode T stripped)
+     *  - "C17:22:31" (old format) -> ["C17"]
      *
      * IMPORTANT: Don't confuse ":A" (outbound direction) with metro line A
      */
-    internal fun parseDesserte(desserte: String): List<String> {
-        if (desserte.isBlank()) return emptyList()
+    private fun parseSingleDesserteEntry(entry: String): List<String> {
+        val tokens = entry.split(":")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+        if (tokens.isEmpty()) return emptyList()
 
-        val entries = desserte.split(",")
-        val rawLines: List<String> = if (entries.size > 1) {
-            entries.mapNotNull { part ->
-                val trimmed = part.trim()
-                if (trimmed.isEmpty()) null else {
-                    trimmed.substringBefore(":").trim()
-                }
-            }.filter { it.isNotEmpty() }
-        } else {
-            val tokens = desserte.split(":")
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-            if (tokens.isEmpty()) return emptyList()
-
-            if (tokens.size == 2) {
-                val first = tokens[0]
-                val second = tokens[1]
-                if (second.uppercase() == "A" || second.uppercase() == "R") {
-                    listOf(first)
-                } else {
-                    tokens
-                }
-            } else if (tokens.size > 2) {
-                val first = tokens.first()
-                val rest = tokens.drop(1).filter { t ->
-                    val up = t.uppercase()
-                    up != "A" && up != "R"
-                }
-                listOf(first) + rest
+        return if (tokens.size == 2) {
+            val first = tokens[0]
+            val second = tokens[1]
+            if (second.uppercase() == "A" || second.uppercase() == "R") {
+                listOf(first)
             } else {
                 tokens
             }
+        } else if (tokens.size > 2) {
+            // WFS format can be "M:A:B" (mode:line:direction) where the
+            // first token is a mode prefix (M=Métro, T=Tram, F=Funiculaire)
+            // and the actual line name is the SECOND token.
+            // Older format "C17:22:31" also hits this branch (line:extra:extra)
+            // where extra tokens are direction/terminus, not lines.
+            val modePrefixes = setOf("M", "T", "F", "TB", "NAV")
+            val lineName = if (tokens.first().uppercase() in modePrefixes) {
+                tokens.getOrNull(1) ?: tokens.first()
+            } else {
+                tokens.first()
+            }
+            listOf(lineName)
+        } else {
+            tokens
+        }
+    }
+
+    fun parseDesserte(desserte: String): List<String> {
+        if (desserte.isBlank()) return emptyList()
+
+        val entries = desserte.split(",")
+        val rawLines = entries.flatMap { entry ->
+            parseSingleDesserteEntry(entry)
         }
 
         val seen = HashSet<String>()

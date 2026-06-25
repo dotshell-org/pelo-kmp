@@ -468,11 +468,17 @@ private fun RootScaffold(
                         }
                         null
                     }
-                    var lastFocusCenter by remember { mutableStateOf<Position?>(null) }
-                    val focusCenter: Position? = if (computedFocusCenter != lastFocusCenter) {
-                        lastFocusCenter = computedFocusCenter
-                        computedFocusCenter
-                    } else null
+                    val lastFocusCenter = remember { mutableStateOf<Position?>(null) }
+                    val focusCenter = remember(computedFocusCenter, lastFocusCenter.value) {
+                        if (computedFocusCenter != lastFocusCenter.value) {
+                            computedFocusCenter
+                        } else {
+                            null
+                        }
+                    }
+                    LaunchedEffect(computedFocusCenter) {
+                        lastFocusCenter.value = computedFocusCenter
+                    }
 
                     val focusZoom: Double? = remember(selectedLine?.lineName, selectedLine?.currentStationName, selectedStation?.nom, stops, linesUiState, itineraryActive, activeJourneys, selectedJourney, manualFocusCenter) {
                         if (manualFocusCenter != null) return@remember 18.0
@@ -539,11 +545,17 @@ private fun RootScaffold(
                         }
                         null
                     }
-                    var lastFocusZoom by remember { mutableStateOf<Double?>(null) }
-                    val actualFocusZoom: Double? = if (focusZoom != lastFocusZoom || focusCenter != null) {
-                        lastFocusZoom = focusZoom
-                        focusZoom
-                    } else null
+                    val lastFocusZoom = remember { mutableStateOf<Double?>(null) }
+                    val actualFocusZoom = remember(focusZoom, lastFocusZoom.value, focusCenter) {
+                        if (focusZoom != lastFocusZoom.value || focusCenter != null) {
+                            focusZoom
+                        } else {
+                            null
+                        }
+                    }
+                    LaunchedEffect(focusZoom) {
+                        lastFocusZoom.value = focusZoom
+                    }
 
                     PlanContent(
                         viewModel = viewModel,

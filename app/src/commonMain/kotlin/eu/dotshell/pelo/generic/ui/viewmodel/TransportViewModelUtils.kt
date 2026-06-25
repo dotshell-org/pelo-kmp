@@ -2,6 +2,7 @@ package eu.dotshell.pelo.generic.ui.viewmodel
 
 import eu.dotshell.pelo.generic.data.models.geojson.StopFeature
 import eu.dotshell.pelo.generic.data.network.transport.TransportLineRules
+import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 
 fun parseTimeToMinutes(rawTime: String): Int? {
     val clean = if (rawTime.count { it == ':' } >= 2) rawTime.substringBeforeLast(":") else rawTime
@@ -30,12 +31,7 @@ fun normalizeStopName(stopName: String): String {
 }
 
 fun parseLineCodesFromDesserte(desserte: String): List<String> {
-    return desserte
-        .split(",")
-        .mapNotNull { token ->
-            val line = token.trim().substringBefore(":").trim()
-            line.takeIf { it.isNotEmpty() }
-        }
+    return LineIconResolver.parseDesserte(desserte)
 }
 
 fun parseAlertTokens(raw: String, lineRules: TransportLineRules): Set<String> {
