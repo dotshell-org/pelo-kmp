@@ -17,7 +17,6 @@ import kotlinx.serialization.json.putJsonObject
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModel
 import eu.dotshell.pelo.generic.data.models.geojson.Feature
-import kotlinx.coroutines.runBlocking
 
 /**
  * Converts a transport [FeatureCollection] (line geometries with MultiLineString
@@ -238,103 +237,113 @@ fun StopCollection.toStopsGeoJsonByPriority(
  * Converts a list of calculated itinerary journeys into a standard GeoJSON FeatureCollection string.
  * This reconstructs the actual cut line segments or draws straight fallback paths between stops/legs.
  */
-fun toItinerariesGeoJson(
+suspend fun toItinerariesGeoJson(
     journeys: List<JourneyResult>,
     selectedJourney: JourneyResult?,
     viewModel: TransportViewModel
-): String = buildJsonObject {
-    put("type", "FeatureCollection")
-    putJsonArray("features") {
-        val journeysToDraw = selectedJourney?.let { listOf(it) } ?: journeys
-        for ((journeyIndex, journey) in journeysToDraw.withIndex()) {
-            for ((legIndex, leg) in journey.legs.withIndex()) {
-                val lineColor = if (leg.isWalking) {
-                    "#6B7280"
-                } else {
-                    LineColorHelper.getColorForLineStringAux(leg.routeName ?: "")
-                }
+): String {
+    val journeysToDraw = selectedJourney?.let { listOf(it) } ?: journeys
+    val lineNames = journeysToDraw.flatMap { journey ->
+        journey.legs.mapNotNull { leg ->
+            if (!leg.isWalking) leg.routeName else null
+        }
+    }.distinct()
 
-                var drewSection = false
+    val lineFeaturesMap = lineNames.associateWith { lineName ->
+        try {
+            viewModel.transportRepository.getLineByName(lineName)
+                .getOrElse { emptyList() }
+        } catch (_: Exception) {
+            emptyList<Feature>()
+        }
+    }
 
-                if (!leg.isWalking) {
-                    val lineName = leg.routeName ?: ""
-                    val lines = try {
-                        runBlocking {
-                            viewModel.transportRepository.getLineByName(lineName)
-                                .getOrElse { emptyList() }
-                        }
-                    } catch (_: Exception) {
-                        emptyList<Feature>()
+    return buildJsonObject {
+        put("type", "FeatureCollection")
+        putJsonArray("features") {
+            for ((journeyIndex, journey) in journeysToDraw.withIndex()) {
+                for ((legIndex, leg) in journey.legs.withIndex()) {
+                    val lineColor = if (leg.isWalking) {
+                        "#6B7280"
+                    } else {
+                        LineColorHelper.getColorForLineStringAux(leg.routeName ?: "")
                     }
 
-                    if (lines.isNotEmpty()) {
-                        val sectionedLines = viewModel.sectionLinesBetweenStops(
-                            lines,
-                            leg.fromStopId,
-                            leg.toStopId,
-                            leg
-                        )
-                        if (sectionedLines.isNotEmpty()) {
-                            val sectionedLine = sectionedLines.first()
-                            val firstLine = sectionedLine.multiLineStringGeometry.coordinates.firstOrNull()
-                            if (!firstLine.isNullOrEmpty() && firstLine.size > 1) {
-                                addJsonObject {
-                                    put("type", "Feature")
-                                    putJsonObject("geometry") {
-                                        put("type", "LineString")
-                                        putJsonArray("coordinates") {
-                                            for (coord in firstLine) {
-                                                addJsonArray {
-                                                    add(coord[0])
-                                                    add(coord[1])
+                    var drewSection = false
+
+                    if (!leg.isWalking) {
+                        val lineName = leg.routeName ?: ""
+                        val lines = lineFeaturesMap[lineName] ?: emptyList()
+
+                        if (lines.isNotEmpty()) {
+                            val sectionedLines = viewModel.sectionLinesBetweenStops(
+                                lines,
+                                leg.fromStopId,
+                                leg.toStopId,
+                                leg
+                            )
+                            if (sectionedLines.isNotEmpty()) {
+                                val sectionedLine = sectionedLines.first()
+                                val firstLine = sectionedLine.multiLineStringGeometry.coordinates.firstOrNull()
+                                if (!firstLine.isNullOrEmpty() && firstLine.size > 1) {
+                                    addJsonObject {
+                                        put("type", "Feature")
+                                        putJsonObject("geometry") {
+                                            put("type", "LineString")
+                                            putJsonArray("coordinates") {
+                                                for (coord in firstLine) {
+                                                    addJsonArray {
+                                                        add(coord[0])
+                                                        add(coord[1])
+                                                    }
                                                 }
                                             }
                                         }
+                                        putJsonObject("properties") {
+                                            put("color", lineColor)
+                                            put("isWalking", "no")
+                                            put("journeyIndex", journeyIndex)
+                                            put("legIndex", legIndex)
+                                        }
                                     }
-                                    putJsonObject("properties") {
-                                        put("color", lineColor)
-                                        put("isWalking", "no")
-                                        put("journeyIndex", journeyIndex)
-                                        put("legIndex", legIndex)
-                                    }
+                                    drewSection = true
                                 }
-                                drewSection = true
                             }
                         }
                     }
-                }
 
-                if (!drewSection) {
-                    addJsonObject {
-                        put("type", "Feature")
-                        putJsonObject("geometry") {
-                            put("type", "LineString")
-                            putJsonArray("coordinates") {
-                                addJsonArray {
-                                    add(leg.fromLon)
-                                    add(leg.fromLat)
-                                }
-                                for (stop in leg.intermediateStops) {
+                    if (!drewSection) {
+                        addJsonObject {
+                            put("type", "Feature")
+                            putJsonObject("geometry") {
+                                put("type", "LineString")
+                                putJsonArray("coordinates") {
                                     addJsonArray {
-                                        add(stop.lon)
-                                        add(stop.lat)
+                                        add(leg.fromLon)
+                                        add(leg.fromLat)
+                                    }
+                                    for (stop in leg.intermediateStops) {
+                                        addJsonArray {
+                                            add(stop.lon)
+                                            add(stop.lat)
+                                        }
+                                    }
+                                    addJsonArray {
+                                        add(leg.toLon)
+                                        add(leg.toLat)
                                     }
                                 }
-                                addJsonArray {
-                                    add(leg.toLon)
-                                    add(leg.toLat)
-                                }
                             }
-                        }
-                        putJsonObject("properties") {
-                            put("color", lineColor)
-                            put("isWalking", if (leg.isWalking) "yes" else "no")
-                            put("journeyIndex", journeyIndex)
-                            put("legIndex", legIndex)
+                            putJsonObject("properties") {
+                                put("color", lineColor)
+                                put("isWalking", if (leg.isWalking) "yes" else "no")
+                                put("journeyIndex", journeyIndex)
+                                put("legIndex", legIndex)
+                            }
                         }
                     }
                 }
             }
         }
-    }
-}.toString()
+    }.toString()
+}

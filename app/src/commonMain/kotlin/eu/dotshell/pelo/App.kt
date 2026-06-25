@@ -59,6 +59,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -128,6 +129,7 @@ import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportLinesUiState
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportStopsUiState
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModel
+import eu.dotshell.pelo.generic.ui.viewmodel.findStopByCoordinates
 import eu.dotshell.pelo.generic.utils.location.LocationProvider
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
@@ -288,9 +290,15 @@ private fun RootScaffold(
     var itineraryActive by remember { mutableStateOf(false) }
     var activeJourneys by remember { mutableStateOf<List<JourneyResult>>(emptyList()) }
     var selectedJourney by remember { mutableStateOf<JourneyResult?>(null) }
-    val itineraryGeoJson = remember(activeJourneys, selectedJourney) {
-        if (activeJourneys.isNotEmpty()) {
-            toItinerariesGeoJson(activeJourneys, selectedJourney, viewModel)
+    val itineraryGeoJson by produceState<String?>(
+        initialValue = null,
+        key1 = activeJourneys,
+        key2 = selectedJourney
+    ) {
+        value = if (activeJourneys.isNotEmpty()) {
+            withContext(Dispatchers.Default) {
+                toItinerariesGeoJson(activeJourneys, selectedJourney, viewModel)
+            }
         } else {
             null
         }
@@ -322,13 +330,31 @@ private fun RootScaffold(
     val fabDrawableProvider = DrawableProvider(LocalPlatformContext.current)
 
     var filteredStopsCollection by remember { mutableStateOf<StopCollection?>(null) }
-    LaunchedEffect(stops, selectedLineName) {
+    LaunchedEffect(stops, selectedLineName, itineraryActive, activeJourneys, selectedJourney) {
         if (stops == null) {
             filteredStopsCollection = null
         } else {
             val collection = withContext(Dispatchers.Default) {
                 val lineRules = TransportServiceProvider.getTransportLineRules()
-                val finalStops = if (selectedLineName.isNullOrBlank()) {
+                val finalStops = if (itineraryActive && activeJourneys.isNotEmpty()) {
+                    val journeysToDraw = selectedJourney?.let { listOf(it) } ?: activeJourneys
+                    val matchedStops = mutableSetOf<StopFeature>()
+                    for (journey in journeysToDraw) {
+                        for (leg in journey.legs) {
+                            val fromStop = stops.find { it.properties.id.toString() == leg.fromStopId }
+                                ?: findStopByCoordinates(stops, leg.fromLat, leg.fromLon)
+                            if (fromStop != null) {
+                                matchedStops.add(fromStop)
+                            }
+                            val toStop = stops.find { it.properties.id.toString() == leg.toStopId }
+                                ?: findStopByCoordinates(stops, leg.toLat, leg.toLon)
+                            if (toStop != null) {
+                                matchedStops.add(toStop)
+                            }
+                        }
+                    }
+                    matchedStops.toList()
+                } else if (selectedLineName.isNullOrBlank()) {
                     stops
                 } else {
                     val normSelected = lineRules.normalizeForComparison(selectedLineName)

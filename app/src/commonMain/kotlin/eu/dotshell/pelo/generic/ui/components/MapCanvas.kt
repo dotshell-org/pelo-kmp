@@ -157,22 +157,46 @@ fun MapCanvas(
     // comparison ensure we only update state when the boolean VALUE actually
     // flips — keeping composition quiet while the camera moves freely.
     // ────────────────────────────────────────────────────────────────────────
-    var shouldRenderStops by remember(selectedLineName) {
-        mutableStateOf(!selectedLineName.isNullOrBlank() || cameraState.position.zoom >= STOP_RENDER_MIN_ZOOM)
+    var shouldRenderStops by remember(selectedLineName, itineraryGeoJson) {
+        mutableStateOf(
+            if (itineraryGeoJson != null) {
+                cameraState.position.zoom >= 12.5f
+            } else {
+                !selectedLineName.isNullOrBlank() || cameraState.position.zoom >= STOP_RENDER_MIN_ZOOM
+            }
+        )
     }
-    LaunchedEffect(cameraState, selectedLineName) {
+    LaunchedEffect(cameraState, selectedLineName, itineraryGeoJson) {
         snapshotFlow { cameraState.position.zoom }
-            .map { zoom -> !selectedLineName.isNullOrBlank() || zoom >= STOP_RENDER_MIN_ZOOM }
+            .map { zoom ->
+                if (itineraryGeoJson != null) {
+                    zoom >= 12.5f
+                } else {
+                    !selectedLineName.isNullOrBlank() || zoom >= STOP_RENDER_MIN_ZOOM
+                }
+            }
             .distinctUntilChanged()
             .collect { shouldRenderStops = it }
     }
 
-    var shouldIncludeBus by remember {
-        mutableStateOf(cameraState.position.zoom >= BUS_RENDER_MIN_ZOOM)
+    var shouldIncludeBus by remember(itineraryGeoJson) {
+        mutableStateOf(
+            if (itineraryGeoJson != null) {
+                cameraState.position.zoom >= 12.5f
+            } else {
+                cameraState.position.zoom >= BUS_RENDER_MIN_ZOOM
+            }
+        )
     }
-    LaunchedEffect(cameraState) {
+    LaunchedEffect(cameraState, itineraryGeoJson) {
         snapshotFlow { cameraState.position.zoom }
-            .map { zoom -> zoom >= BUS_RENDER_MIN_ZOOM }
+            .map { zoom ->
+                if (itineraryGeoJson != null) {
+                    zoom >= 12.5f
+                } else {
+                    zoom >= BUS_RENDER_MIN_ZOOM
+                }
+            }
             .distinctUntilChanged()
             .collect { shouldIncludeBus = it }
     }
@@ -350,6 +374,27 @@ fun MapCanvas(
             }
 
             // ------------------------------------------------------------------
+            // Itinerary legs
+            // ------------------------------------------------------------------
+            if (itineraryGeoJson != null) {
+                LineLayer(
+                    id = "itinerary-transit",
+                    source = itinerarySource,
+                    filter = feature["isWalking"].convertToString() eq const("no"),
+                    color = feature["color"].convertToColor(),
+                    width = const(4.dp),
+                )
+                LineLayer(
+                    id = "itinerary-walking",
+                    source = itinerarySource,
+                    filter = feature["isWalking"].convertToString() eq const("yes"),
+                    color = feature["color"].convertToColor(),
+                    width = const(4.dp),
+                    dasharray = const(listOf(2.0, 2.0)),
+                )
+            }
+
+            // ------------------------------------------------------------------
             // Stop icons
             //
             // All painters were resolved in the outer scope. Here we only build
@@ -384,11 +429,12 @@ fun MapCanvas(
                     Triple("0", 17.0f, "transport-stops-priority-0")
                 )
                 for ((priority, minZoom, baseId) in tiers) {
+                    val actualMinZoom = if (itineraryGeoJson != null) 12.5f else minZoom
                     for (slot in slots) {
                         SymbolLayer(
                             id = "$baseId-$slot",
                             source = stopsSource,
-                            minZoom = minZoom,
+                            minZoom = actualMinZoom,
                             filter = (feature["stop_priority"].convertToString() eq const(priority)) and
                                     (feature["slot"].convertToNumber() eq const(slot)),
                             iconImage = iconImageExpr,
@@ -406,7 +452,7 @@ fun MapCanvas(
                 CircleLayer(
                     id = "transport-stops-bus",
                     source = stopsSource,
-                    minZoom = 16f,
+                    minZoom = if (itineraryGeoJson != null) 12.5f else 16f,
                     filter = feature["stop_priority"].convertToString() eq const("0"),
                     radius = const(3.dp),
                     color = const(Color(0xFF6B7280)),
@@ -415,7 +461,7 @@ fun MapCanvas(
                 CircleLayer(
                     id = "transport-stops-tram",
                     source = stopsSource,
-                    minZoom = 13f,
+                    minZoom = if (itineraryGeoJson != null) 12.5f else 13f,
                     filter = feature["stop_priority"].convertToString() eq const("1"),
                     radius = const(4.dp),
                     color = const(Color(0xFF1F2937)),
@@ -424,31 +470,11 @@ fun MapCanvas(
                 CircleLayer(
                     id = "transport-stops-priority",
                     source = stopsSource,
+                    minZoom = if (itineraryGeoJson != null) 12.5f else 0f,
                     filter = feature["stop_priority"].convertToString() eq const("2"),
                     radius = const(5.dp),
                     color = const(Color(0xFF1F2937)),
                     onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
-                )
-            }
-
-            // ------------------------------------------------------------------
-            // Itinerary legs
-            // ------------------------------------------------------------------
-            if (itineraryGeoJson != null) {
-                LineLayer(
-                    id = "itinerary-transit",
-                    source = itinerarySource,
-                    filter = feature["isWalking"].convertToString() eq const("no"),
-                    color = feature["color"].convertToColor(),
-                    width = const(3.dp),
-                )
-                LineLayer(
-                    id = "itinerary-walking",
-                    source = itinerarySource,
-                    filter = feature["isWalking"].convertToString() eq const("yes"),
-                    color = feature["color"].convertToColor(),
-                    width = const(3.dp),
-                    dasharray = const(listOf(2.0, 2.0)),
                 )
             }
 
