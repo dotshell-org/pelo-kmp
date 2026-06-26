@@ -89,10 +89,12 @@ fun MapCanvas(
     initialLatitude: Double = 45.75,
     initialLongitude: Double = 4.85,
     initialZoom: Double = 10.0,
+    initialBearing: Double? = null,
     cameraState: CameraState = rememberCameraState(
         firstPosition = CameraPosition(
             target = Position(latitude = initialLatitude, longitude = initialLongitude),
             zoom = initialZoom,
+            bearing = initialBearing ?: 0.0,
         )
     ),
     lines: FeatureCollection? = null,
@@ -109,6 +111,8 @@ fun MapCanvas(
     onMapMoved: () -> Unit = {},
     centerOn: Position? = null,
     focusZoom: Double? = null,
+    bearing: Double? = null,
+    tilt: Double? = null,
 ) {
     Log.i("MapCanvas", "compose entered, stops=${stops?.features?.size} shouldRenderStops=${!selectedLineName.isNullOrBlank() || initialZoom >= STOP_RENDER_MIN_ZOOM} lines=${lines?.features?.size}")
 
@@ -123,13 +127,20 @@ fun MapCanvas(
 
     var isAnimating by remember { mutableStateOf(false) }
 
-    LaunchedEffect(centerOn, focusZoom) {
-        if (centerOn != null || focusZoom != null) {
+    LaunchedEffect(centerOn, focusZoom, bearing, tilt) {
+        if (centerOn != null || focusZoom != null || bearing != null || tilt != null) {
             isAnimating = true
             val targetCenter = centerOn ?: cameraState.position.target
             val targetZoom = focusZoom ?: cameraState.position.zoom
+            val targetBearing = bearing ?: cameraState.position.bearing
+            val targetTilt = tilt ?: cameraState.position.tilt
             cameraState.animateTo(
-                CameraPosition(target = targetCenter, zoom = targetZoom)
+                CameraPosition(
+                    target = targetCenter,
+                    zoom = targetZoom,
+                    bearing = targetBearing,
+                    tilt = targetTilt
+                )
             )
             isAnimating = false
         }
@@ -306,7 +317,8 @@ fun MapCanvas(
             gestureOptions = mapGestureOptions(interactive),
             ornamentOptions = OrnamentOptions(
                 isScaleBarEnabled = false,
-                isAttributionEnabled = false
+                isAttributionEnabled = false,
+                isCompassEnabled = false
             )
         )
     }

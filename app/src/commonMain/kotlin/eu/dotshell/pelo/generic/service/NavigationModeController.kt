@@ -31,7 +31,8 @@ data class NavigationModeUiState(
     val distanceToNextMeters: Int? = null,
     val remainingMinutes: Int = 0,
     val instruction: String = "",
-    val isComplete: Boolean = false
+    val isComplete: Boolean = false,
+    val bearing: Double? = null
 )
 
 class NavigationModeController(
@@ -45,10 +46,16 @@ class NavigationModeController(
     private var tripDetector: TripDetector? = null
     private var tripDetectorInitJob: Job? = null
     private var waypoints: List<NavigationWaypoint> = emptyList()
+    private var tracePoints: List<GeoPoint> = emptyList()
     private var targetWaypointIndex: Int = 0
 
-    fun start(journey: JourneyResult) {
+    fun start(journey: JourneyResult, tracePoints: List<GeoPoint> = emptyList()) {
         waypoints = journey.toNavigationWaypoints()
+        this.tracePoints = if (tracePoints.isNotEmpty()) {
+            tracePoints
+        } else {
+            waypoints.map { GeoPoint(it.lat, it.lon) }
+        }
         targetWaypointIndex = 0
         NavigationModeStateStore.setNavigationActive(context, true)
         _uiState.value = buildState(
@@ -63,6 +70,7 @@ class NavigationModeController(
         NavigationModeStateStore.setNavigationActive(context, false)
         finalizeTripDetector()
         waypoints = emptyList()
+        tracePoints = emptyList()
         targetWaypointIndex = 0
         _uiState.value = NavigationModeUiState()
     }
@@ -103,6 +111,18 @@ class NavigationModeController(
             ?: waypoints.lastOrNull()?.legIndex
             ?: 0
 
+        // Calculate bearing based on the closest segment of the trace points
+        val bearing = if (location != null && tracePoints.isNotEmpty()) {
+            val segment = GeometryUtils.findNavigationAxisSegment(location, tracePoints)
+            if (segment != null) {
+                GeometryUtils.computeBearingDegrees(segment.first, segment.second)
+            } else {
+                null
+            }
+        } else {
+            null
+        }
+
         return NavigationModeUiState(
             isActive = true,
             journey = journey,
@@ -113,7 +133,8 @@ class NavigationModeController(
             distanceToNextMeters = distance,
             remainingMinutes = remainingMinutesUntil(journey.arrivalTime),
             instruction = instructionFor(target, isComplete),
-            isComplete = isComplete
+            isComplete = isComplete,
+            bearing = bearing
         )
     }
 

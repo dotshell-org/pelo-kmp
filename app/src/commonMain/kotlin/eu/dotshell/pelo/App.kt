@@ -23,6 +23,10 @@ import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.filled.Navigation
+import org.maplibre.compose.camera.rememberCameraState
+import org.maplibre.compose.camera.CameraState
+import org.maplibre.compose.camera.CameraPosition
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -63,6 +67,8 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -93,6 +99,7 @@ import eu.dotshell.pelo.generic.service.TransportServiceProvider
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.generic.utils.map.toVehiclesGeoJson
 import eu.dotshell.pelo.generic.utils.map.toItinerariesGeoJson
+import eu.dotshell.pelo.generic.utils.map.calculateJourneyTrace
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
 import eu.dotshell.pelo.generic.ui.components.MapCanvas
 import eu.dotshell.pelo.generic.ui.components.favorites.AddFavoriteDialog
@@ -256,6 +263,13 @@ private fun RootScaffold(
     var userLocation by remember { mutableStateOf<Position?>(null) }
     var hasCenteredInitially by remember { mutableStateOf(false) }
     val locationProvider = remember { LocationProvider(context) }
+    val cameraState = rememberCameraState(
+        firstPosition = CameraPosition(
+            target = org.maplibre.spatialk.geojson.Position(latitude = 45.75, longitude = 4.85),
+            zoom = 12.0,
+            bearing = 0.0
+        )
+    )
     val navigationController = remember(context) { NavigationModeController(context) }
     val navigationState by navigationController.uiState.collectAsState()
     DisposableEffect(locationProvider, navigationController) {
@@ -473,6 +487,102 @@ private fun RootScaffold(
         itineraryActive = true
     }
 
+    LaunchedEffect(selectedStation?.nom, stops) {
+        val stName = selectedStation?.nom
+        if (!stName.isNullOrBlank() && stops != null) {
+            val stop = stops.firstOrNull { it.properties.nom.equals(stName, ignoreCase = true) }
+            if (stop != null && stop.geometry.coordinates.size >= 2) {
+                manualFocusCenter = Position(latitude = stop.geometry.coordinates[1], longitude = stop.geometry.coordinates[0])
+                manualFocusZoom = 18.0
+            }
+        }
+    }
+
+    LaunchedEffect(selectedLine?.lineName, linesUiState) {
+        val ln = selectedLine?.lineName
+        if (!ln.isNullOrBlank()) {
+            val allLines = when (val s = linesUiState) {
+                is TransportLinesUiState.Success -> s.lines
+                is TransportLinesUiState.PartialSuccess -> s.lines
+                else -> null
+            }
+            val feat = allLines?.firstOrNull { it.properties.lineName.equals(ln, ignoreCase = true) }
+            if (feat != null) {
+                val points = feat.multiLineStringGeometry.coordinates.flatten()
+                if (points.isNotEmpty()) {
+                    manualFocusCenter = Position(
+                        latitude = points.map { it[1] }.average(),
+                        longitude = points.map { it[0] }.average(),
+                    )
+                    val lats = points.map { it[1] }
+                    val lons = points.map { it[0] }
+                    val latMin = lats.minOrNull() ?: 45.75
+                    val latMax = lats.maxOrNull() ?: 45.75
+                    val lonMin = lons.minOrNull() ?: 4.85
+                    val lonMax = lons.maxOrNull() ?: 4.85
+                    val latDiff = latMax - latMin
+                    val lonDiff = lonMax - lonMin
+                    val span = maxOf(latDiff, lonDiff)
+                    manualFocusZoom = if (span > 0.0001) {
+                        val log2Val = kotlin.math.log2(360.0 / span)
+                        (log2Val - 1.2).coerceIn(9.5, 15.0)
+                    } else {
+                        12.0
+                    }
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(itineraryActive, activeJourneys, selectedJourney) {
+        if (itineraryActive && activeJourneys.isNotEmpty()) {
+            val journeysToDraw = selectedJourney?.let { listOf(it) } ?: activeJourneys
+            val lats = mutableListOf<Double>()
+            val lons = mutableListOf<Double>()
+            for (journey in journeysToDraw) {
+                for (leg in journey.legs) {
+                    lats.add(leg.fromLat)
+                    lons.add(leg.fromLon)
+                    lats.add(leg.toLat)
+                    lons.add(leg.toLon)
+                    for (stop in leg.intermediateStops) {
+                        lats.add(stop.lat)
+                        lons.add(stop.lon)
+                    }
+                }
+            }
+            if (lats.isNotEmpty()) {
+                manualFocusCenter = Position(latitude = lats.average(), longitude = lons.average())
+                val latMin = lats.minOrNull() ?: 45.75
+                val latMax = lats.maxOrNull() ?: 45.75
+                val lonMin = lons.minOrNull() ?: 4.85
+                val lonMax = lons.maxOrNull() ?: 4.85
+                val latDiff = latMax - latMin
+                val lonDiff = lonMax - lonMin
+                val span = maxOf(latDiff, lonDiff)
+                manualFocusZoom = if (span > 0.0001) {
+                    val log2Val = kotlin.math.log2(360.0 / span)
+                    (log2Val - 1.2).coerceIn(9.5, 15.0)
+                } else {
+                    12.0
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(navigationState.isActive) {
+        if (!navigationState.isActive) {
+            cameraState.animateTo(
+                CameraPosition(
+                    target = cameraState.position.target,
+                    zoom = cameraState.position.zoom,
+                    bearing = 0.0,
+                    tilt = 0.0
+                )
+            )
+        }
+    }
+
     val bottomSheetState = rememberStandardBottomSheetState(initialValue = SheetValue.Hidden, skipHiddenState = false)
     val bsScaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = bottomSheetState)
     val hasSheet = !navigationState.isActive && (itineraryActive || selectedStation != null || selectedLine != null || allSchedules != null)
@@ -502,143 +612,15 @@ private fun RootScaffold(
                 if (selectedTab == Destination.SETTINGS) {
                     SettingsTab(viewModel, Modifier.fillMaxSize()) { selectedTab = Destination.PLAN }
                 } else {
-                    val computedFocusCenter: Position? = remember(selectedLine?.lineName, selectedLine?.currentStationName, selectedStation?.nom, stops, linesUiState, itineraryActive, activeJourneys, selectedJourney, manualFocusCenter) {
-                        if (manualFocusCenter != null) return@remember manualFocusCenter
-                        if (itineraryActive && activeJourneys.isNotEmpty()) {
-                            val journeysToDraw = selectedJourney?.let { listOf(it) } ?: activeJourneys
-                            val lats = mutableListOf<Double>()
-                            val lons = mutableListOf<Double>()
-                            for (journey in journeysToDraw) {
-                                for (leg in journey.legs) {
-                                    lats.add(leg.fromLat)
-                                    lons.add(leg.fromLon)
-                                    lats.add(leg.toLat)
-                                    lons.add(leg.toLon)
-                                    for (stop in leg.intermediateStops) {
-                                        lats.add(stop.lat)
-                                        lons.add(stop.lon)
-                                    }
-                                }
-                            }
-                            if (lats.isNotEmpty()) {
-                                return@remember Position(latitude = lats.average(), longitude = lons.average())
-                            }
-                        }
-                        val stName = selectedStation?.nom ?: selectedLine?.currentStationName
-                        if (!stName.isNullOrBlank()) {
-                            val stop = stops?.firstOrNull { it.properties.nom.equals(stName, ignoreCase = true) }
-                            if (stop != null && stop.geometry.coordinates.size >= 2) {
-                                return@remember Position(latitude = stop.geometry.coordinates[1], longitude = stop.geometry.coordinates[0])
-                            }
-                        }
-                        val ln = selectedLine?.lineName
-                        if (ln != null) {
-                            val allLines = when (val s = linesUiState) {
-                                is TransportLinesUiState.Success -> s.lines
-                                is TransportLinesUiState.PartialSuccess -> s.lines
-                                else -> null
-                            }
-                            val feat = allLines?.firstOrNull { it.properties.lineName.equals(ln, ignoreCase = true) }
-                            if (feat != null) {
-                                val points = feat.multiLineStringGeometry.coordinates.flatten()
-                                if (points.isNotEmpty()) {
-                                    return@remember Position(
-                                        latitude = points.map { it[1] }.average(),
-                                        longitude = points.map { it[0] }.average(),
-                                    )
-                                }
-                            }
-                        }
-                        null
+                    val focusCenter = remember(isCenteredOnUser, userLocation, manualFocusCenter, navigationState.isActive) {
+                        if (navigationState.isActive && userLocation != null) return@remember userLocation
+                        if (isCenteredOnUser && userLocation != null) return@remember userLocation
+                        manualFocusCenter
                     }
-                    val lastFocusCenter = remember { mutableStateOf<Position?>(null) }
-                    val focusCenter = remember(computedFocusCenter, lastFocusCenter.value) {
-                        if (computedFocusCenter != lastFocusCenter.value) {
-                            computedFocusCenter
-                        } else {
-                            null
-                        }
-                    }
-                    LaunchedEffect(computedFocusCenter) {
-                        lastFocusCenter.value = computedFocusCenter
-                    }
-
-                    val focusZoom: Double? = remember(selectedLine?.lineName, selectedLine?.currentStationName, selectedStation?.nom, stops, linesUiState, itineraryActive, activeJourneys, selectedJourney, manualFocusCenter, manualFocusZoom) {
-                        if (manualFocusZoom != null) return@remember manualFocusZoom
-                        if (manualFocusCenter != null) return@remember 18.0
-                        if (itineraryActive && activeJourneys.isNotEmpty()) {
-                            val journeysToDraw = selectedJourney?.let { listOf(it) } ?: activeJourneys
-                            val lats = mutableListOf<Double>()
-                            val lons = mutableListOf<Double>()
-                            for (journey in journeysToDraw) {
-                                for (leg in journey.legs) {
-                                    lats.add(leg.fromLat)
-                                    lons.add(leg.fromLon)
-                                    lats.add(leg.toLat)
-                                    lons.add(leg.toLon)
-                                    for (stop in leg.intermediateStops) {
-                                        lats.add(stop.lat)
-                                        lons.add(stop.lon)
-                                    }
-                                }
-                            }
-                            if (lats.isNotEmpty()) {
-                                val latMin = lats.minOrNull() ?: 45.75
-                                val latMax = lats.maxOrNull() ?: 45.75
-                                val lonMin = lons.minOrNull() ?: 4.85
-                                val lonMax = lons.maxOrNull() ?: 4.85
-                                val latDiff = latMax - latMin
-                                val lonDiff = lonMax - lonMin
-                                val span = maxOf(latDiff, lonDiff)
-                                if (span > 0.0001) {
-                                    val log2Val = kotlin.math.log2(360.0 / span)
-                                    return@remember (log2Val - 1.2).coerceIn(9.5, 15.0)
-                                }
-                            }
-                        }
-                        val stName = selectedStation?.nom ?: selectedLine?.currentStationName
-                        if (!stName.isNullOrBlank()) {
-                            return@remember 18.0
-                        }
-                        val ln = selectedLine?.lineName
-                        if (ln != null) {
-                            val allLines = when (val s = linesUiState) {
-                                is TransportLinesUiState.Success -> s.lines
-                                is TransportLinesUiState.PartialSuccess -> s.lines
-                                else -> null
-                            }
-                            val feat = allLines?.firstOrNull { it.properties.lineName.equals(ln, ignoreCase = true) }
-                            if (feat != null) {
-                                val points = feat.multiLineStringGeometry.coordinates.flatten()
-                                if (points.isNotEmpty()) {
-                                    val lats = points.map { it[1] }
-                                    val lons = points.map { it[0] }
-                                    val latMin = lats.minOrNull() ?: 45.75
-                                    val latMax = lats.maxOrNull() ?: 45.75
-                                    val lonMin = lons.minOrNull() ?: 4.85
-                                    val lonMax = lons.maxOrNull() ?: 4.85
-                                    val latDiff = latMax - latMin
-                                    val lonDiff = lonMax - lonMin
-                                    val span = maxOf(latDiff, lonDiff)
-                                    if (span > 0.0001) {
-                                        val log2Val = kotlin.math.log2(360.0 / span)
-                                        return@remember (log2Val - 1.2).coerceIn(9.5, 15.0)
-                                    }
-                                }
-                            }
-                        }
-                        null
-                    }
-                    val lastFocusZoom = remember { mutableStateOf<Double?>(null) }
-                    val actualFocusZoom = remember(focusZoom, lastFocusZoom.value, focusCenter) {
-                        if (focusZoom != lastFocusZoom.value || focusCenter != null) {
-                            focusZoom
-                        } else {
-                            null
-                        }
-                    }
-                    LaunchedEffect(focusZoom) {
-                        lastFocusZoom.value = focusZoom
+                    val focusZoom = remember(isCenteredOnUser, manualFocusZoom, navigationState.isActive) {
+                        if (navigationState.isActive) return@remember 18.5
+                        if (isCenteredOnUser) return@remember 18.0
+                        manualFocusZoom
                     }
 
                     PlanContent(
@@ -650,7 +632,8 @@ private fun RootScaffold(
                         vehiclesGeoJson = vehiclesGeoJson,
                         vehicleIconName = vehicleIconName,
                         focusCenter = focusCenter,
-                        focusZoom = actualFocusZoom,
+                        focusZoom = focusZoom,
+                        cameraState = cameraState,
                         selectedLineName = selectedLine?.lineName,
                         itineraryGeoJson = itineraryGeoJson,
                         filteredStopsCollection = filteredStopsCollection,
@@ -664,24 +647,37 @@ private fun RootScaffold(
                         onItinerarySelected = { name -> startItinerary(name) },
                         isCenteredOnUser = isCenteredOnUser,
                         onFabClick = {
-                            if (isCenteredOnUser) {
+                            val isOriented = kotlin.math.abs(cameraState.position.bearing) <= 1.0
+                            val isCenteredAndOriented = isCenteredOnUser && isOriented
+                            if (isCenteredAndOriented) {
                                 alertReportInitialStopName = null
                                 alertReportInitialLines = emptyList()
                                 showAlertReport = true
+                            } else if (!isOriented) {
+                                scope.launch {
+                                    cameraState.animateTo(
+                                        CameraPosition(
+                                            target = cameraState.position.target,
+                                            zoom = cameraState.position.zoom,
+                                            bearing = 0.0,
+                                            tilt = 0.0
+                                        )
+                                    )
+                                }
                             } else {
                                 val loc = userLocation
                                 if (loc != null) {
-                                    manualFocusCenter = null
-                                    manualFocusZoom = null
-                                    scope.launch {
-                                        kotlinx.coroutines.delay(10)
-                                        manualFocusCenter = loc
-                                        isCenteredOnUser = true
-                                    }
+                                    manualFocusCenter = loc
+                                    manualFocusZoom = 18.0
+                                    isCenteredOnUser = true
                                 }
                             }
                         },
-                        onFabReset = { isCenteredOnUser = false },
+                        onFabReset = {
+                            isCenteredOnUser = false
+                            manualFocusCenter = null
+                            manualFocusZoom = null
+                        },
                         showAlertReport = showAlertReport,
                         bsScaffoldState = bsScaffoldState,
                         sheetPeekHeight = if (hasSheet) 130.dp else 0.dp,
@@ -702,9 +698,18 @@ private fun RootScaffold(
                                         onJourneysChanged = { activeJourneys = it },
                                         onSelectedJourneyChanged = { selectedJourney = it },
                                         onStartNavigation = { journey ->
-                                            navigationController.start(journey)
-                                            onNavigationModeChanged(true)
-                                        },
+                                             val vm = viewModel
+                                             if (vm != null) {
+                                                 scope.launch {
+                                                     val tracePoints = calculateJourneyTrace(journey, vm)
+                                                     navigationController.start(journey, tracePoints)
+                                                     onNavigationModeChanged(true)
+                                                 }
+                                             } else {
+                                                 navigationController.start(journey)
+                                                 onNavigationModeChanged(true)
+                                             }
+                                         },
                                         onClose = closeItinerary,
                                         onRequestExpandSheet = { },
                                     )
@@ -995,8 +1000,16 @@ private fun PlanContent(
     sheetPeekHeight: Dp,
     sheetContent: @Composable () -> Unit,
     navigationState: NavigationModeUiState,
+    cameraState: CameraState,
 ) {
     val context = LocalPlatformContext.current
+    val scope = rememberCoroutineScope()
+    var isMapRotated by remember { mutableStateOf(false) }
+    LaunchedEffect(cameraState) {
+        snapshotFlow { kotlin.math.abs(cameraState.position.bearing) > 1.0 }
+            .distinctUntilChanged()
+            .collect { isMapRotated = it }
+    }
     val searchHistoryRepo = remember { SearchHistoryRepository(context) }
     var searchHistory by remember { mutableStateOf(searchHistoryRepo.getSearchHistory()) }
     val linesState by viewModel.uiState.collectAsState()
@@ -1053,6 +1066,8 @@ private fun PlanContent(
                     initialZoom = 12.0,
                     centerOn = focusCenter,
                     focusZoom = focusZoom,
+                    cameraState = cameraState,
+                    bearing = if (navigationState.isActive) navigationState.bearing else null,
                     lines = mapLines?.let { FeatureCollection(features = it) },
                     stops = filteredStopsCollection,
                     userLocation = userLocation,
@@ -1060,6 +1075,8 @@ private fun PlanContent(
                     vehicleIconName = vehicleIconName,
                     selectedLineName = selectedLineName,
                     itineraryGeoJson = itineraryGeoJson,
+                    interactive = !navigationState.isActive,
+                    tilt = if (navigationState.isActive) 55.0 else null,
                     onStopClick = { nom -> onStopSelected(nom, null, emptyList()) },
                     onLineClick = { lineName -> onLineSelected(lineName) },
                     onVehicleClick = { lineName -> onLineSelected(lineName) },
@@ -1076,7 +1093,8 @@ private fun PlanContent(
                             .clickable { onFabClick() },
                         contentAlignment = Alignment.Center
                     ) {
-                        if (isCenteredOnUser) {
+                        val isCenteredAndOriented = isCenteredOnUser && !isMapRotated
+                        if (isCenteredAndOriented) {
                             Icon(
                                 painter = fabDrawableProvider.getPainter("add_triangle_24px"),
                                 contentDescription = "Signaler une alerte",
@@ -1165,62 +1183,62 @@ private fun PlanContent(
                                 else -> PrimaryColor
                             }
 
-                             Row(
-                                 modifier = Modifier
-                                     .shadow(4.dp, RoundedCornerShape(20.dp))
-                                     .clip(RoundedCornerShape(20.dp))
-                                     .background(PrimaryColor)
-                                     .clickable { showStyleSheet = true }
-                                     .height(40.dp)
-                                     .padding(horizontal = 16.dp),
-                                 verticalAlignment = Alignment.CenterVertically
-                             ) {
-                                 Icon(
-                                     Icons.Filled.Layers,
-                                     contentDescription = "Style de carte",
-                                     tint = SecondaryColor,
-                                     modifier = Modifier.size(20.dp)
-                                 )
-                             }
+                            Row(
+                                modifier = Modifier
+                                    .shadow(4.dp, RoundedCornerShape(20.dp))
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(PrimaryColor)
+                                    .clickable { showStyleSheet = true }
+                                    .height(40.dp)
+                                    .padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Filled.Layers,
+                                    contentDescription = "Style de carte",
+                                    tint = SecondaryColor,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
 
-                              if (selectedLineName.isNullOrBlank() || lineRules.isLiveTrackableLine(selectedLineName)) {
-                                  Row(
-                                      modifier = Modifier
-                                          .shadow(4.dp, RoundedCornerShape(20.dp))
-                                          .clip(RoundedCornerShape(20.dp))
-                                          .background(buttonColor)
-                                          .clickable {
-                                              if (isLiveModeEnabled) {
-                                                  if (isLiveTrackingEnabled) viewModel.stopLiveTracking()
-                                                  if (isGlobalLiveEnabled) viewModel.stopGlobalLive()
-                                              } else {
-                                                  if (!selectedLineName.isNullOrBlank()) {
-                                                      viewModel.startLiveTracking(selectedLineName)
-                                                  } else {
-                                                      viewModel.toggleGlobalLive()
-                                                  }
-                                              }
-                                          }
-                                          .height(40.dp)
-                                          .padding(horizontal = 16.dp),
-                                      verticalAlignment = Alignment.CenterVertically
-                                  ) {
-                                      Canvas(
-                                          modifier = Modifier
-                                              .size(8.dp)
-                                              .graphicsLayer { translationY = dotOffset }
-                                      ) {
-                                          drawCircle(color = SecondaryColor)
-                                      }
-                                      Spacer(modifier = Modifier.width(6.dp))
-                                      Text(
-                                          text = "LIVE",
-                                          fontWeight = FontWeight.Bold,
-                                          color = SecondaryColor,
-                                          fontSize = 14.sp
-                                      )
-                                  }
-                              }
+                            if (selectedLineName.isNullOrBlank() || lineRules.isLiveTrackableLine(selectedLineName)) {
+                                Row(
+                                    modifier = Modifier
+                                        .shadow(4.dp, RoundedCornerShape(20.dp))
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(buttonColor)
+                                        .clickable {
+                                            if (isLiveModeEnabled) {
+                                                if (isLiveTrackingEnabled) viewModel.stopLiveTracking()
+                                                if (isGlobalLiveEnabled) viewModel.stopGlobalLive()
+                                            } else {
+                                                if (!selectedLineName.isNullOrBlank()) {
+                                                    viewModel.startLiveTracking(selectedLineName)
+                                                } else {
+                                                    viewModel.toggleGlobalLive()
+                                                }
+                                            }
+                                        }
+                                        .height(40.dp)
+                                        .padding(horizontal = 16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Canvas(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .graphicsLayer { translationY = dotOffset }
+                                    ) {
+                                        drawCircle(color = SecondaryColor)
+                                    }
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "LIVE",
+                                        fontWeight = FontWeight.Bold,
+                                        color = SecondaryColor,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
                         }
                     }
                 }

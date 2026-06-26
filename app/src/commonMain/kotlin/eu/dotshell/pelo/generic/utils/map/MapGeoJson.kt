@@ -17,6 +17,7 @@ import kotlinx.serialization.json.putJsonObject
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModel
 import eu.dotshell.pelo.generic.data.models.geojson.Feature
+import eu.dotshell.pelo.generic.utils.location.GeoPoint
 
 /**
  * Converts a transport [FeatureCollection] (line geometries with MultiLineString
@@ -346,4 +347,73 @@ suspend fun toItinerariesGeoJson(
             }
         }
     }.toString()
+}
+
+/**
+ * Calculates the exact trace (list of GeoPoints) representing the journey path.
+ * Reconstructs detailed transit geometries or walking paths segment-by-segment.
+ */
+suspend fun calculateJourneyTrace(
+    journey: JourneyResult,
+    viewModel: TransportViewModel
+): List<GeoPoint> {
+    val points = mutableListOf<GeoPoint>()
+
+    val lineNames = journey.legs.mapNotNull { leg ->
+        if (!leg.isWalking) leg.routeName else null
+    }.distinct()
+
+    val lineFeaturesMap = lineNames.associateWith { lineName ->
+        try {
+            viewModel.transportRepository.getLineByName(lineName)
+                .getOrElse { emptyList() }
+        } catch (_: Exception) {
+            emptyList<Feature>()
+        }
+    }
+
+    for (leg in journey.legs) {
+        var drewSection = false
+
+        if (!leg.isWalking) {
+            val lineName = leg.routeName ?: ""
+            val lines = lineFeaturesMap[lineName] ?: emptyList()
+
+            if (lines.isNotEmpty()) {
+                val sectionedLines = viewModel.sectionLinesBetweenStops(
+                    lines,
+                    leg.fromStopId,
+                    leg.toStopId,
+                    leg
+                )
+                if (sectionedLines.isNotEmpty()) {
+                    val sectionedLine = sectionedLines.first()
+                    val firstLine = sectionedLine.multiLineStringGeometry.coordinates.firstOrNull()
+                    if (!firstLine.isNullOrEmpty() && firstLine.size > 1) {
+                        for (coord in firstLine) {
+                            points.add(GeoPoint(latitude = coord[1], longitude = coord[0]))
+                        }
+                        drewSection = true
+                    }
+                }
+            }
+        }
+
+        if (!drewSection) {
+            points.add(GeoPoint(latitude = leg.fromLat, longitude = leg.fromLon))
+            for (stop in leg.intermediateStops) {
+                points.add(GeoPoint(latitude = stop.lat, longitude = stop.lon))
+            }
+            points.add(GeoPoint(latitude = leg.toLat, longitude = leg.toLon))
+        }
+    }
+
+    // Deduplicate consecutive identical coordinates
+    val dedupedPoints = mutableListOf<GeoPoint>()
+    for (p in points) {
+        if (dedupedPoints.isEmpty() || dedupedPoints.last() != p) {
+            dedupedPoints.add(p)
+        }
+    }
+    return dedupedPoints
 }
