@@ -287,33 +287,23 @@ private fun RootScaffold(
     LaunchedEffect(selectedTab) {
         if (selectedTab == Destination.SETTINGS) {
             hasCenteredInitially = false
+        } else if (selectedTab == Destination.PLAN) {
+            cameraState.animateTo(
+                CameraPosition(
+                    target = cameraState.position.target,
+                    zoom = cameraState.position.zoom,
+                    bearing = 0.0,
+                    tilt = 0.0
+                )
+            )
         }
     }
 
     LaunchedEffect(selectedTab, userLocation) {
-        if (selectedTab == Destination.PLAN && !hasCenteredInitially) {
-            val loc = userLocation
-            if (loc != null) {
-                hasCenteredInitially = true
-                cameraState.animateTo(
-                    CameraPosition(
-                        target = org.maplibre.spatialk.geojson.Position(latitude = loc.latitude, longitude = loc.longitude),
-                        zoom = 18.0,
-                        bearing = 0.0,
-                        tilt = 0.0
-                    )
-                )
-                isCenteredOnUser = true
-            } else {
-                cameraState.animateTo(
-                    CameraPosition(
-                        target = cameraState.position.target,
-                        zoom = cameraState.position.zoom,
-                        bearing = 0.0,
-                        tilt = 0.0
-                    )
-                )
-            }
+        val loc = userLocation
+        if (loc != null && selectedTab == Destination.PLAN && !hasCenteredInitially) {
+            isCenteredOnUser = true
+            hasCenteredInitially = true
         }
     }
 
@@ -1073,7 +1063,7 @@ private fun PlanContent(
                     centerOn = focusCenter,
                     focusZoom = focusZoom,
                     cameraState = cameraState,
-                    bearing = if (navigationState.isActive) navigationState.bearing else null,
+                    bearing = if (navigationState.isActive) navigationState.bearing else (if (isCenteredOnUser) 0.0 else null),
                     lines = mapLines?.let { FeatureCollection(features = it) },
                     stops = filteredStopsCollection,
                     userLocation = userLocation,
@@ -1082,7 +1072,7 @@ private fun PlanContent(
                     selectedLineName = selectedLineName,
                     itineraryGeoJson = itineraryGeoJson,
                     interactive = !navigationState.isActive,
-                    tilt = if (navigationState.isActive) 55.0 else null,
+                    tilt = if (navigationState.isActive) 55.0 else (if (isCenteredOnUser) 0.0 else null),
                     onStopClick = { nom -> onStopSelected(nom, null, emptyList()) },
                     onLineClick = { lineName -> onLineSelected(lineName) },
                     onVehicleClick = { lineName -> onLineSelected(lineName) },
