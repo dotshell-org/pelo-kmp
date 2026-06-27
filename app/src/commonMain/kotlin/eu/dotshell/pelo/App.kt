@@ -288,14 +288,24 @@ private fun RootScaffold(
         if (selectedTab == Destination.SETTINGS) {
             hasCenteredInitially = false
         } else if (selectedTab == Destination.PLAN) {
-            cameraState.animateTo(
-                CameraPosition(
+            val loc = userLocation
+            if (loc != null) {
+                cameraState.position = CameraPosition(
+                    target = org.maplibre.spatialk.geojson.Position(latitude = loc.latitude, longitude = loc.longitude),
+                    zoom = 18.0,
+                    bearing = 0.0,
+                    tilt = 0.0
+                )
+                isCenteredOnUser = true
+                hasCenteredInitially = true
+            } else {
+                cameraState.position = CameraPosition(
                     target = cameraState.position.target,
                     zoom = cameraState.position.zoom,
                     bearing = 0.0,
                     tilt = 0.0
                 )
-            )
+            }
         }
     }
 
@@ -661,12 +671,17 @@ private fun RootScaffold(
                         },
                         onItinerarySelected = { name -> startItinerary(name) },
                         isCenteredOnUser = isCenteredOnUser,
-                        onFabClick = {
-                            val loc = userLocation
-                            if (loc != null) {
-                                manualFocusCenter = loc
-                                manualFocusZoom = 18.0
-                                isCenteredOnUser = true
+                        onFabClick = { isAtTarget ->
+                            if (isAtTarget) {
+                                alertReportInitialStopName = null
+                                alertReportInitialLines = emptyList()
+                                showAlertReport = true
+                            } else {
+                                val loc = userLocation
+                                if (loc != null) {
+                                    isCenteredOnUser = true
+                                    hasCenteredInitially = true
+                                }
                             }
                         },
                         onFabReset = {
@@ -989,7 +1004,7 @@ private fun PlanContent(
     onAddFavoriteClick: () -> Unit,
     onItinerarySelected: (String) -> Unit,
     isCenteredOnUser: Boolean,
-    onFabClick: () -> Unit,
+    onFabClick: (Boolean) -> Unit,
     onFabReset: () -> Unit,
     showAlertReport: Boolean,
     bsScaffoldState: BottomSheetScaffoldState,
@@ -1005,6 +1020,23 @@ private fun PlanContent(
         snapshotFlow { kotlin.math.abs(cameraState.position.bearing) > 1.0 || cameraState.position.tilt > 1.0 }
             .distinctUntilChanged()
             .collect { isMapRotated = it }
+    }
+    var isAtCenteringTarget by remember { mutableStateOf(false) }
+    LaunchedEffect(cameraState, userLocation) {
+        snapshotFlow {
+            val loc = userLocation
+            if (loc != null) {
+                val deltaLat = cameraState.position.target.latitude - loc.latitude
+                val deltaLon = cameraState.position.target.longitude - loc.longitude
+                val isNear = kotlin.math.abs(deltaLat) < 0.0005 && kotlin.math.abs(deltaLon) < 0.0005
+                val isZoomed = cameraState.position.zoom >= 17.0
+                isNear && isZoomed
+            } else {
+                false
+            }
+        }
+        .distinctUntilChanged()
+        .collect { isAtCenteringTarget = it }
     }
     val searchHistoryRepo = remember { SearchHistoryRepository(context) }
     var searchHistory by remember { mutableStateOf(searchHistoryRepo.getSearchHistory()) }
@@ -1163,20 +1195,29 @@ private fun PlanContent(
                             modifier = Modifier
                                 .size(56.dp)
                                 .background(Color.Black, CircleShape)
-                                .clickable { onFabClick() },
+                                .clickable { onFabClick(isAtCenteringTarget) },
                             contentAlignment = Alignment.Center
                         ) {
-                            Canvas(modifier = Modifier.size(18.dp)) {
-                                val radius = size.minDimension / 2f
-                                drawCircle(
-                                    color = Color(0xFF3B82F6),
-                                    radius = radius
+                            if (isAtCenteringTarget) {
+                                Icon(
+                                    painter = fabDrawableProvider.getPainter("add_triangle_24px"),
+                                    contentDescription = "Signaler une alerte",
+                                    tint = Color(0xFFFACC15),
+                                    modifier = Modifier.size(30.dp)
                                 )
-                                drawCircle(
-                                    color = Color.White,
-                                    radius = radius,
-                                    style = Stroke(width = 3.dp.toPx())
-                                )
+                            } else {
+                                Canvas(modifier = Modifier.size(18.dp)) {
+                                    val radius = size.minDimension / 2f
+                                    drawCircle(
+                                        color = Color(0xFF3B82F6),
+                                        radius = radius
+                                    )
+                                    drawCircle(
+                                        color = Color.White,
+                                        radius = radius,
+                                        style = Stroke(width = 3.dp.toPx())
+                                    )
+                                }
                             }
                         }
                     }
