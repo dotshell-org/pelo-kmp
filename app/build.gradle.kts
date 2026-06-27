@@ -125,7 +125,7 @@ android {
         create("release") {
             storeFile = rootProject.file("pelotcl.jks")
             storePassword = localProperties.getProperty("RELEASE_STORE_PASSWORD") ?: ""
-            keyAlias = "pelotcl-key"
+            keyAlias = "key0"
             keyPassword = localProperties.getProperty("RELEASE_KEY_PASSWORD") ?: ""
         }
     }
