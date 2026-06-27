@@ -283,9 +283,15 @@ private fun RootScaffold(
         }
     }
 
-    LaunchedEffect(userLocation) {
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == Destination.SETTINGS) {
+            hasCenteredInitially = false
+        }
+    }
+
+    LaunchedEffect(userLocation, selectedTab) {
         val loc = userLocation
-        if (loc != null && !hasCenteredInitially) {
+        if (loc != null && selectedTab == Destination.PLAN && !hasCenteredInitially) {
             manualFocusCenter = loc
             isCenteredOnUser = true
             hasCenteredInitially = true
@@ -647,30 +653,11 @@ private fun RootScaffold(
                         onItinerarySelected = { name -> startItinerary(name) },
                         isCenteredOnUser = isCenteredOnUser,
                         onFabClick = {
-                            val isOriented = kotlin.math.abs(cameraState.position.bearing) <= 1.0
-                            val isCenteredAndOriented = isCenteredOnUser && isOriented
-                            if (isCenteredAndOriented) {
-                                alertReportInitialStopName = null
-                                alertReportInitialLines = emptyList()
-                                showAlertReport = true
-                            } else if (!isOriented) {
-                                scope.launch {
-                                    cameraState.animateTo(
-                                        CameraPosition(
-                                            target = cameraState.position.target,
-                                            zoom = cameraState.position.zoom,
-                                            bearing = 0.0,
-                                            tilt = 0.0
-                                        )
-                                    )
-                                }
-                            } else {
-                                val loc = userLocation
-                                if (loc != null) {
-                                    manualFocusCenter = loc
-                                    manualFocusZoom = 18.0
-                                    isCenteredOnUser = true
-                                }
+                            val loc = userLocation
+                            if (loc != null) {
+                                manualFocusCenter = loc
+                                manualFocusZoom = 18.0
+                                isCenteredOnUser = true
                             }
                         },
                         onFabReset = {
@@ -1006,7 +993,7 @@ private fun PlanContent(
     val scope = rememberCoroutineScope()
     var isMapRotated by remember { mutableStateOf(false) }
     LaunchedEffect(cameraState) {
-        snapshotFlow { kotlin.math.abs(cameraState.position.bearing) > 1.0 }
+        snapshotFlow { kotlin.math.abs(cameraState.position.bearing) > 1.0 || cameraState.position.tilt > 1.0 }
             .distinctUntilChanged()
             .collect { isMapRotated = it }
     }
@@ -1084,24 +1071,52 @@ private fun PlanContent(
                 )
 
                 if (!showAlertReport && !navigationState.isActive) {
-                    Box(
+                    Column(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .padding(end = 16.dp, bottom = sheetPeekHeight + 16.dp)
-                            .size(56.dp)
-                            .background(Color.Black, CircleShape)
-                            .clickable { onFabClick() },
-                        contentAlignment = Alignment.Center
+                            .padding(end = 16.dp, bottom = sheetPeekHeight + 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        val isCenteredAndOriented = isCenteredOnUser && !isMapRotated
-                        if (isCenteredAndOriented) {
-                            Icon(
-                                painter = fabDrawableProvider.getPainter("add_triangle_24px"),
-                                contentDescription = "Signaler une alerte",
-                                tint = Color(0xFFFACC15),
-                                modifier = Modifier.size(30.dp)
-                            )
-                        } else {
+                        if (isMapRotated) {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(Color.Black, CircleShape)
+                                    .clickable {
+                                        scope.launch {
+                                            cameraState.animateTo(
+                                                CameraPosition(
+                                                    target = cameraState.position.target,
+                                                    zoom = cameraState.position.zoom,
+                                                    bearing = 0.0,
+                                                    tilt = 0.0
+                                                )
+                                            )
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Navigation,
+                                    contentDescription = "Réorienter la carte",
+                                    tint = Color.White,
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .graphicsLayer {
+                                            rotationZ = -cameraState.position.bearing.toFloat()
+                                        }
+                                )
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .size(56.dp)
+                                .background(Color.Black, CircleShape)
+                                .clickable { onFabClick() },
+                            contentAlignment = Alignment.Center
+                        ) {
                             Canvas(modifier = Modifier.size(18.dp)) {
                                 val radius = size.minDimension / 2f
                                 drawCircle(
