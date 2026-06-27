@@ -485,6 +485,7 @@ private fun RootScaffold(
         onNavigationModeChanged(false)
     }
     fun showStation(name: String, stopId: Int? = null, searchLines: List<String> = emptyList()) {
+        closeItinerary()
         val stop = stops?.firstOrNull { 
             (stopId != null && it.properties.id == stopId) || 
             it.properties.nom.equals(name, ignoreCase = true) 
@@ -498,10 +499,12 @@ private fun RootScaffold(
         selectedLine = null; allSchedules = null
     }
     fun showLine(name: String) {
+        closeItinerary()
         viewModel.selectLine(name); lineDirection = 0
         selectedLine = LineInfo(lineName = name, currentStationName = ""); selectedStation = null; allSchedules = null
     }
     fun showLineAtStation(lineName: String, stationName: String) {
+        closeItinerary()
         viewModel.selectLine(lineName); lineDirection = 0
         selectedLine = LineInfo(lineName = lineName, currentStationName = stationName); selectedStation = null; allSchedules = null
     }
