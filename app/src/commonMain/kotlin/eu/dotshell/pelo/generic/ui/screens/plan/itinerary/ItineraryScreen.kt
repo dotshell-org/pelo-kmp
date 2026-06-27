@@ -547,7 +547,6 @@ fun JourneyDetailsSheetContent(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .background(Color.White)
                 .padding(horizontal = 8.dp, vertical = 16.dp)
         ) {
             Row(
