@@ -18,6 +18,7 @@ import io.raptor.RaptorLibrary
 import io.raptor.data.NetworkLoader
 import io.raptor.model.Route
 import io.raptor.model.Stop
+import java.io.ByteArrayInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -191,8 +192,8 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                 ).map { periodId ->
                     PeriodData(
                         periodId = periodId,
-                        stopsBytes = fileSystem.readAssetBytes("raptor/stops_$periodId.bin"),
-                        routesBytes = fileSystem.readAssetBytes("raptor/routes_$periodId.bin")
+                        stopsInputStream = ByteArrayInputStream(fileSystem.readAssetBytes("raptor/stops_$periodId.bin")),
+                        routesInputStream = ByteArrayInputStream(fileSystem.readAssetBytes("raptor/routes_$periodId.bin"))
                     )
                 }
 
@@ -326,14 +327,14 @@ class RaptorRepository private constructor(private val context: PlatformContext)
 
     private fun getRoutesForPeriod(periodId: String): List<Route> {
         routesByPeriod[periodId]?.let { return it }
-        val loaded = NetworkLoader.loadRoutes(fileSystem.readAssetBytes("raptor/routes_$periodId.bin"))
+        val loaded = NetworkLoader.loadRoutes(ByteArrayInputStream(fileSystem.readAssetBytes("raptor/routes_$periodId.bin")))
         routesByPeriod = routesByPeriod + (periodId to loaded)
         return loaded
     }
 
     private fun getStopsForPeriod(periodId: String): List<Stop> {
         stopsByPeriod[periodId]?.let { return it }
-        val loaded = NetworkLoader.loadStops(fileSystem.readAssetBytes("raptor/stops_$periodId.bin"))
+        val loaded = NetworkLoader.loadStops(ByteArrayInputStream(fileSystem.readAssetBytes("raptor/stops_$periodId.bin")))
         stopsByPeriod = stopsByPeriod + (periodId to loaded)
         return loaded
     }
