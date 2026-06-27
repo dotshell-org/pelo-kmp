@@ -1028,7 +1028,9 @@ private fun PlanContent(
             if (loc != null) {
                 val deltaLat = cameraState.position.target.latitude - loc.latitude
                 val deltaLon = cameraState.position.target.longitude - loc.longitude
-                val isNear = kotlin.math.abs(deltaLat) < 0.0005 && kotlin.math.abs(deltaLon) < 0.0005
+                val dx = deltaLon * 77500.0
+                val dy = deltaLat * 111000.0
+                val isNear = (dx * dx + dy * dy) < 400.0 // less than 20 meters (20^2 = 400)
                 val isZoomed = cameraState.position.zoom >= 17.0
                 isNear && isZoomed
             } else {
