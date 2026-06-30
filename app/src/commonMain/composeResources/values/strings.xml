@@ -34,4 +34,12 @@
     <string name="recent_searches">Recherches récentes</string>
     <string name="delete">Supprimer</string>
     <string name="map_style_preview">Aperçu du style de carte</string>
+    <string name="back_to_station">Retour à la station</string>
+    <string name="no_stops_for_line">Aucun arrêt disponible pour cette ligne</string>
+    <string name="last_update">Dernière mise à jour %s</string>
+    <string name="alert_date_range">Du %1$s au %2$s</string>
+    <string name="direction">Direction</string>
+    <string name="no_schedule_at_stop">Aucun horaire disponible à cet arrêt</string>
+    <string name="next_departures">Prochains départs</string>
+    <string name="see_all">Voir tout</string>
 </resources>

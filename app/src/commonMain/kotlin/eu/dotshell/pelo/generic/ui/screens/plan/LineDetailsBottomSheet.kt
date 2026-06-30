@@ -5,6 +5,7 @@ import eu.dotshell.pelo.platform.ioDispatcher
 import eu.dotshell.pelo.platform.Log
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -185,6 +186,7 @@ fun LineDetailsBottomSheet(
     // Remembered so it stays stable as a remember() key below (it's rebuilt on every
     // recomposition otherwise, and this sheet recomposes as schedules/alerts load).
     val drawableProvider = remember(platformContext) { DrawableProvider(platformContext) }
+    val strings = StringProvider(platformContext)
 
     // Key states on lineInfo to reset when switching lines - prevents stale data accumulation
     val lineKey = lineInfo?.lineName to lineInfo?.currentStationName
@@ -324,7 +326,7 @@ fun LineDetailsBottomSheet(
                     IconButton(onClick = onBackToStation) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back to station",
+                            contentDescription = strings["back_to_station"],
                             tint = Gray700
                         )
                     }
@@ -350,7 +352,7 @@ fun LineDetailsBottomSheet(
                             if (hasLineIcon) {
                                 Image(
                                     painter = drawableProvider.getPainter(drawableName),
-                                    contentDescription = "Line ${lineInfo.lineName}",
+                                    contentDescription = strings["line_label"].replace("%s", lineInfo.lineName),
                                     modifier = Modifier.fillMaxSize()
                                 )
                             } else {
@@ -450,7 +452,7 @@ fun LineDetailsBottomSheet(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "Aucun arrêt disponible pour cette ligne",
+                                    text = strings["no_stops_for_line"],
                                     color = Gray700
                                 )
                             }
@@ -518,7 +520,7 @@ private fun TrafficAlertsSection(
                 formatTimeAgo(alertsTimestampMillis)
             }
             Text(
-                text = "Dernière mise à jour $agoText",
+                text = strings["last_update"].replace("%s", agoText),
                 color = Color.Gray,
                 fontSize = 12.sp,
                 fontStyle = FontStyle.Italic,
@@ -606,7 +608,9 @@ private fun TrafficAlertsSection(
                         return "${date.dayOfMonth.toString().padStart(2, '0')}/${date.monthNumber.toString().padStart(2, '0')}/${date.year} ${date.hour.toString().padStart(2, '0')}:${date.minute.toString().padStart(2, '0')}"
                     }
                     Text(
-                        text = "Du ${formatDate(alert.startDate)} au ${formatDate(alert.endDate)}",
+                        text = strings["alert_date_range"]
+                            .replace("%1\$s", formatDate(alert.startDate))
+                            .replace("%2\$s", formatDate(alert.endDate)),
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.Gray,
                         fontStyle = FontStyle.Italic
@@ -773,7 +777,7 @@ private fun NextSchedulesSection(
     ) {
         if (availableDirections.isNotEmpty()) {
             Text(
-                text = "Direction",
+                text = strings["direction"],
                 textAlign = TextAlign.Left,
                 fontSize = 22.sp,
                 color = PrimaryColor,
@@ -812,7 +816,7 @@ private fun NextSchedulesSection(
             Spacer(modifier = Modifier.height(16.dp))
         } else {
             Text(
-                text = "Aucun horaire disponible à cet arrêt",
+                text = strings["no_schedule_at_stop"],
                 textAlign = TextAlign.Left,
                 color = Color.DarkGray,
                 modifier = Modifier
@@ -823,7 +827,7 @@ private fun NextSchedulesSection(
 
         if (availableDirections.isNotEmpty()) {
             Text(
-                text = "Prochains départs",
+                text = strings["next_departures"],
                 textAlign = TextAlign.Left,
                 fontSize = 22.sp,
                 color = PrimaryColor,
@@ -873,7 +877,7 @@ private fun NextSchedulesSection(
 
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
-                    contentDescription = "See all",
+                    contentDescription = strings["see_all"],
                     tint = Gray700
                 )
             }
@@ -992,6 +996,7 @@ private fun ConnectionBadge(
     onClick: (() -> Unit)? = null
 ) {
     val drawableProvider = DrawableProvider(LocalPlatformContext.current)
+    val strings = StringProvider(LocalPlatformContext.current)
     val drawableName = remember(lineName) {
         LineIconResolver.getDrawableNameForLineName(lineName)
     }
@@ -1011,7 +1016,7 @@ private fun ConnectionBadge(
         // Display TCL image via Compose Resources (cross-platform)
         Image(
             painter = drawableProvider.getPainter(drawableName),
-            contentDescription = "Ligne $lineName",
+            contentDescription = strings["line_label"].replace("%s", lineName),
             modifier = modifier
         )
     }
