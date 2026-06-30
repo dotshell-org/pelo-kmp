@@ -78,7 +78,8 @@ fun SettingsScreen(
     LaunchedEffect(clickCount) {
         if (clickCount > 0) {
             delay(2000)
-            if (clickCount < 3) clickCount = 0
+            // The tap handler already resets to 0 on the 3rd tap, so by here clickCount is 1 or 2.
+            clickCount = 0
         }
     }
 

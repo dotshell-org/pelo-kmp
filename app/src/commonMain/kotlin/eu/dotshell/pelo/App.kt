@@ -713,18 +713,12 @@ private fun RootScaffold(
                                         onJourneysChanged = { activeJourneys = it },
                                         onSelectedJourneyChanged = { selectedJourney = it },
                                         onStartNavigation = { journey ->
-                                             val vm = viewModel
-                                             if (vm != null) {
-                                                 scope.launch {
-                                                     val tracePoints = calculateJourneyTrace(journey, vm)
-                                                     navigationController.start(journey, tracePoints)
-                                                     onNavigationModeChanged(true)
-                                                 }
-                                             } else {
-                                                 navigationController.start(journey)
-                                                 onNavigationModeChanged(true)
-                                             }
-                                         },
+                                            scope.launch {
+                                                val tracePoints = calculateJourneyTrace(journey, viewModel)
+                                                navigationController.start(journey, tracePoints)
+                                                onNavigationModeChanged(true)
+                                            }
+                                        },
                                         onClose = closeItinerary,
                                         onRequestExpandSheet = { },
                                     )

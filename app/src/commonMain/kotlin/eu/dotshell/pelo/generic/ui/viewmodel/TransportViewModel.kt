@@ -1208,45 +1208,6 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         return eu.dotshell.pelo.generic.ui.viewmodel.parseAlertTokens(raw, lineRules)
     }
 
-    private fun alertAffectsLine(alert: TrafficAlert, lineName: String): Boolean {
-        val target = normalizeLineToken(lineName)
-        if (target.isEmpty() || !isLikelyLineToken(target)) return false
-
-        // Check if the line is directly referenced in the alert's primary fields
-        val lineCodeTokens = parseAlertTokens(alert.lineCode)
-        val lineNameTokens = parseAlertTokens(alert.lineName)
-
-        // Only use objectList if the alert type specifically indicates it's about lines/routes
-        val shouldUseObjectList = alert.objectType.contains("ligne", ignoreCase = true) ||
-                alert.objectType.contains("line", ignoreCase = true) ||
-                alert.objectType.contains("route", ignoreCase = true)
-
-        val primaryTokens = buildSet {
-            addAll(lineCodeTokens)
-            addAll(lineNameTokens)
-            if (shouldUseObjectList) {
-                addAll(parseAlertTokens(alert.objectList))
-            }
-        }
-
-        // If we found the line in primary fields, it definitely affects this line
-        if (target in primaryTokens) {
-            return true
-        }
-
-        // Only check text fields if no primary fields matched
-        // This prevents false positives from mentions in message text
-        if (lineCodeTokens.isEmpty() && lineNameTokens.isEmpty() && !shouldUseObjectList) {
-            val textTokens = buildSet {
-                addAll(parseLineMentionsFromText(alert.title))
-                addAll(parseLineMentionsFromText(alert.message))
-            }
-            return target in textTokens
-        }
-
-        return false
-    }
-
     private fun parseTimeToMinutes(rawTime: String): Int? {
         return eu.dotshell.pelo.generic.ui.viewmodel.parseTimeToMinutes(rawTime)
     }
@@ -1267,10 +1228,6 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         vehiclePositionsJob?.cancel()
         globalLiveJob?.cancel()
         super.onCleared()
-    }
-
-    fun generateBezierCurve(start: List<Double>, end: List<Double>): List<List<Double>> {
-        return eu.dotshell.pelo.generic.ui.viewmodel.generateBezierCurve(start, end)
     }
 
     /**

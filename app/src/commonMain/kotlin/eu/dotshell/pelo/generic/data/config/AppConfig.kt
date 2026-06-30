@@ -32,8 +32,7 @@ data class TransportConfigData(
     val primaryColor: String,
     val secondaryColor: String,
     val trafficAlertsBaseUrl: String,
-    val vehiclePositionsStreamUrl: String,
-    val vehiclePositionsLineRefPattern: String = "(?<=::)[^:]+"
+    val vehiclePositionsStreamUrl: String
 )
 
 @Serializable

@@ -47,7 +47,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,7 +56,6 @@ import eu.dotshell.pelo.generic.data.telemetry.PlaceRef
 import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
 import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import kotlinx.datetime.Instant
-import kotlinx.serialization.json.Json
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -69,14 +67,6 @@ fun TelemetrySettingsScreen(
 ) {
     val strings = StringProvider(LocalPlatformContext.current)
     var showWipeConfirmDialog by remember { mutableStateOf(false) }
-
-    val prettyJson = remember {
-        Json {
-            prettyPrint = true
-            prettyPrintIndent = "  "
-            encodeDefaults = true
-        }
-    }
 
     if (showWipeConfirmDialog) {
         AlertDialog(

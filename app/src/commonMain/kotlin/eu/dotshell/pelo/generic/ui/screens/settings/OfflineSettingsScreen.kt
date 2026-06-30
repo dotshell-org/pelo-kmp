@@ -410,23 +410,6 @@ private fun StatusRow(label: String, value: String) {
     }
 }
 
-@Composable
-private fun FeatureRow(feature: String, available: Boolean) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = if (available) "✓" else "✕",
-            color = if (available) Color(0xFF4CAF50) else Color(0xFFEF4444),
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(feature, color = if (available) SecondaryColor else Color.Gray, fontSize = 14.sp)
-    }
-}
 
 @Composable
 private fun WavyLinearProgressIndicator(
