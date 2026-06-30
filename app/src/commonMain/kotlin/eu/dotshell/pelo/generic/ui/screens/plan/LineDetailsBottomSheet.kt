@@ -105,23 +105,22 @@ private fun getScheduleColorBasedOnTime(scheduleTime: String): Color {
     try {
         val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).time
 
-        val cleanTime = if (scheduleTime.count { it == ':' } == 2) {
+        val timeToParse = if (scheduleTime.count { it == ':' } == 2) {
             scheduleTime.substringBeforeLast(":")
         } else {
             scheduleTime
         }
 
-        val parts = cleanTime.split(":")
+        val parts = timeToParse.split(":")
         if (parts.size < 2) return Green500
 
         val hour = parts[0].toInt()
         val minute = parts[1].toInt()
         val schedule = LocalTime(hour, minute)
 
-        val diffMinutes = (schedule.toSecondOfDay() - now.toSecondOfDay()) / 60
-
+        var diffMinutes = (schedule.toSecondOfDay() - now.toSecondOfDay()) / 60
         if (diffMinutes < 0) {
-            return Green500
+            diffMinutes += 24 * 60
         }
 
         return when (diffMinutes) {
@@ -137,17 +136,21 @@ private fun getScheduleColorBasedOnTime(scheduleTime: String): Color {
 private fun getMinutesUntil(scheduleTime: String): Long? {
     try {
         val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).time
-        val cleanTime = if (scheduleTime.count { it == ':' } == 2) {
+
+        val timeToParse = if (scheduleTime.count { it == ':' } == 2) {
             scheduleTime.substringBeforeLast(":")
         } else {
             scheduleTime
         }
-        val parts = cleanTime.split(":")
+        val parts = timeToParse.split(":")
         if (parts.size < 2) return null
         val hour = parts[0].toInt()
         val minute = parts[1].toInt()
         val schedule = LocalTime(hour, minute)
-        val diff = (schedule.toSecondOfDay() - now.toSecondOfDay()) / 60
+        var diff = (schedule.toSecondOfDay() - now.toSecondOfDay()) / 60
+        if (diff < 0) {
+            diff += 24 * 60
+        }
         return if (diff < 0) null else diff.toLong()
     } catch (_: Exception) {
         return null
@@ -504,6 +507,7 @@ private fun TrafficAlertsSection(
     modifier: Modifier = Modifier,
     alertsTimestampMillis: Long? = null,
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     if (alerts.isEmpty()) {
         return
     }
@@ -710,6 +714,7 @@ private fun NextSchedulesSection(
     onShowAllSchedules: (lineName: String, directionName: String, schedules: List<String>) -> Unit,
     onItineraryClick: () -> Unit = {}
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     val headsigns by viewModel.headsigns.collectAsState(initial = emptyMap())
     val allSchedules by viewModel.allSchedules.collectAsState(initial = emptyList())
     val nextSchedules by viewModel.nextSchedules.collectAsState(initial = emptyList())

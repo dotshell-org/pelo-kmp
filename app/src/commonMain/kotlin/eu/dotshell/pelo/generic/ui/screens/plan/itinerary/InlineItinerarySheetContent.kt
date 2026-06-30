@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
@@ -152,14 +154,15 @@ fun InlineItinerarySheetContent(
             originIds: List<Int>,
             destinationIds: List<Int>,
             date: LocalDate,
-            blockedNames: Set<String>
+            blockedNames: Set<String>,
+            overrideTimeSeconds: Int? = null
         ): List<JourneyResult> {
             return withContext(ioDispatcher) {
                 if (timeMode == TimeMode.ARRIVAL) {
                     raptorRepository.getOptimizedPathsArriveBy(
                         originStopIds = originIds,
                         destinationStopIds = destinationIds,
-                        arrivalTimeSeconds = selectedTimeSeconds ?: defaultArrivalSeconds(),
+                        arrivalTimeSeconds = overrideTimeSeconds ?: selectedTimeSeconds ?: defaultArrivalSeconds(),
                         searchWindowMinutes = 120,
                         date = date,
                         blockedRouteNames = blockedNames
@@ -168,7 +171,7 @@ fun InlineItinerarySheetContent(
                     raptorRepository.getOptimizedPaths(
                         originStopIds = originIds,
                         destinationStopIds = destinationIds,
-                        departureTimeSeconds = selectedTimeSeconds,
+                        departureTimeSeconds = overrideTimeSeconds ?: selectedTimeSeconds,
                         date = date,
                         blockedRouteNames = blockedNames
                     )
@@ -352,7 +355,8 @@ fun InlineItinerarySheetContent(
                         originIds = departureStopIds,
                         destinationIds = arrivalStopIds,
                         date = tomorrow,
-                        blockedNames = blockedRouteNames
+                        blockedNames = blockedRouteNames,
+                        overrideTimeSeconds = 0
                     )
                     suppressRecalcOnce = true
                     selectedDate = tomorrow
@@ -644,6 +648,8 @@ fun InlineItinerarySheetContent(
                             Spacer(modifier = Modifier.height(10.dp))
                         }
                     }
+
+
 
                     if (journeysAvoidingAlerts.isNotEmpty()) {
                         items(journeysAvoidingAlerts, key = { "${journeySignature(it.journey)}_${it.label}" }) { avoidedJourney ->

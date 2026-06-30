@@ -38,6 +38,8 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.plus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -890,20 +892,39 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
                 isPublicHoliday = isPublicHoliday
             )
             _allSchedules.value = allSchedulesForDay
-            if (allSchedulesForDay.isEmpty()) return@launch
 
             val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
             val nowMinutes = now.hour * 60 + now.minute
             val ordered = allSchedulesForDay.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
 
-            // Only upcoming departures: padding with the full day's list reintroduced
-            // duplicates and showed already-passed times as if they were next.
             val nextThree = ordered
                 .filter { schedule ->
                     val minutes = parseTimeToMinutes(schedule) ?: return@filter false
                     minutes >= nowMinutes
                 }
                 .take(3)
+                .toMutableList()
+
+            if (nextThree.size < 3) {
+                // Fetch tomorrow's schedules to fill the list
+                val tomorrow = today.plus(1, DateTimeUnit.DAY)
+                val tomorrowIsSchoolHoliday = holidayDetector.isSchoolHoliday(tomorrow)
+                val tomorrowIsPublicHoliday = holidayDetector.isPublicHoliday(tomorrow)
+                val tomorrowSchedules = runCatching {
+                    schedulesRepository.getSchedules(
+                        lineName = resolveScheduleRouteName(lineName),
+                        stopName = stopName,
+                        directionId = directionId,
+                        isSchoolHoliday = tomorrowIsSchoolHoliday,
+                        isPublicHoliday = tomorrowIsPublicHoliday
+                    )
+                }.getOrDefault(emptyList())
+
+                val tomorrowOrdered = tomorrowSchedules.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+                val needed = 3 - nextThree.size
+                val tomorrowNext = tomorrowOrdered.take(needed)
+                nextThree.addAll(tomorrowNext)
+            }
 
             _nextSchedules.value = nextThree
         }

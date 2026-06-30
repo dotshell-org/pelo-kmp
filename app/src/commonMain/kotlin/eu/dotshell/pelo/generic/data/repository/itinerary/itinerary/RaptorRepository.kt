@@ -73,6 +73,10 @@ class RaptorRepository private constructor(private val context: PlatformContext)
     // Performance: HashMap index for O(1) stop lookup by index position
     private var stopsByIndex: Map<Int, Stop> = emptyMap()
 
+    // Performance: Cache of stop names with active lines to avoid O(N^2) lookups in findNearestStops
+    @Volatile
+    private var stopsWithRoutes: Set<String> = emptySet()
+
     // Performance: Cache of normalized stop names to avoid repeated normalization during search
     private var normalizedStopNames: Map<Stop, String> = emptyMap()
     private var stopIdsByNormalizedName: Map<String, List<Int>> = emptyMap()
@@ -375,6 +379,20 @@ class RaptorRepository private constructor(private val context: PlatformContext)
         stopIdsByNormalizedName = stopsCache
             .groupBy { stop -> SearchUtils.normalizeForSearch(stop.name) }
             .mapValues { (_, stops) -> stops.map { it.id }.distinct() }
+
+        // Build stopsWithRoutes cache for fast hasLinesForStop lookup
+        val period = raptorLibrary?.getCurrentPeriod()
+        if (period != null) {
+            val stops = getStopsForPeriod(period)
+            val routes = getRoutesForPeriod(period)
+            val routeIdsWithVariants = routes.map { it.id }.toSet()
+            stopsWithRoutes = stops
+                .filter { stop -> stop.routeIds.any { routeIdsWithVariants.contains(it) } }
+                .map { it.name.lowercase() }
+                .toSet()
+        } else {
+            stopsWithRoutes = emptySet()
+        }
     }
 
     /**
@@ -518,8 +536,8 @@ class RaptorRepository private constructor(private val context: PlatformContext)
      * @param stopName The name of the stop to check
      * @return true if the stop has at least one line, false otherwise
      */
-    private suspend fun hasLinesForStop(stopName: String): Boolean {
-        return getDesserteForStop(stopName)?.isNotEmpty() == true
+    private fun hasLinesForStop(stopName: String): Boolean {
+        return stopsWithRoutes.contains(stopName.lowercase())
     }
 
     /**

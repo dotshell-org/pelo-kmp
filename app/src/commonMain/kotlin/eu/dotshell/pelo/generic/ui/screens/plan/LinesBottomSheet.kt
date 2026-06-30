@@ -313,6 +313,7 @@ private fun LineChip(
     alertSeverity: TrafficAlertSeverity? = null,
     drawableProvider: DrawableProvider
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     val drawableName = remember(lineName) { LineIconResolver.getDrawableNameForLineName(lineName) }
     val hasIcon = remember(drawableName, drawableProvider) {
         drawableProvider.hasDrawable(drawableName)
