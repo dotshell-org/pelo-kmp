@@ -56,6 +56,7 @@ import eu.dotshell.pelo.generic.utils.LineColorHelper
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 
 /**
  * Bottom Sheet qui affiche toutes les lignes organisées par catégories
@@ -72,6 +73,7 @@ fun LinesBottomSheet(
     // made the remember(allLines, drawableProvider) key below change each pass and re-ran the
     // (filter + bucket + natural sort) categorizeLines() on every keystroke.
     val drawableProvider = remember(platformContext) { DrawableProvider(platformContext) }
+    val strings = StringProvider(platformContext)
     var searchQuery by remember { mutableStateOf("") }
 
     // State pour gérer le scroll
@@ -289,7 +291,7 @@ fun LinesBottomSheet(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Aucune ligne trouvée",
+                            text = strings["no_lines_found"],
                             color = Color.Gray,
                             style = MaterialTheme.typography.bodyLarge
                         )
@@ -333,7 +335,7 @@ private fun LineChip(
                 // Use official TCL icon
                 Icon(
                     painter = drawableProvider.getPainter(drawableName),
-                    contentDescription = "Ligne $lineName",
+                    contentDescription = strings["line_label"].replace("%s", lineName),
                     modifier = Modifier.size(64.dp),
                     tint = Color.Unspecified
                 )

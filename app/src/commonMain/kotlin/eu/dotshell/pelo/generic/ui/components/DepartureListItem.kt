@@ -26,6 +26,7 @@ import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.generic.utils.schedule.DepartureManager
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 
 @Composable
 fun DepartureListItem(
@@ -35,6 +36,7 @@ fun DepartureListItem(
     onClick: () -> Unit
 ) {
     val drawableProvider = DrawableProvider(LocalPlatformContext.current)
+    val strings = StringProvider(LocalPlatformContext.current)
     val drawableName = remember(lineName) {
         LineIconResolver.getDrawableNameForLineName(lineName)
     }
@@ -55,7 +57,7 @@ fun DepartureListItem(
             if (hasDrawable) {
                 Image(
                     painter = drawableProvider.getPainter(drawableName),
-                    contentDescription = "Ligne $lineName",
+                    contentDescription = strings["line_label"].replace("%s", lineName),
                     modifier = Modifier.size(52.dp)
                 )
             } else {
@@ -94,7 +96,7 @@ fun DepartureListItem(
 
         Icon(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-            contentDescription = "Voir le détail de la ligne $lineName",
+            contentDescription = strings["line_details_cd"].replace("%s", lineName),
             tint = Gray700,
             modifier = Modifier.size(24.dp)
         )

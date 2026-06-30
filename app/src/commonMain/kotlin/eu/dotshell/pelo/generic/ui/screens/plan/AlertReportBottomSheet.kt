@@ -75,6 +75,7 @@ import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.generic.utils.LineColorHelper
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 import eu.dotshell.pelo.platform.Log
 import eu.dotshell.pelo.platform.randomId
 import eu.dotshell.pelo.platform.showToast
@@ -105,6 +106,7 @@ fun AlertReportBottomSheet(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalPlatformContext.current
+    val strings = StringProvider(context)
     var selectedStop by remember { mutableStateOf<StationSearchResult?>(initialStop) }
     var selectedLine by remember { mutableStateOf<LineSearchResult?>(null) }
     var showSearchFullscreen by remember { mutableStateOf(false) }
@@ -128,7 +130,7 @@ fun AlertReportBottomSheet(
             if (selectedStop == null && selectedLine == null) {
                 // PAGE 1: Initial view
                 Text(
-                    text = "Signaler une alerte",
+                    text = strings["alert_report_title"],
                     style = MaterialTheme.typography.headlineSmall,
                     color = Color.Black,
                     fontWeight = FontWeight.Normal,
@@ -136,7 +138,7 @@ fun AlertReportBottomSheet(
                 )
 
                 Text(
-                    text = "Commencez par rechercher un arrêt ou une ligne.",
+                    text = strings["alert_report_search_hint"],
                     color = Color.Black,
                     modifier = Modifier.padding(bottom = 16.dp, start = 8.dp)
                 )
@@ -163,7 +165,7 @@ fun AlertReportBottomSheet(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "Rechercher",
+                        text = strings["search"],
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.White
                     )
@@ -193,7 +195,7 @@ fun AlertReportBottomSheet(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "Arrêt le plus proche",
+                        text = strings["nearest_stop"],
                         style = MaterialTheme.typography.bodyMedium,
                         color = Color.Black,
                         textAlign = TextAlign.Center
@@ -209,7 +211,7 @@ fun AlertReportBottomSheet(
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Retour",
+                        contentDescription = strings["back"],
                         tint = Color.Black,
                         modifier = Modifier
                             .size(24.dp)
@@ -237,7 +239,7 @@ fun AlertReportBottomSheet(
                         if (hasIcon) {
                             Image(
                                 painter = drawableProvider.getPainter(drawableName),
-                                contentDescription = "Ligne $lineName",
+                                contentDescription = strings["line_label"].replace("%s", lineName),
                                 modifier = Modifier.size(44.dp)
                             )
                         } else {

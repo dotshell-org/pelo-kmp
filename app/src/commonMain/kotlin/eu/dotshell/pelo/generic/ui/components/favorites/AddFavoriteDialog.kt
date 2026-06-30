@@ -54,6 +54,8 @@ import eu.dotshell.pelo.generic.ui.theme.Gray700
 import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
 import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModelInterface
+import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 
 /**
  * Dialog for creating a new favorite from predefined presets.
@@ -68,6 +70,7 @@ fun AddFavoriteDialog(
     viewModel: TransportViewModelInterface,
     initialStopName: String? = null
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val presets = remember {
@@ -126,7 +129,7 @@ fun AddFavoriteDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Nouveau favori",
+                    text = strings["favorite_new"],
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = PrimaryColor
@@ -134,7 +137,7 @@ fun AddFavoriteDialog(
                 IconButton(onClick = onDismiss) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Fermer",
+                        contentDescription = strings["close"],
                         tint = Gray700
                     )
                 }
@@ -144,7 +147,7 @@ fun AddFavoriteDialog(
 
             // Preset selection
             Text(
-                text = "Type de favori",
+                text = strings["favorite_type"],
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
                 color = PrimaryColor
@@ -173,7 +176,7 @@ fun AddFavoriteDialog(
             if (isOtherSelected) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Titre du favori",
+                    text = strings["favorite_title"],
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     color = PrimaryColor
@@ -196,7 +199,7 @@ fun AddFavoriteDialog(
                     decorationBox = { innerTextField ->
                         if (customOtherTitle.isBlank()) {
                             Text(
-                                text = "Ex: Salle de sport",
+                                text = strings["favorite_title_placeholder"],
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color.Gray
                             )
@@ -210,7 +213,7 @@ fun AddFavoriteDialog(
 
             // Stop selection
             Text(
-                text = "Arrêt associé",
+                text = strings["favorite_associated_stop"],
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
                 color = PrimaryColor
@@ -265,7 +268,7 @@ fun AddFavoriteDialog(
                 enabled = selectedPreset != null && selectedStop != null && finalFavoriteTitle.isNotBlank()
             ) {
                 Text(
-                    text = "Créer le favori",
+                    text = strings["favorite_create"],
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )

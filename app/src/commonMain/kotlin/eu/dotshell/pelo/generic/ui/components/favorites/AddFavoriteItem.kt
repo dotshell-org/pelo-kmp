@@ -24,6 +24,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
 import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 
 @Composable
 fun AddFavoriteItem(
@@ -31,6 +33,7 @@ fun AddFavoriteItem(
     textStyle: TextStyle,
     isDarkMode: Boolean = false
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     Row(
         modifier = Modifier
             .shadow(4.dp, RoundedCornerShape(20.dp))
@@ -43,13 +46,13 @@ fun AddFavoriteItem(
     ) {
         Icon(
             imageVector = Icons.Default.Add,
-            contentDescription = "Ajouter un favori",
+            contentDescription = strings["favorite_add"],
             tint = SecondaryColor,
             modifier = Modifier.size(16.dp)
         )
         Spacer(modifier = Modifier.width(4.dp))
         Text(
-            text = "Créer un favori",
+            text = strings["favorite_create_cta"],
             style = textStyle,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis

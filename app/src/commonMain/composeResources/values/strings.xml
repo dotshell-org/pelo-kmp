@@ -9,4 +9,25 @@
     <string name="downloaded">Téléchargé</string>
     <string name="stale_data_warning">Avertissement de données anciennes</string>
     <string name="category_header">Catégorie</string>
+    <string name="close">Fermer</string>
+    <string name="back">Retour</string>
+    <string name="search">Rechercher</string>
+    <string name="line_label">Ligne %s</string>
+    <string name="favorite_new">Nouveau favori</string>
+    <string name="favorite_type">Type de favori</string>
+    <string name="favorite_title">Titre du favori</string>
+    <string name="favorite_title_placeholder">Ex: Salle de sport</string>
+    <string name="favorite_associated_stop">Arrêt associé</string>
+    <string name="favorite_create">Créer le favori</string>
+    <string name="favorite_create_cta">Créer un favori</string>
+    <string name="favorite_add">Ajouter un favori</string>
+    <string name="alert_report_title">Signaler une alerte</string>
+    <string name="alert_report_search_hint">Commencez par rechercher un arrêt ou une ligne.</string>
+    <string name="nearest_stop">Arrêt le plus proche</string>
+    <string name="itinerary">Itinéraire</string>
+    <string name="add_to_favorites">Ajouter aux favoris</string>
+    <string name="no_schedule_for_stop">Aucun horaire disponible pour cet arrêt</string>
+    <string name="line_details_cd">Voir le détail de la ligne %s</string>
+    <string name="no_lines_found">Aucune ligne trouvée</string>
+    <string name="theme_title">Thème</string>
 </resources>

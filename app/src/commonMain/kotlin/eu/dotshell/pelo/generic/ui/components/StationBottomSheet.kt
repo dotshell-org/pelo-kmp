@@ -48,6 +48,7 @@ import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModelInterface
 import eu.dotshell.pelo.generic.utils.schedule.DepartureManager
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 import eu.dotshell.pelo.generic.data.telemetry.emitTelemetryEvent
 import eu.dotshell.pelo.platform.provideTransportLineRules
 import eu.dotshell.pelo.platform.randomId
@@ -74,6 +75,7 @@ fun StationBottomSheet(
     val actionsInset = 8.dp
 
     val drawableProvider = DrawableProvider(LocalPlatformContext.current)
+    val strings = StringProvider(LocalPlatformContext.current)
     val stationName = stationInfo?.nom
 
     androidx.compose.runtime.LaunchedEffect(stationName) {
@@ -169,7 +171,7 @@ fun StationBottomSheet(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.size(8.dp))
-                        Text(text = "Itinéraire", fontWeight = FontWeight.Bold)
+                        Text(text = strings["itinerary"], fontWeight = FontWeight.Bold)
                     }
 
                     Button(
@@ -190,7 +192,7 @@ fun StationBottomSheet(
                         )
                         Spacer(modifier = Modifier.size(8.dp))
                         Text(
-                            text = "Signaler une alerte",
+                            text = strings["alert_report_title"],
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -211,7 +213,7 @@ fun StationBottomSheet(
                         )
                         Spacer(modifier = Modifier.size(8.dp))
                         Text(
-                            text = "Ajouter aux favoris",
+                            text = strings["add_to_favorites"],
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -259,7 +261,7 @@ fun StationBottomSheet(
                         departures.isEmpty() -> {
                             item(key = "empty") {
                                 Text(
-                                    text = "Aucun horaire disponible pour cet arrêt",
+                                    text = strings["no_schedule_for_stop"],
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = Gray700,
                                     modifier = Modifier.padding(vertical = 12.dp)
