@@ -131,6 +131,7 @@ import eu.dotshell.pelo.generic.ui.screens.onboarding.TelemetryOptInGate
 import eu.dotshell.pelo.generic.ui.screens.settings.about.ContactScreen
 import eu.dotshell.pelo.generic.ui.screens.settings.about.CreditsScreen
 import eu.dotshell.pelo.generic.ui.screens.settings.about.LegalScreen
+import eu.dotshell.pelo.generic.ui.screens.settings.LanguageSettingsScreen
 import eu.dotshell.pelo.generic.ui.theme.AccentColor
 import eu.dotshell.pelo.generic.ui.theme.PeloTheme
 import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
@@ -1397,6 +1398,7 @@ private fun SettingsTab(viewModel: TransportViewModel, modifier: Modifier = Modi
             "credits" -> CreditsScreen(onBackClick = navigateBack)
             "contact" -> ContactScreen(onBackClick = navigateBack)
             "offline" -> OfflineSettingsScreen(viewModel = viewModel, onBackClick = navigateBack)
+            "language" -> LanguageSettingsScreen(onBackClick = navigateBack)
             "itinerary" -> {
                 val cfg = remember { AppConfigLoader.getConfig().itinerarySettings }
                 val prefs = remember { ItineraryPreferencesRepository(context) }
@@ -1438,6 +1440,7 @@ private fun SettingsTab(viewModel: TransportViewModel, modifier: Modifier = Modi
                 onContactClick = { navigateTo("contact") },
                 onOfflineClick = {},
                 onTelemetryClick = {},
+                onLanguageClick = { navigateTo("language") },
                 isAboutMenu = true
             )
             else -> SettingsScreen(
@@ -1450,6 +1453,7 @@ private fun SettingsTab(viewModel: TransportViewModel, modifier: Modifier = Modi
                 onOfflineClick = { navigateTo("offline") },
                 onTelemetryClick = { navigateTo("telemetry") },
                 onAboutClick = { navigateTo("about") },
+                onLanguageClick = { navigateTo("language") },
                 isAboutMenu = false
             )
         }

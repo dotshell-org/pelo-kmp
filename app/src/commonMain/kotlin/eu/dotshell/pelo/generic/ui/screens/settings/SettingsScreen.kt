@@ -69,11 +69,11 @@ fun SettingsScreen(
     onApiHealthClick: () -> Unit = {},
     onTelemetryClick: () -> Unit = {},
     onAboutClick: () -> Unit = {},
+    onLanguageClick: () -> Unit = {},
     isAboutMenu: Boolean = false
 ) {
     var clickCount by remember { mutableIntStateOf(0) }
     var isEasterEggActive by remember { mutableStateOf(false) }
-    var showLanguageDialog by remember { mutableStateOf(false) }
     val hapticFeedback = LocalHapticFeedback.current
     val drawableProvider = DrawableProvider(LocalPlatformContext.current)
     val strings = StringProvider(LocalPlatformContext.current)
@@ -181,7 +181,7 @@ fun SettingsScreen(
                 SettingsMenuRow(
                     title = strings["language_title"],
                     subtitle = currentLanguageLabel,
-                    onClick = { showLanguageDialog = true }
+                    onClick = onLanguageClick
                 )
             }
 
@@ -199,45 +199,6 @@ fun SettingsScreen(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = strings["back"],
                 tint = SecondaryColor
-            )
-        }
-
-        if (showLanguageDialog) {
-            AlertDialog(
-                onDismissRequest = { showLanguageDialog = false },
-                confirmButton = {},
-                title = { Text(strings["language_title"]) },
-                text = {
-                    Column {
-                        eu.dotshell.pelo.platform.AppLanguage.entries.forEach { lang ->
-                            val label = if (lang == eu.dotshell.pelo.platform.AppLanguage.SYSTEM) {
-                                strings["language_system"]
-                            } else {
-                                lang.nativeName
-                            }
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        eu.dotshell.pelo.platform.LanguageManager.set(lang)
-                                        showLanguageDialog = false
-                                    }
-                                    .padding(vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                RadioButton(
-                                    selected = eu.dotshell.pelo.platform.LanguageManager.current == lang,
-                                    onClick = {
-                                        eu.dotshell.pelo.platform.LanguageManager.set(lang)
-                                        showLanguageDialog = false
-                                    }
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(label)
-                            }
-                        }
-                    }
-                }
             )
         }
     }
