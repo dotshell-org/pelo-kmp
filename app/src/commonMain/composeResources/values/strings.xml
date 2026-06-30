@@ -30,4 +30,8 @@
     <string name="line_details_cd">Voir le détail de la ligne %s</string>
     <string name="no_lines_found">Aucune ligne trouvée</string>
     <string name="theme_title">Thème</string>
+    <string name="next_up">À suivre</string>
+    <string name="recent_searches">Recherches récentes</string>
+    <string name="delete">Supprimer</string>
+    <string name="map_style_preview">Aperçu du style de carte</string>
 </resources>

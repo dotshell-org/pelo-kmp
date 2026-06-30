@@ -2,6 +2,8 @@ package eu.dotshell.pelo.generic.ui.components.search.bar
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -96,6 +98,7 @@ fun SimpleSearchBar(
     minQueryLengthForResults: Int = 1,
     showDirections: Boolean = true
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     val isControlled = externalQuery != null && externalOnQueryChange != null
     var internalQuery by rememberSaveable { mutableStateOf("") }
     val queryText = if (isControlled) externalQuery else internalQuery
@@ -245,7 +248,7 @@ fun SimpleSearchBar(
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Search,
-                                contentDescription = "Search",
+                                contentDescription = strings["search"],
                                 tint = AccentColor,
                                 modifier = Modifier.padding(start = 32.dp, end = 12.dp)
                             )
@@ -285,7 +288,7 @@ fun SimpleSearchBar(
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Search,
-                                contentDescription = "Search",
+                                contentDescription = strings["search"],
                                 tint = AccentColor
                             )
                         },
@@ -346,7 +349,7 @@ fun SimpleSearchBar(
             ) {
                 if (queryText.isEmpty() && showHistory && searchHistory.isNotEmpty()) {
                     item(key = "history_header") {
-                        SectionHeader(icon = Icons.Default.History, text = "Recherches récentes")
+                        SectionHeader(icon = Icons.Default.History, text = strings["recent_searches"])
                     }
                     items(searchHistory, key = { "history_${it.query}_${it.type}" }) { historyItem ->
                         HistoryListItem(

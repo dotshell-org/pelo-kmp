@@ -57,6 +57,7 @@ import eu.dotshell.pelo.generic.utils.search.SearchUtils
 import eu.dotshell.pelo.generic.utils.LineColorHelper
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 import eu.dotshell.pelo.platform.randomId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -95,6 +96,7 @@ fun InlineItinerarySheetContent(
 ) {
     val raptorRepository = viewModel.raptorRepository
     val context = LocalPlatformContext.current
+    val strings = StringProvider(context)
 
     // Load user preferences for route filtering
     val itineraryPrefsRepo = remember { ItineraryPreferencesRepository(context) }
@@ -510,7 +512,7 @@ fun InlineItinerarySheetContent(
             // Show "Itinéraire" title when no journey is selected
             if (selectedJourney == null) {
                 Text(
-                    text = "Itinéraire",
+                    text = strings["itinerary"],
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = PrimaryColor,

@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.data.network.mapstyle.MapStyleData
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 
 @Composable
 fun MapStylePreviewTile(
@@ -33,6 +34,7 @@ fun MapStylePreviewTile(
         else -> "visu_positron"
     }
     val drawableProvider = DrawableProvider(LocalPlatformContext.current)
+    val strings = StringProvider(LocalPlatformContext.current)
     val previewPainter = drawableProvider.getPainter(drawableName)
     val alpha = if (isEnabled) 1f else 0.4f
     Box(
@@ -49,7 +51,7 @@ fun MapStylePreviewTile(
     ) {
         Image(
             painter = previewPainter,
-            contentDescription = "Aperçu du style de carte",
+            contentDescription = strings["map_style_preview"],
             modifier = Modifier.fillMaxSize(),
             alpha = alpha
         )

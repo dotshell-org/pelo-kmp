@@ -49,6 +49,7 @@ import eu.dotshell.pelo.generic.utils.LineColorHelper
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -87,6 +88,7 @@ fun AllSchedulesSheetContent(
     onBack: () -> Unit
 ) {
     val drawableProvider = DrawableProvider(LocalPlatformContext.current)
+    val strings = StringProvider(LocalPlatformContext.current)
     val drawableName = remember(allSchedulesInfo.lineName) {
         LineIconResolver.getDrawableNameForLineName(allSchedulesInfo.lineName)
     }
@@ -116,7 +118,7 @@ fun AllSchedulesSheetContent(
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
+                    contentDescription = strings["back"],
                     tint = Gray700
                 )
             }
@@ -125,7 +127,7 @@ fun AllSchedulesSheetContent(
             if (hasDrawable) {
                 Image(
                     painter = drawableProvider.getPainter(drawableName),
-                    contentDescription = "Line ${allSchedulesInfo.lineName}",
+                    contentDescription = strings["line_label"].replace("%s", allSchedulesInfo.lineName),
                     modifier = Modifier.size(50.dp)
                 )
             } else {

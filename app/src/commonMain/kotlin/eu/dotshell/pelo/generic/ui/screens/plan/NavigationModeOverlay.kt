@@ -30,6 +30,7 @@ import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
 import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 
 @Composable
 fun NavigationModeOverlay(
@@ -38,6 +39,7 @@ fun NavigationModeOverlay(
     onReportAlert: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     val displayedLeg = state.displayedLeg
     val topShape = if (state.upcomingLeg != null) {
         RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 0.dp, bottomEnd = 20.dp)
@@ -123,7 +125,7 @@ fun NavigationModeOverlay(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Text(
-                            text = "A suivre",
+                            text = strings["next_up"],
                             fontSize = 16.sp,
                             color = SecondaryColor,
                             style = MaterialTheme.typography.bodySmall
@@ -165,7 +167,7 @@ fun NavigationModeOverlay(
 
             Icon(
                 imageVector = Icons.Filled.Close,
-                contentDescription = "Retour",
+                contentDescription = strings["back"],
                 tint = SecondaryColor,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
@@ -180,7 +182,7 @@ fun NavigationModeOverlay(
             val drawableProvider = DrawableProvider(LocalPlatformContext.current)
             Icon(
                 painter = drawableProvider.getPainter("add_triangle_24px"),
-                contentDescription = "Signaler une alerte",
+                contentDescription = strings["alert_report_title"],
                 tint = Color(0xFFFACC15),
                 modifier = Modifier
                     .align(Alignment.CenterEnd)

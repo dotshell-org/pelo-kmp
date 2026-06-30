@@ -29,6 +29,8 @@ import eu.dotshell.pelo.generic.data.models.search.StationSearchResult
 import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
 import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import eu.dotshell.pelo.generic.ui.theme.Stone900
+import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 import eu.dotshell.pelo.platform.provideTransportLineRules
 
 @Composable
@@ -37,6 +39,7 @@ fun StopSearchResultItem(
     onClick: () -> Unit,
     onOptionsClick: () -> Unit
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     ListItem(
         headlineContent = {
             Column(modifier = Modifier.padding(horizontal = 24.dp)) {
@@ -85,7 +88,7 @@ fun StopSearchResultItem(
             ) {
                 Icon(
                     imageVector = Icons.Default.Directions,
-                    contentDescription = "Itinéraire",
+                    contentDescription = strings["itinerary"],
                     tint = SecondaryColor,
                     modifier = Modifier
                         .size(17.dp)
