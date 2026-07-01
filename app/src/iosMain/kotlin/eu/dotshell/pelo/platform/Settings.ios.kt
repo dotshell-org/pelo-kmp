@@ -40,10 +40,11 @@ actual class Settings actual constructor(context: PlatformContext, name: String)
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
     actual fun getStringSet(key: String, defaultValue: Set<String>): Set<String> {
         val array = defaults.arrayForKey(key) ?: return defaultValue
-        return (array as List<String>).toSet()
+        // filterIsInstance instead of an unchecked `as List<String>`: a stored array that isn't
+        // all strings (legacy/corrupt data) would otherwise crash on the cast.
+        return array.filterIsInstance<String>().toSet()
     }
 
     actual fun putStringSet(key: String, value: Set<String>) =

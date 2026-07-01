@@ -127,13 +127,12 @@ class LocalHistoryStorage(context: PlatformContext) {
     private fun <T> writeList(fileName: String, value: List<T>, elementSerializer: KSerializer<T>) {
         try {
             val path = "$BASE_DIR/$fileName"
-            val tmpPath = "$BASE_DIR/${fileName}.tmp"
             val encoded = json.encodeToString(ListSerializer(elementSerializer), value)
-            fs.writeFile(tmpPath, encoded)
-            // Atomic rename: delete target first, then rename tmp
-            fs.deleteFile(path)
+            // Single overwrite. The previous "delete target then rewrite" left a window where a
+            // crash between the delete and the write lost the data entirely (and the tmp copy was
+            // never read back on load). writeFile overwrites in place — atomic on iOS
+            // (NSString.writeToFile atomically=true) and a plain truncate-write on Android.
             fs.writeFile(path, encoded)
-            fs.deleteFile(tmpPath)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to persist $fileName: ${e.message}")
         }

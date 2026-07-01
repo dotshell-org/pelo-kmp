@@ -126,8 +126,11 @@ class DailyReportRepository(
         val current = _state.value ?: return@withLock null
         forceFlush()
 
-        val pendingEvents = current.events.filter { it.eventId in pendingEventIds.toSet() }
-        val pendingSessions = current.sessions.filter { it.sessionId in pendingSessionIds.toSet() }
+        // Hoist the sets out of the filter lambdas — otherwise toSet() rebuilt them per element.
+        val pendingEventIdSet = pendingEventIds.toSet()
+        val pendingSessionIdSet = pendingSessionIds.toSet()
+        val pendingEvents = current.events.filter { it.eventId in pendingEventIdSet }
+        val pendingSessions = current.sessions.filter { it.sessionId in pendingSessionIdSet }
         if (pendingEvents.isEmpty() && pendingSessions.isEmpty()) return@withLock null
 
         UploadSnapshot(
@@ -197,12 +200,6 @@ class DailyReportRepository(
     }
 
     private fun nowIso(): String = Clock.System.now().toString()
-
-    /**
-     * Helper to mint event_ids consistently. Useful for call sites that construct events
-     * manually instead of going through the [TelemetryEmitter] (rare).
-     */
-    fun newEventId(): String = randomId()
 
     companion object {
         private const val TAG = "TelemetryRepo"

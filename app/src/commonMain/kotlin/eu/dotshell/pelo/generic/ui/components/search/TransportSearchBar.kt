@@ -27,7 +27,7 @@ fun TransportSearchBar(
     showHistory: Boolean = true,
     startExpanded: Boolean = false,
     showDarkOutline: Boolean? = null,
-    searchPlaceholder: String = "Rechercher",
+    searchPlaceholder: String? = null,
     query: String? = null,
     onQueryChange: ((String) -> Unit)? = null,
     minQueryLengthForResults: Int? = null,

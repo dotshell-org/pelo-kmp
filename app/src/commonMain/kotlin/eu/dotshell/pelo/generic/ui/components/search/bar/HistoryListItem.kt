@@ -33,6 +33,8 @@ import eu.dotshell.pelo.generic.ui.components.search.bar.stops.SearchConnectionB
 import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
 import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import eu.dotshell.pelo.generic.ui.theme.Stone900
+import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 import eu.dotshell.pelo.platform.provideTransportLineRules
 
 @Composable
@@ -43,6 +45,7 @@ fun HistoryListItem(
     onOptionsClick: () -> Unit,
     onRemoveClick: () -> Unit
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     ListItem(
         headlineContent = {
             Row(
@@ -108,7 +111,7 @@ fun HistoryListItem(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Directions,
-                            contentDescription = "Itinéraire",
+                            contentDescription = strings["itinerary"],
                             tint = SecondaryColor,
                             modifier = Modifier
                                 .size(17.dp)
@@ -120,7 +123,7 @@ fun HistoryListItem(
                     IconButton(onClick = onRemoveClick) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Supprimer",
+                            contentDescription = strings["delete"],
                             tint = SecondaryColor.copy(alpha = 0.5f),
                             modifier = Modifier.size(18.dp)
                         )

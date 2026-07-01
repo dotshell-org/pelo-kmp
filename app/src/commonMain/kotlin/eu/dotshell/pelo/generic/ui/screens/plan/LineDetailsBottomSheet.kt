@@ -5,6 +5,7 @@ import eu.dotshell.pelo.platform.ioDispatcher
 import eu.dotshell.pelo.platform.Log
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -104,23 +105,22 @@ private fun getScheduleColorBasedOnTime(scheduleTime: String): Color {
     try {
         val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).time
 
-        val cleanTime = if (scheduleTime.count { it == ':' } == 2) {
+        val timeToParse = if (scheduleTime.count { it == ':' } == 2) {
             scheduleTime.substringBeforeLast(":")
         } else {
             scheduleTime
         }
 
-        val parts = cleanTime.split(":")
+        val parts = timeToParse.split(":")
         if (parts.size < 2) return Green500
 
         val hour = parts[0].toInt()
         val minute = parts[1].toInt()
         val schedule = LocalTime(hour, minute)
 
-        val diffMinutes = (schedule.toSecondOfDay() - now.toSecondOfDay()) / 60
-
+        var diffMinutes = (schedule.toSecondOfDay() - now.toSecondOfDay()) / 60
         if (diffMinutes < 0) {
-            return Green500
+            diffMinutes += 24 * 60
         }
 
         return when (diffMinutes) {
@@ -136,30 +136,37 @@ private fun getScheduleColorBasedOnTime(scheduleTime: String): Color {
 private fun getMinutesUntil(scheduleTime: String): Long? {
     try {
         val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).time
-        val cleanTime = if (scheduleTime.count { it == ':' } == 2) {
+
+        val timeToParse = if (scheduleTime.count { it == ':' } == 2) {
             scheduleTime.substringBeforeLast(":")
         } else {
             scheduleTime
         }
-        val parts = cleanTime.split(":")
+        val parts = timeToParse.split(":")
         if (parts.size < 2) return null
         val hour = parts[0].toInt()
         val minute = parts[1].toInt()
         val schedule = LocalTime(hour, minute)
-        val diff = (schedule.toSecondOfDay() - now.toSecondOfDay()) / 60
+        var diff = (schedule.toSecondOfDay() - now.toSecondOfDay()) / 60
+        if (diff < 0) {
+            diff += 24 * 60
+        }
         return if (diff < 0) null else diff.toLong()
     } catch (_: Exception) {
         return null
     }
 }
 
-private fun formatTimeUntilDeparture(minutes: Long): String {
-    if (minutes == 0L) return "< 1 min"
-    if (minutes < 60L) return "dans ${minutes}min"
+@Composable
+private fun formatTimeUntilDeparture(minutes: Long, strings: StringProvider): String {
+    if (minutes == 0L) return strings["time_less_than_minute"]
+    if (minutes < 60L) return strings["time_in_minutes"].replace("%s", minutes.toString())
 
     val hours = minutes / 60
     val remainingMinutes = minutes % 60
-    return "dans ${hours}h${remainingMinutes.toString().padStart(2, '0')}min"
+    return strings["time_in_hours_minutes"]
+        .replace("%1\$s", hours.toString())
+        .replace("%2\$s", remainingMinutes.toString().padStart(2, '0'))
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -181,7 +188,11 @@ fun LineDetailsBottomSheet(
     onToggleFavoriteStop: (String) -> Unit = {},
     onHeaderLineCountChanged: (Int) -> Unit = {}
 ) {
-    val drawableProvider = DrawableProvider(LocalPlatformContext.current)
+    val platformContext = LocalPlatformContext.current
+    // Remembered so it stays stable as a remember() key below (it's rebuilt on every
+    // recomposition otherwise, and this sheet recomposes as schedules/alerts load).
+    val drawableProvider = remember(platformContext) { DrawableProvider(platformContext) }
+    val strings = StringProvider(platformContext)
 
     // Key states on lineInfo to reset when switching lines - prevents stale data accumulation
     val lineKey = lineInfo?.lineName to lineInfo?.currentStationName
@@ -321,7 +332,7 @@ fun LineDetailsBottomSheet(
                     IconButton(onClick = onBackToStation) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back to station",
+                            contentDescription = strings["back_to_station"],
                             tint = Gray700
                         )
                     }
@@ -347,7 +358,7 @@ fun LineDetailsBottomSheet(
                             if (hasLineIcon) {
                                 Image(
                                     painter = drawableProvider.getPainter(drawableName),
-                                    contentDescription = "Line ${lineInfo.lineName}",
+                                    contentDescription = strings["line_label"].replace("%s", lineInfo.lineName),
                                     modifier = Modifier.fillMaxSize()
                                 )
                             } else {
@@ -447,7 +458,7 @@ fun LineDetailsBottomSheet(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "Aucun arrêt disponible pour cette ligne",
+                                    text = strings["no_stops_for_line"],
                                     color = Gray700
                                 )
                             }
@@ -499,6 +510,7 @@ private fun TrafficAlertsSection(
     modifier: Modifier = Modifier,
     alertsTimestampMillis: Long? = null,
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     if (alerts.isEmpty()) {
         return
     }
@@ -515,7 +527,7 @@ private fun TrafficAlertsSection(
                 formatTimeAgo(alertsTimestampMillis)
             }
             Text(
-                text = "Dernière mise à jour $agoText",
+                text = strings["last_update"].replace("%s", agoText),
                 color = Color.Gray,
                 fontSize = 12.sp,
                 fontStyle = FontStyle.Italic,
@@ -524,7 +536,9 @@ private fun TrafficAlertsSection(
         }
 
         alerts.forEachIndexed { index, alert ->
-            var isExpanded by remember { mutableStateOf(false) }
+            // Key on alert identity (like hasEmittedRead) so expansion state follows the alert,
+            // not the slot index, when the list reorders or changes size.
+            var isExpanded by remember(alert.alertNumber) { mutableStateOf(false) }
             var hasEmittedRead by remember(alert.alertNumber) { mutableStateOf(false) }
             val severity = AlertSeverity.fromSeverityType(alert.severityType, alert.severityLevel)
             val severityColor = Color(severity.color)
@@ -601,7 +615,9 @@ private fun TrafficAlertsSection(
                         return "${date.dayOfMonth.toString().padStart(2, '0')}/${date.monthNumber.toString().padStart(2, '0')}/${date.year} ${date.hour.toString().padStart(2, '0')}:${date.minute.toString().padStart(2, '0')}"
                     }
                     Text(
-                        text = "Du ${formatDate(alert.startDate)} au ${formatDate(alert.endDate)}",
+                        text = strings["alert_date_range"]
+                            .replace("%1\$s", formatDate(alert.startDate))
+                            .replace("%2\$s", formatDate(alert.endDate)),
                         style = MaterialTheme.typography.labelSmall,
                         color = Color.Gray,
                         fontStyle = FontStyle.Italic
@@ -701,6 +717,7 @@ private fun NextSchedulesSection(
     onShowAllSchedules: (lineName: String, directionName: String, schedules: List<String>) -> Unit,
     onItineraryClick: () -> Unit = {}
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     val headsigns by viewModel.headsigns.collectAsState(initial = emptyMap())
     val allSchedules by viewModel.allSchedules.collectAsState(initial = emptyList())
     val nextSchedules by viewModel.nextSchedules.collectAsState(initial = emptyList())
@@ -768,7 +785,7 @@ private fun NextSchedulesSection(
     ) {
         if (availableDirections.isNotEmpty()) {
             Text(
-                text = "Direction",
+                text = strings["direction"],
                 textAlign = TextAlign.Left,
                 fontSize = 22.sp,
                 color = PrimaryColor,
@@ -807,7 +824,7 @@ private fun NextSchedulesSection(
             Spacer(modifier = Modifier.height(16.dp))
         } else {
             Text(
-                text = "Aucun horaire disponible à cet arrêt",
+                text = strings["no_schedule_at_stop"],
                 textAlign = TextAlign.Left,
                 color = Color.DarkGray,
                 modifier = Modifier
@@ -818,7 +835,7 @@ private fun NextSchedulesSection(
 
         if (availableDirections.isNotEmpty()) {
             Text(
-                text = "Prochains départs",
+                text = strings["next_departures"],
                 textAlign = TextAlign.Left,
                 fontSize = 22.sp,
                 color = PrimaryColor,
@@ -856,7 +873,7 @@ private fun NextSchedulesSection(
                         )
                         getMinutesUntil(schedule)?.let { minutes ->
                             Text(
-                                text = formatTimeUntilDeparture(minutes),
+                                text = formatTimeUntilDeparture(minutes, strings),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = getScheduleColorBasedOnTime(schedule)
                             )
@@ -868,7 +885,7 @@ private fun NextSchedulesSection(
 
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
-                    contentDescription = "See all",
+                    contentDescription = strings["see_all"],
                     tint = Gray700
                 )
             }
@@ -987,6 +1004,7 @@ private fun ConnectionBadge(
     onClick: (() -> Unit)? = null
 ) {
     val drawableProvider = DrawableProvider(LocalPlatformContext.current)
+    val strings = StringProvider(LocalPlatformContext.current)
     val drawableName = remember(lineName) {
         LineIconResolver.getDrawableNameForLineName(lineName)
     }
@@ -1006,7 +1024,7 @@ private fun ConnectionBadge(
         // Display TCL image via Compose Resources (cross-platform)
         Image(
             painter = drawableProvider.getPainter(drawableName),
-            contentDescription = "Ligne $lineName",
+            contentDescription = strings["line_label"].replace("%s", lineName),
             modifier = modifier
         )
     }

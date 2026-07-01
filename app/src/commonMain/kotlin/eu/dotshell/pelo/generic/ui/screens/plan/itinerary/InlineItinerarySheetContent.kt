@@ -21,6 +21,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
@@ -57,6 +59,7 @@ import eu.dotshell.pelo.generic.utils.search.SearchUtils
 import eu.dotshell.pelo.generic.utils.LineColorHelper
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 import eu.dotshell.pelo.platform.randomId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -95,6 +98,7 @@ fun InlineItinerarySheetContent(
 ) {
     val raptorRepository = viewModel.raptorRepository
     val context = LocalPlatformContext.current
+    val strings = StringProvider(context)
 
     // Load user preferences for route filtering
     val itineraryPrefsRepo = remember { ItineraryPreferencesRepository(context) }
@@ -124,6 +128,10 @@ fun InlineItinerarySheetContent(
     var errorText by remember { mutableStateOf<String?>(null) }
     var previousStopPairKey by remember { mutableStateOf<String?>(null) }
     var recalcVersion by remember { mutableStateOf(0) }
+    // When recalc() itself moves the search to "tomorrow" it writes selectedDate/selectedTimeSeconds,
+    // which are keys of the recalc LaunchedEffect. This flag swallows that one self-triggered
+    // re-run so the (already-computed) tomorrow journeys aren't recalculated a second time.
+    var suppressRecalcOnce by remember { mutableStateOf(false) }
     var avoidAlertsJob by remember { mutableStateOf<Job?>(null) }
     // Telemetry: the calc_id of the most recent itinerary calculation. Bound at the start of
     // recalc() and reused for itinerary.calculated + itinerary.chosen events to correlate them.
@@ -146,14 +154,15 @@ fun InlineItinerarySheetContent(
             originIds: List<Int>,
             destinationIds: List<Int>,
             date: LocalDate,
-            blockedNames: Set<String>
+            blockedNames: Set<String>,
+            overrideTimeSeconds: Int? = null
         ): List<JourneyResult> {
             return withContext(ioDispatcher) {
                 if (timeMode == TimeMode.ARRIVAL) {
                     raptorRepository.getOptimizedPathsArriveBy(
                         originStopIds = originIds,
                         destinationStopIds = destinationIds,
-                        arrivalTimeSeconds = selectedTimeSeconds ?: defaultArrivalSeconds(),
+                        arrivalTimeSeconds = overrideTimeSeconds ?: selectedTimeSeconds ?: defaultArrivalSeconds(),
                         searchWindowMinutes = 120,
                         date = date,
                         blockedRouteNames = blockedNames
@@ -162,7 +171,7 @@ fun InlineItinerarySheetContent(
                     raptorRepository.getOptimizedPaths(
                         originStopIds = originIds,
                         destinationStopIds = destinationIds,
-                        departureTimeSeconds = selectedTimeSeconds,
+                        departureTimeSeconds = overrideTimeSeconds ?: selectedTimeSeconds,
                         date = date,
                         blockedRouteNames = blockedNames
                     )
@@ -346,8 +355,10 @@ fun InlineItinerarySheetContent(
                         originIds = departureStopIds,
                         destinationIds = arrivalStopIds,
                         date = tomorrow,
-                        blockedNames = blockedRouteNames
+                        blockedNames = blockedRouteNames,
+                        overrideTimeSeconds = 0
                     )
+                    suppressRecalcOnce = true
                     selectedDate = tomorrow
                     selectedTimeSeconds = 0
                 }
@@ -471,6 +482,10 @@ fun InlineItinerarySheetContent(
     }
 
     LaunchedEffect(departureStop, arrivalStop, timeMode, selectedTimeSeconds, selectedDate) {
+        if (suppressRecalcOnce) {
+            suppressRecalcOnce = false
+            return@LaunchedEffect
+        }
         recalc()
     }
 
@@ -501,7 +516,7 @@ fun InlineItinerarySheetContent(
             // Show "Itinéraire" title when no journey is selected
             if (selectedJourney == null) {
                 Text(
-                    text = "Itinéraire",
+                    text = strings["itinerary"],
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = PrimaryColor,
@@ -514,8 +529,8 @@ fun InlineItinerarySheetContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Start
                 ) {
-                    val nonWalkingLegs = remember(selectedJourney!!.legs) {
-                        selectedJourney!!.legs.filterNot { it.isWalking }
+                    val nonWalkingLegs = remember(selectedJourney?.legs) {
+                        selectedJourney?.legs?.filterNot { it.isWalking }.orEmpty()
                     }
 
                     nonWalkingLegs.forEachIndexed { index, leg ->
@@ -599,7 +614,7 @@ fun InlineItinerarySheetContent(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = errorText!!, color = PrimaryColor)
+                    Text(text = errorText.orEmpty(), color = PrimaryColor)
                 }
             } else {
                 val avoidedSignatures = remember(journeysAvoidingAlerts) {
@@ -634,8 +649,10 @@ fun InlineItinerarySheetContent(
                         }
                     }
 
+
+
                     if (journeysAvoidingAlerts.isNotEmpty()) {
-                        items(journeysAvoidingAlerts, key = { "${it.journey.departureTime}_${it.journey.arrivalTime}_${it.journey.legs.size}_${it.label}" }) { avoidedJourney ->
+                        items(journeysAvoidingAlerts, key = { "${journeySignature(it.journey)}_${it.label}" }) { avoidedJourney ->
                             CompactJourneyCard(
                                 journey = avoidedJourney.journey,
                                 onClick = { selectedJourney = avoidedJourney.journey },
@@ -653,7 +670,7 @@ fun InlineItinerarySheetContent(
                     }
 
                     if (regularJourneys.isNotEmpty()) {
-                        items(regularJourneys, key = { "${it.departureTime}_${it.arrivalTime}_${it.legs.size}" }) { journey ->
+                        items(regularJourneys, key = { journeySignature(it) }) { journey ->
                             CompactJourneyCard(
                                 journey = journey,
                                 onClick = { selectedJourney = journey },
@@ -667,31 +684,33 @@ fun InlineItinerarySheetContent(
                 }
             }
         } else {
-            JourneyDetailsSheetContent(
-                journey = selectedJourney!!,
-                isExpanded = true,
-                onStartNavigation = {
-                    val chosen = selectedJourney!!
-                    val combined = journeysAvoidingAlerts.map { it.journey } + journeys
-                    val index = combined.indexOf(chosen).takeIf { it >= 0 } ?: -1
-                    lastCalcId?.let { calcId ->
-                        eu.dotshell.pelo.generic.data.telemetry.TelemetryEmitter.emit(
-                            eu.dotshell.pelo.generic.data.telemetry.TelemetryEvent.ItineraryChosen(
-                                eventId = randomId(),
-                    at = Clock.System.now().toString(),
-                                calcId = calcId,
-                                optionIndex = index
+            val chosenJourney = selectedJourney
+            if (chosenJourney != null) {
+                JourneyDetailsSheetContent(
+                    journey = chosenJourney,
+                    isExpanded = true,
+                    onStartNavigation = {
+                        val combined = journeysAvoidingAlerts.map { it.journey } + journeys
+                        val index = combined.indexOf(chosenJourney).takeIf { it >= 0 } ?: -1
+                        lastCalcId?.let { calcId ->
+                            eu.dotshell.pelo.generic.data.telemetry.TelemetryEmitter.emit(
+                                eu.dotshell.pelo.generic.data.telemetry.TelemetryEvent.ItineraryChosen(
+                                    eventId = randomId(),
+                                    at = Clock.System.now().toString(),
+                                    calcId = calcId,
+                                    optionIndex = index
+                                )
                             )
-                        )
-                    }
-                    onStartNavigation(chosen)
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                useLightColors = true,
-                scrollAllContent = true
-            )
+                        }
+                        onStartNavigation(chosenJourney)
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    useLightColors = true,
+                    scrollAllContent = true
+                )
+            }
         }
 
         if (showTimePicker) {

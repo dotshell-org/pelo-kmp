@@ -24,7 +24,8 @@ class TrafficAlertsWorker(
 
     private val trafficAlertsRepository = TrafficAlertsRepository(
         TransportServiceProvider.getTransportApi(),
-        eu.dotshell.pelo.platform.Settings(applicationContext, "traffic_alerts_cache")
+        eu.dotshell.pelo.platform.Settings(applicationContext, "traffic_alerts_cache"),
+        eu.dotshell.pelo.generic.data.offline.OfflineRepository(applicationContext)
     )
 
     override suspend fun doWork(): Result {

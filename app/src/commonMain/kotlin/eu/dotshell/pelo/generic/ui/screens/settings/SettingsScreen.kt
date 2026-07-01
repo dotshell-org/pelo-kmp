@@ -8,6 +8,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -48,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
 import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import kotlinx.coroutines.delay
@@ -71,12 +74,15 @@ fun SettingsScreen(
     var isEasterEggActive by remember { mutableStateOf(false) }
     val hapticFeedback = LocalHapticFeedback.current
     val drawableProvider = DrawableProvider(LocalPlatformContext.current)
+    val strings = StringProvider(LocalPlatformContext.current)
+
 
     // Reset click count after 2 seconds
     LaunchedEffect(clickCount) {
         if (clickCount > 0) {
             delay(2000)
-            if (clickCount < 3) clickCount = 0
+            // The tap handler already resets to 0 on the 3rd tap, so by here clickCount is 1 or 2.
+            clickCount = 0
         }
     }
 
@@ -97,7 +103,8 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 32.dp)
-                .padding(top = 40.dp, bottom = 24.dp),
+                .padding(top = 40.dp, bottom = 24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Top
         ) {
@@ -110,7 +117,7 @@ fun SettingsScreen(
 
             Image(
                 painter = drawableProvider.getPainter("ic_launcher_foreground"),
-                contentDescription = "Logo Pelo",
+                contentDescription = strings["logo_pelo"],
                 modifier = Modifier
                     .size(200.dp)
                     .padding(bottom = 48.dp)
@@ -127,46 +134,47 @@ fun SettingsScreen(
 
             if (isAboutMenu) {
                 SettingsMenuRow(
-                    title = "Version de l'application",
+                    title = strings["app_version_title"],
                     subtitle = versionName,
                     onClick = null,
                     showChevron = false
                 )
                 HorizontalDivider(color = Color(0xFF3A3A3C))
                 SettingsMenuRow(
-                    title = "Mentions légales / CGU",
+                    title = strings["legal_title"],
                     onClick = onLegalClick
                 )
                 HorizontalDivider(color = Color(0xFF3A3A3C))
                 SettingsMenuRow(
-                    title = "Crédits",
+                    title = strings["credits_title"],
                     onClick = onCreditsClick
                 )
                 HorizontalDivider(color = Color(0xFF3A3A3C))
                 SettingsMenuRow(
-                    title = "Nous contacter",
+                    title = strings["contact_title"],
                     onClick = onContactClick
                 )
             } else {
                 SettingsMenuRow(
-                    title = "Itinéraire",
+                    title = strings["itinerary"],
                     onClick = onItineraryClick
                 )
                 HorizontalDivider(color = Color(0xFF3A3A3C))
                 SettingsMenuRow(
-                    title = "Mode hors ligne",
+                    title = strings["offline_mode"],
                     onClick = onOfflineClick
                 )
                 HorizontalDivider(color = Color(0xFF3A3A3C))
                 SettingsMenuRow(
-                    title = "Confidentialité",
+                    title = strings["privacy_title"],
                     onClick = onTelemetryClick
                 )
                 HorizontalDivider(color = Color(0xFF3A3A3C))
                 SettingsMenuRow(
-                    title = "À propos",
+                    title = strings["about_title"],
                     onClick = onAboutClick
                 )
+
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -181,7 +189,7 @@ fun SettingsScreen(
         ) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = "Retour",
+                contentDescription = strings["back"],
                 tint = SecondaryColor
             )
         }
@@ -196,6 +204,7 @@ private fun SettingsMenuRow(
     onClick: (() -> Unit)?,
     showChevron: Boolean = true
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val pressedBackgroundColor by animateColorAsState(
@@ -252,7 +261,7 @@ private fun SettingsMenuRow(
             if (showChevron && onClick != null) {
                 Icon(
                     imageVector = Icons.Filled.ChevronRight,
-                    contentDescription = "Next Arrow Icon",
+                    contentDescription = strings["next_arrow"],
                     tint = SecondaryColor
                 )
             }

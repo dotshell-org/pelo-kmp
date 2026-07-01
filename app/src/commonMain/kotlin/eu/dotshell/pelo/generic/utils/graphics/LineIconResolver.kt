@@ -1,17 +1,11 @@
 package eu.dotshell.pelo.generic.utils.graphics
 
-import eu.dotshell.pelo.generic.data.models.geojson.StopFeature
-
 /**
  * Multiplatform-safe line icon name resolution.
  * Maps line names to drawable file names (e.g., "212" -> "_212", "A" -> "a").
  * Also parses "desserte" strings from stop features.
  */
 object LineIconResolver {
-
-    // Simple bounded cache for parsed desserte strings
-    private val desserteCache = HashMap<String, List<String>>()
-    private const val CACHE_MAX_SIZE = 500
 
     /**
      * Converts a line name to a drawable name.
@@ -27,25 +21,6 @@ object LineIconResolver {
         } else {
             lineName.lowercase()
         }
-    }
-
-    /**
-     * Returns all lines serving a stop (line names parsed from desserte).
-     * Results are cached by desserte string to avoid repeated parsing.
-     */
-    fun getAllLinesForStop(stopFeature: StopFeature): List<String> {
-        val desserte = stopFeature.properties.desserte
-        desserteCache[desserte]?.let { return it }
-        val result = parseDesserte(desserte)
-        if (desserteCache.size >= CACHE_MAX_SIZE) {
-            desserteCache.clear()
-        }
-        desserteCache[desserte] = result
-        return result
-    }
-
-    fun clearCache() {
-        desserteCache.clear()
     }
 
     /**

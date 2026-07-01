@@ -47,7 +47,12 @@ internal suspend fun submitUserAlert(
         }
         val code = response.status.value
         when (code) {
-            201, 400 -> UserAlertSubmissionResult(isSuccess = true, httpCode = code)
+            201 -> UserAlertSubmissionResult(isSuccess = true, httpCode = code)
+            400 -> UserAlertSubmissionResult(
+                isSuccess = false,
+                errorMessage = "Données invalides. Vérifiez votre signalement et réessayez.",
+                httpCode = code
+            )
             404 -> UserAlertSubmissionResult(
                 isSuccess = false,
                 errorMessage = "L'arrêt ou la ligne sélectionnée n'a pas été trouvée.",

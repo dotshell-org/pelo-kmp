@@ -95,7 +95,8 @@ object TelemetryService {
                     Log.i(TAG, "Starting background traffic alerts check...")
                     val trafficAlertsRepository = TrafficAlertsRepository(
                         TransportServiceProvider.getTransportApi(),
-                        Settings(IosPlatformContext, "traffic_alerts_cache")
+                        Settings(IosPlatformContext, "traffic_alerts_cache"),
+                        eu.dotshell.pelo.generic.data.offline.OfflineRepository(IosPlatformContext)
                     )
                     val result = trafficAlertsRepository.getTrafficAlerts()
                     task.setTaskCompletedWithSuccess(result.isSuccess)

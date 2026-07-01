@@ -20,6 +20,7 @@ import eu.dotshell.pelo.generic.ui.screens.onboarding.NotificationPermissionGate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -132,6 +133,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        // Cancel the activity-scoped init work so it doesn't outlive the Activity (it would
+        // otherwise leak across configuration-change recreations). The navigation foreground
+        // service runs independently and is unaffected.
+        appScope.cancel()
         // Keep navigation service running when activity/task is closed.
         if (!isNavigationModeEnabled) {
             setNavigationLockScreenBehavior(false)

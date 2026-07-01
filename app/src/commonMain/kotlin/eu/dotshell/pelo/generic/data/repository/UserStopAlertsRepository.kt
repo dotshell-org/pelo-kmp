@@ -61,14 +61,6 @@ class UserStopAlertsRepository(
         }
 
     /**
-     * Get all problematic stop IDs (those with karma_at_or_above_threshold alerts).
-     */
-    suspend fun getProblematicStops(stopIds: List<String>): Set<String> =
-        withContext(Dispatchers.Default) {
-            getProblematicAlertDetails(stopIds).keys
-        }
-
-    /**
      * Return problematic alerts mapped to caller stop names.
      * Prevents false positives when names differ by accents/casing/punctuation.
      */

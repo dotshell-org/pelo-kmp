@@ -28,6 +28,11 @@ class AppTransportLineRules(private val data: RulesData) : TransportLineRules {
     private val defaultVehicleMarker: VehicleMarkerType =
         parseMarker(data.defaultVehicleMarker)
 
+    // Cache for isStrongLine: called once per line per stop during map rendering,
+    // so potentially 10,000+ times per render for a full stop collection.
+    // Bounded by the finite set of unique line names in the network.
+    private val isStrongLineCache = HashMap<String, Boolean>()
+
     override fun normalizeAlertToken(raw: String): String {
         val token = raw.uppercase()
             .replace(" ", "")
@@ -66,12 +71,17 @@ class AppTransportLineRules(private val data: RulesData) : TransportLineRules {
     }
 
     override fun isStrongLine(lineName: String): Boolean {
+        isStrongLineCache[lineName]?.let { return it }
         val upperName = lineName.uppercase()
         val canonical = canonicalRouteName(lineName).uppercase()
         val uiName = normalizeLineNameForUi(lineName).uppercase()
-        if (upperName in excludedLinesSet || canonical in excludedLinesSet || uiName in excludedLinesSet) return false
-        if (strongLineSet.contains(upperName) || strongLineSet.contains(canonical) || strongLineSet.contains(uiName)) return true
-        return strongLinePatterns.any { it.matches(upperName) || it.matches(canonical) || it.matches(uiName) }
+        val result = when {
+            upperName in excludedLinesSet || canonical in excludedLinesSet || uiName in excludedLinesSet -> false
+            strongLineSet.contains(upperName) || strongLineSet.contains(canonical) || strongLineSet.contains(uiName) -> true
+            else -> strongLinePatterns.any { it.matches(upperName) || it.matches(canonical) || it.matches(uiName) }
+        }
+        isStrongLineCache[lineName] = result
+        return result
     }
 
     override fun getTransportType(lineName: String): String {

@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.sp
 import eu.dotshell.pelo.generic.data.config.AboutSectionData
 import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
 import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,6 +34,7 @@ fun LegalScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -39,7 +42,7 @@ fun LegalScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Mentions légales / CGU",
+                        text = strings["legal_title"],
                         color = SecondaryColor,
                         fontWeight = FontWeight.Bold
                     )
@@ -48,7 +51,7 @@ fun LegalScreen(
                     IconButton(onClick = onBackClick) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Retour",
+                            contentDescription = strings["back"],
                             tint = SecondaryColor
                         )
                     }
@@ -68,15 +71,37 @@ fun LegalScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             legalSections.forEach { section ->
+                val resolvedTitle = when (section.title) {
+                    "Éditeur" -> strings["legal_editor_title"]
+                    "Objet" -> strings["legal_object_title"]
+                    "Description de l'application" -> strings["legal_desc_title"]
+                    "Permissions" -> strings["legal_permissions_title"]
+                    "Traitement des données et confidentialité" -> strings["legal_privacy_title"]
+                    "Responsabilité" -> strings["legal_liability_title"]
+                    "Propriété intellectuelle" -> strings["legal_ip_title"]
+                    "Mises à jour" -> strings["legal_updates_title"]
+                    else -> section.title
+                }
+                val resolvedContent = when (section.title) {
+                    "Éditeur" -> strings["legal_editor_content"]
+                    "Objet" -> strings["legal_object_content"]
+                    "Description de l'application" -> strings["legal_desc_content"]
+                    "Permissions" -> strings["legal_permissions_content"]
+                    "Traitement des données et confidentialité" -> strings["legal_privacy_content"]
+                    "Responsabilité" -> strings["legal_liability_content"]
+                    "Propriété intellectuelle" -> strings["legal_ip_content"]
+                    "Mises à jour" -> strings["legal_updates_content"]
+                    else -> section.content
+                }
                 Text(
-                    text = section.title,
+                    text = resolvedTitle,
                     color = SecondaryColor,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(bottom = 6.dp)
                 )
                 Text(
-                    text = section.content,
+                    text = resolvedContent,
                     color = SecondaryColor,
                     fontSize = 14.sp,
                     lineHeight = 20.sp,

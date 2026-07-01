@@ -97,8 +97,14 @@ object TelemetryUploader {
         // per-kind cardinality before serializing.
         val message = PayloadGuardrail.sanitize(rawMessage)
         val payload = json.encodeToString(Message.serializer(), message)
-        // Introspect the serialized form for surprises (oversized strings, etc.) — logs only.
-        PayloadGuardrail.assertNoSurprises(payload)
+        // Introspect the serialized form for surprises (oversized strings, etc.). Per the
+        // guardrail contract we must never silently send a payload that trips it: drop the batch
+        // so the suspect data can't leak and won't be retried forever.
+        if (!PayloadGuardrail.assertNoSurprises(payload)) {
+            Log.e(TAG, "Telemetry payload tripped the guardrail — dropping batch without sending")
+            repo.markSent(snapshot.eventIds, snapshot.sessionIds)
+            return Outcome.GIVE_UP
+        }
         val gzipped = gzip(payload)
 
         var lastException: Exception? = null

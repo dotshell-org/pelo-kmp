@@ -7,6 +7,8 @@ import eu.dotshell.pelo.generic.service.TransportServiceProvider
 import eu.dotshell.pelo.generic.utils.LineColorHelper
 import eu.dotshell.pelo.generic.utils.geo.StopsGeoJsonManager
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.addJsonArray
 import kotlinx.serialization.json.addJsonObject
@@ -135,7 +137,7 @@ data class StopsRenderData(val geoJson: String, val iconNames: Set<String>, val 
  * render; [hasDrawable] only decides which `icon` name to attach (and is collected for image
  * registration). Returns the distinct icon names so the caller can build an `iconImage` expression.
  */
-fun StopCollection.toStopsGeoJsonByPriority(
+suspend fun StopCollection.toStopsGeoJsonByPriority(
     selectedLineName: String? = null,
     hasDrawable: (String) -> Boolean,
     currentZoom: Double = 20.0,
@@ -148,85 +150,110 @@ fun StopCollection.toStopsGeoJsonByPriority(
     val mergedStops = StopsGeoJsonManager.mergeStopsByName(features)
     var maxIcons = 1
     val normSelected = selectedLineName?.let { lineRules.normalizeForComparison(it) }
+
+    data class SlotRecord(
+        val id: String,
+        val coordinates: List<Double>,
+        val nom: String,
+        val desserte: String,
+        val priority: Int,
+        val iconName: String,
+        val slot: Int,
+    )
+    val slots = ArrayList<SlotRecord>(mergedStops.size * 2)
+
+    for (stop in mergedStops) {
+        currentCoroutineContext().ensureActive()
+        val lines = LineIconResolver.parseDesserte(stop.properties.desserte)
+        val icons = ArrayList<Pair<String, Int>>()
+
+        if (normSelected != null) {
+            val isServedBySelected = lines.any { lineRules.normalizeForComparison(it) == normSelected }
+            if (isServedBySelected) {
+                if (lineRules.isStrongLine(normSelected)) {
+                    // Metro / Tram / Funicular: show the line-specific icon (e.g. "a", "t1")
+                    val priority = if (normSelected.startsWith("T")) 1 else 2
+                    val name = LineIconResolver.getDrawableNameForLineName(selectedLineName)
+                    if (hasDrawable(name)) {
+                        icons.add(name to priority)
+                    }
+                } else {
+                    // Non-strong line: use the mode icon from config (e.g. mode_chrono, mode_bus)
+                    // falling back to mode_bus if the configured icon drawable is missing
+                    val configMode = lineRules.getModeIcon(normSelected)
+                    val mode = if (configMode != null && hasDrawable(configMode)) configMode
+                               else if (hasDrawable("mode_bus")) "mode_bus"
+                               else null
+                    if (mode != null) {
+                        icons.add(mode to 2)
+                    }
+                }
+            }
+        } else {
+            // 1. Metro / Tram / Funicular
+            for (line in lines) {
+                val upper = line.uppercase()
+                if (lineRules.isStrongLine(upper)) {
+                    val priority = if (upper.startsWith("T")) 1 else 2
+                    val name = LineIconResolver.getDrawableNameForLineName(line)
+                    if (hasDrawable(name)) icons.add(name to priority)
+                }
+            }
+
+            // 2. Other weak lines/modes — skip bus icons below zoom 17
+            // (they're invisible anyway due to minZoom and just waste CPU/GPU)
+            if (shouldIncludeBus) {
+                val uniqueModes = lines
+                    .filterNot { lineRules.isStrongLine(it.uppercase()) }
+                    .mapNotNull { lineRules.getModeIcon(it) }
+                    .distinct()
+                for (mode in uniqueModes) {
+                    if (hasDrawable(mode)) icons.add(mode to 0)
+                }
+            }
+        }
+        if (icons.isEmpty()) continue
+        val coordinates = stop.geometry.coordinates
+        if (coordinates.size < 2) continue
+        if (icons.size > maxIcons) maxIcons = icons.size
+
+        // Slots spread the icons symmetrically (…, -2, 0, 2, … or …, -1, 1, …).
+        var slot = -(icons.size - 1)
+        for ((iconName, priority) in icons) {
+            iconNames.add(iconName)
+            slots.add(SlotRecord(
+                id = "${stop.id}_$slot",
+                coordinates = coordinates,
+                nom = stop.properties.nom,
+                desserte = stop.properties.desserte,
+                priority = priority,
+                iconName = iconName,
+                slot = slot,
+            ))
+            slot += 2
+        }
+    }
+
     val json = buildJsonObject {
         put("type", "FeatureCollection")
         putJsonArray("features") {
-            for (stop in mergedStops) {
-                val lines = LineIconResolver.parseDesserte(stop.properties.desserte)
-                val icons = ArrayList<Pair<String, Int>>()
-
-                if (normSelected != null) {
-                    val isServedBySelected = lines.any { lineRules.normalizeForComparison(it) == normSelected }
-                    if (isServedBySelected) {
-                        if (lineRules.isStrongLine(normSelected)) {
-                            // Metro / Tram / Funicular: show the line-specific icon (e.g. "a", "t1")
-                            val priority = if (normSelected.startsWith("T")) 1 else 2
-                            val name = LineIconResolver.getDrawableNameForLineName(selectedLineName)
-                            if (hasDrawable(name)) {
-                                icons.add(name to priority)
-                            }
-                        } else {
-                            // Non-strong line: use the mode icon from config (e.g. mode_chrono, mode_bus)
-                            // falling back to mode_bus if the configured icon drawable is missing
-                            val configMode = lineRules.getModeIcon(normSelected)
-                            val mode = if (configMode != null && hasDrawable(configMode)) configMode
-                                       else if (hasDrawable("mode_bus")) "mode_bus"
-                                       else null
-                            if (mode != null) {
-                                icons.add(mode to 2)
-                            }
+            for (record in slots) {
+                addJsonObject {
+                    put("type", "Feature")
+                    put("id", record.id)
+                    putJsonObject("geometry") {
+                        put("type", "Point")
+                        putJsonArray("coordinates") {
+                            for (coordinate in record.coordinates) add(coordinate)
                         }
                     }
-                } else {
-                    // 1. Metro / Tram / Funicular
-                    for (line in lines) {
-                        val upper = line.uppercase()
-                        if (lineRules.isStrongLine(upper)) {
-                            val priority = if (upper.startsWith("T")) 1 else 2
-                            val name = LineIconResolver.getDrawableNameForLineName(line)
-                            if (hasDrawable(name)) icons.add(name to priority)
-                        }
+                    putJsonObject("properties") {
+                        put("nom", record.nom)
+                        put("desserte", record.desserte)
+                        put("stop_priority", record.priority.toString()) // String to match convertToString() filter
+                        put("icon", record.iconName)
+                        put("slot", record.slot)
                     }
-
-                    // 2. Other weak lines/modes — skip bus icons below zoom 17
-                    // (they're invisible anyway due to minZoom and just waste CPU/GPU)
-                    if (shouldIncludeBus) {
-                        val uniqueModes = lines
-                            .filterNot { lineRules.isStrongLine(it.uppercase()) }
-                            .mapNotNull { lineRules.getModeIcon(it) }
-                            .distinct()
-                        for (mode in uniqueModes) {
-                            if (hasDrawable(mode)) icons.add(mode to 0)
-                        }
-                    }
-                }
-                if (icons.isEmpty()) continue
-                val coordinates = stop.geometry.coordinates
-                if (coordinates.size < 2) continue
-                if (icons.size > maxIcons) maxIcons = icons.size
-
-                // Slots spread the icons symmetrically (…, -2, 0, 2, … or …, -1, 1, …).
-                var slot = -(icons.size - 1)
-                for ((iconName, priority) in icons) {
-                    iconNames.add(iconName)
-                    addJsonObject {
-                        put("type", "Feature")
-                        put("id", "${stop.id}_$slot")
-                        putJsonObject("geometry") {
-                            put("type", "Point")
-                            putJsonArray("coordinates") {
-                                for (coordinate in coordinates) add(coordinate)
-                            }
-                        }
-                        putJsonObject("properties") {
-                            put("nom", stop.properties.nom)
-                            put("desserte", stop.properties.desserte)
-                            put("stop_priority", priority.toString()) // String to match convertToString() filter
-                            put("icon", iconName)
-                            put("slot", slot)
-                        }
-                    }
-                    slot += 2
                 }
             }
         }

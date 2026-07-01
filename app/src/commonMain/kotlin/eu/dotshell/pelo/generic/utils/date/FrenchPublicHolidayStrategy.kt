@@ -4,16 +4,24 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.Month
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.plus
+import kotlin.concurrent.Volatile
 
 /**
  * Implementation of PublicHolidayStrategy for France
  */
 class FrenchPublicHolidayStrategy : PublicHolidayStrategy {
 
-    private val holidaysByYear = HashMap<Int, Set<LocalDate>>()
+    // Copy-on-write cache: reads are lock-free and never hit a HashMap mid-resize.
+    // isPublicHoliday is reachable from concurrent itinerary calculations, and a plain
+    // HashMap.getOrPut there could throw ConcurrentModificationException. A racing double
+    // compute for the same year just recomputes once — cheap and harmless.
+    @Volatile
+    private var holidaysByYear: Map<Int, Set<LocalDate>> = emptyMap()
 
     override fun isPublicHoliday(date: LocalDate): Boolean {
-        val holidays = holidaysByYear.getOrPut(date.year) { computeHolidays(date.year) }
+        holidaysByYear[date.year]?.let { return date in it }
+        val holidays = computeHolidays(date.year)
+        holidaysByYear = holidaysByYear + (date.year to holidays)
         return date in holidays
     }
 

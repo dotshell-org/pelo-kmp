@@ -131,6 +131,7 @@ import eu.dotshell.pelo.generic.ui.screens.onboarding.TelemetryOptInGate
 import eu.dotshell.pelo.generic.ui.screens.settings.about.ContactScreen
 import eu.dotshell.pelo.generic.ui.screens.settings.about.CreditsScreen
 import eu.dotshell.pelo.generic.ui.screens.settings.about.LegalScreen
+
 import eu.dotshell.pelo.generic.ui.theme.AccentColor
 import eu.dotshell.pelo.generic.ui.theme.PeloTheme
 import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
@@ -149,6 +150,7 @@ import eu.dotshell.pelo.generic.utils.geo.GeometryUtils
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.BackHandler
 import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 import eu.dotshell.pelo.platform.Log
 import eu.dotshell.pelo.platform.appVersionName
 import eu.dotshell.pelo.platform.ioDispatcher
@@ -712,18 +714,12 @@ private fun RootScaffold(
                                         onJourneysChanged = { activeJourneys = it },
                                         onSelectedJourneyChanged = { selectedJourney = it },
                                         onStartNavigation = { journey ->
-                                             val vm = viewModel
-                                             if (vm != null) {
-                                                 scope.launch {
-                                                     val tracePoints = calculateJourneyTrace(journey, vm)
-                                                     navigationController.start(journey, tracePoints)
-                                                     onNavigationModeChanged(true)
-                                                 }
-                                             } else {
-                                                 navigationController.start(journey)
-                                                 onNavigationModeChanged(true)
-                                             }
-                                         },
+                                            scope.launch {
+                                                val tracePoints = calculateJourneyTrace(journey, viewModel)
+                                                navigationController.start(journey, tracePoints)
+                                                onNavigationModeChanged(true)
+                                            }
+                                        },
                                         onClose = closeItinerary,
                                         onRequestExpandSheet = { },
                                     )
@@ -788,6 +784,7 @@ private fun RootScaffold(
 
             if (!navigationState.isActive) {
                 NavigationBar(containerColor = PrimaryColor) {
+                    val tabStrings = StringProvider(LocalPlatformContext.current)
                     Destination.entries.forEach { destination ->
                         NavigationBarItem(
                             selected = when (destination) {
@@ -806,8 +803,8 @@ private fun RootScaffold(
                                     }
                                 }
                             },
-                            icon = { Icon(destination.icon, contentDescription = destination.contentDescription) },
-                            label = { Text(destination.label) },
+                            icon = { Icon(destination.icon, contentDescription = tabStrings[destination.contentDescriptionKey]) },
+                            label = { Text(tabStrings[destination.labelKey]) },
                             colors = NavigationBarItemDefaults.colors(
                                 indicatorColor = AccentColor,
                                 selectedIconColor = SecondaryColor,
@@ -930,7 +927,7 @@ private fun RootScaffold(
                 eu.dotshell.pelo.generic.data.models.search.StationSearchResult(
                     stopName = stop.properties.nom,
                     stopId = stop.properties.id,
-                    lines = stop.properties.desserte.split(":")
+                    lines = viewModel.parseLineCodesFromDesserte(stop.properties.desserte)
                 )
             }
 
@@ -952,9 +949,10 @@ private fun RootScaffold(
         // Navigation mode overlay - displayed when navigation is active
         if (navigationState.isActive) {
             val loc = userLocation
-            if (loc != null) {
+            val activeJourney = navigationState.journey
+            if (loc != null && activeJourney != null) {
                 val overlayState = buildNavigationModeUiState(
-                    journey = navigationState.journey!!,
+                    journey = activeJourney,
                     nowSeconds = GeometryUtils.currentTimeInSeconds(),
                     userLocation = GeoPoint(latitude = loc.latitude, longitude = loc.longitude)
                 )
@@ -976,7 +974,7 @@ private fun RootScaffold(
                         }
                         if (nearestStop != null) {
                             alertReportInitialStopName = nearestStop.properties.nom
-                            alertReportInitialLines = nearestStop.properties.desserte.split(":")
+                            alertReportInitialLines = viewModel.parseLineCodesFromDesserte(nearestStop.properties.desserte)
                             showAlertReport = true
                         }
                     },
@@ -1400,11 +1398,13 @@ private fun SettingsTab(viewModel: TransportViewModel, modifier: Modifier = Modi
             "credits" -> CreditsScreen(onBackClick = navigateBack)
             "contact" -> ContactScreen(onBackClick = navigateBack)
             "offline" -> OfflineSettingsScreen(viewModel = viewModel, onBackClick = navigateBack)
+
             "itinerary" -> {
                 val cfg = remember { AppConfigLoader.getConfig().itinerarySettings }
                 val prefs = remember { ItineraryPreferencesRepository(context) }
+                val strings = StringProvider(context)
                 ItinerarySettingsScreen(
-                    screenTitle = cfg.screenTitle,
+                    screenTitle = strings["itinerary"],
                     sectionTitle = cfg.sectionTitle,
                     options = cfg.options,
                     onBackClick = navigateBack,
@@ -1441,6 +1441,7 @@ private fun SettingsTab(viewModel: TransportViewModel, modifier: Modifier = Modi
                 onContactClick = { navigateTo("contact") },
                 onOfflineClick = {},
                 onTelemetryClick = {},
+
                 isAboutMenu = true
             )
             else -> SettingsScreen(
@@ -1453,6 +1454,7 @@ private fun SettingsTab(viewModel: TransportViewModel, modifier: Modifier = Modi
                 onOfflineClick = { navigateTo("offline") },
                 onTelemetryClick = { navigateTo("telemetry") },
                 onAboutClick = { navigateTo("about") },
+
                 isAboutMenu = false
             )
         }

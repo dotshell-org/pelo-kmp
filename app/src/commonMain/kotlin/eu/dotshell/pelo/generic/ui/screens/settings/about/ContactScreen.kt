@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
 import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -36,6 +38,7 @@ fun ContactScreen(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     val uriHandler = LocalUriHandler.current
 
     Scaffold(
@@ -44,7 +47,7 @@ fun ContactScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Nous contacter",
+                        text = strings["contact_title"],
                         color = SecondaryColor,
                         fontWeight = FontWeight.Bold
                     )
@@ -53,7 +56,7 @@ fun ContactScreen(
                     IconButton(onClick = onBackClick) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Retour",
+                            contentDescription = strings["back"],
                             tint = SecondaryColor
                         )
                     }
@@ -73,7 +76,7 @@ fun ContactScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             Text(
-                text = "Une question ? Un problème ?",
+                text = strings["contact_header"],
                 color = SecondaryColor,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
@@ -81,7 +84,7 @@ fun ContactScreen(
             )
 
             Text(
-                text = "N'hésitez pas à nous contacter pour toute question, suggestion ou pour signaler un bug.",
+                text = strings["contact_subtitle"],
                 color = SecondaryColor,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
@@ -91,7 +94,7 @@ fun ContactScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Signaler un bug",
+                text = strings["contact_bug_title"],
                 color = SecondaryColor,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -99,8 +102,7 @@ fun ContactScreen(
             )
 
             Text(
-                text = "Pour signaler un bug, merci de nous envoyer un message via la page contact" +
-                        " de notre site web [dotshell.eu].",
+                text = strings["contact_bug_content"],
                 color = SecondaryColor,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
@@ -116,7 +118,7 @@ fun ContactScreen(
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
-                    text = "Nous contacter",
+                    text = strings["contact_title"],
                     color = SecondaryColor,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,

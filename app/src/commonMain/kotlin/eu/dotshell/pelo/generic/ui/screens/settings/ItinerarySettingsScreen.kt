@@ -30,6 +30,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
@@ -57,6 +59,7 @@ fun ItinerarySettingsScreen(
     getInitialOptionState: (ItineraryOptionData) -> Boolean = { it.defaultEnabled },
     modifier: Modifier = Modifier
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     val optionStates = remember(options) {
         mutableStateMapOf<String, Boolean>().apply {
             options.forEach { option ->
@@ -80,7 +83,7 @@ fun ItinerarySettingsScreen(
                     IconButton(onClick = onBackClick) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Retour",
+                            contentDescription = strings["back"],
                             tint = SecondaryColor,
                         )
                     }
@@ -100,12 +103,17 @@ fun ItinerarySettingsScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             ItineraryLineCategorySection(
-                sectionTitle = sectionTitle,
+                sectionTitle = if (sectionTitle == "Lignes à tarification spéciale") strings["special_fare_lines"] else sectionTitle,
                 lines = options.map { option ->
                     val isEnabled = optionStates[option.key] ?: option.defaultEnabled
+                    val resolvedSubtitle = when (option.subtitle) {
+                        "Lignes scolaires" -> strings["school_lines"]
+                        "Navette aéroport" -> strings["airport_shuttle"]
+                        else -> option.subtitle
+                    }
                     ItineraryLineOption(
                         title = option.title,
-                        subtitle = option.subtitle,
+                        subtitle = resolvedSubtitle,
                         isSelected = isEnabled,
                         onClick = {
                             val enabled = !isEnabled
@@ -189,6 +197,7 @@ private fun ItineraryLineItem(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -214,7 +223,7 @@ private fun ItineraryLineItem(
             if (isSelected) {
                 Icon(
                     imageVector = Icons.Default.Check,
-                    contentDescription = "Sélectionné",
+                    contentDescription = strings["selected"],
                     tint = SecondaryColor,
                     modifier = Modifier.size(16.dp)
                 )

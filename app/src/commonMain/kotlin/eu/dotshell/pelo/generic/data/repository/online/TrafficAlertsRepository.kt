@@ -19,10 +19,9 @@ import kotlinx.coroutines.withContext
  */
 class TrafficAlertsRepository(
     private val transportApi: TransportApi,
-    settings: Settings
+    settings: Settings,
+    private val offlineRepo: OfflineRepository? = null
 ) : ApiTrafficAlertsRepository {
-
-    private val offlineRepo: OfflineRepository? = null // injected externally if needed
 
     // Simple in-memory + Settings-based cache
     private val settingsRef = settings

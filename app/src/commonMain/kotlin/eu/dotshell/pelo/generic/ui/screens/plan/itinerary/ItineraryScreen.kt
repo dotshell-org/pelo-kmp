@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -274,6 +275,7 @@ private fun JourneyLegItem(
     useLightColors: Boolean
 ) {
     val drawableProvider = DrawableProvider(LocalPlatformContext.current)
+    val strings = StringProvider(LocalPlatformContext.current)
     val lineColor = remember(leg.isWalking, leg.routeName) {
         if (leg.isWalking) Gray700 else Color(
             LineColorHelper.getColorForLineString(leg.routeName ?: "")
@@ -389,7 +391,7 @@ private fun JourneyLegItem(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = if (leg.isWalking) "Marche ${leg.durationMinutes} min" else "Direction ${leg.direction ?: leg.toStopName}",
+                text = if (leg.isWalking) strings["walking_duration"].replace("%s", leg.durationMinutes.toString()) else strings["direction_to"].replace("%s", leg.direction ?: leg.toStopName),
                 color = secondaryTextColor,
                 style = MaterialTheme.typography.bodySmall
             )
@@ -411,7 +413,9 @@ private fun JourneyLegItem(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = "${leg.intermediateStops.size} arrêt${if (leg.intermediateStops.size > 1) "s" else ""}",
+                        text = strings["intermediate_stops"]
+                            .replace("%1\$s", leg.intermediateStops.size.toString())
+                            .replace("%2\$s", if (leg.intermediateStops.size > 1) "s" else ""),
                         color = secondaryTextColor,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(start = 4.dp)
@@ -484,6 +488,7 @@ fun JourneyDetailsSheetContent(
     useLightColors: Boolean = false,
     scrollAllContent: Boolean = false
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     val primaryTextColor = if (useLightColors) PrimaryColor else SecondaryColor
     val secondaryTextColor =
         if (useLightColors) Color(0xFF4B5563) else SecondaryColor.copy(alpha = 0.7f)
@@ -589,7 +594,7 @@ fun JourneyDetailsSheetContent(
                             modifier = Modifier.size(18.dp)
                         )
                         Text(
-                            text = "Démarrer",
+                            text = strings["start"],
                             color = SecondaryColor,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
@@ -657,6 +662,7 @@ fun TimeSelectionRow(
     onClearDateTime: () -> Unit,
     useLightColors: Boolean = false
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     val containerColor = remember(useLightColors) {
         if (useLightColors) Color(0xFFF9FAFB) else SecondaryColor.copy(alpha = 0.1f)
     }
@@ -703,7 +709,7 @@ fun TimeSelectionRow(
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = "Départ",
+                        text = strings["departure"],
                         color = if (timeMode == TimeMode.DEPARTURE) primaryTextColor else secondaryTextColor,
                         fontWeight = if (timeMode == TimeMode.DEPARTURE) FontWeight.Bold else FontWeight.Normal,
                         fontSize = 14.sp
@@ -723,7 +729,7 @@ fun TimeSelectionRow(
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = "Arrivée",
+                        text = strings["arrival"],
                         color = if (timeMode == TimeMode.ARRIVAL) primaryTextColor else secondaryTextColor,
                         fontWeight = if (timeMode == TimeMode.ARRIVAL) FontWeight.Bold else FontWeight.Normal,
                         fontSize = 14.sp
@@ -735,7 +741,7 @@ fun TimeSelectionRow(
             if (selectedTimeSeconds != null || selectedDate != null) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "Réinitialiser",
+                    contentDescription = strings["reset"],
                     tint = secondaryTextColor,
                     modifier = Modifier
                         .size(20.dp)
@@ -822,6 +828,7 @@ fun TimePickerDialog(
     onTimeSelected: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     val initialHour = (initialTimeSeconds / 3600) % 24
     // Round initial minute to nearest 5 minutes
     val initialMinute = ((initialTimeSeconds % 3600) / 60 / 5) * 5
@@ -851,7 +858,7 @@ fun TimePickerDialog(
                         IconButton(onClick = { selectedHour = (selectedHour + 1) % 24 }) {
                             Icon(
                                 imageVector = Icons.Default.KeyboardArrowUp,
-                                contentDescription = "Augmenter l'heure",
+                                contentDescription = strings["increase_hour"],
                                 tint = SecondaryColor
                             )
                         }
@@ -866,7 +873,7 @@ fun TimePickerDialog(
                         }) {
                             Icon(
                                 imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = "Diminuer l'heure",
+                                contentDescription = strings["decrease_hour"],
                                 tint = SecondaryColor
                             )
                         }
@@ -885,7 +892,7 @@ fun TimePickerDialog(
                         IconButton(onClick = { selectedMinute = (selectedMinute + 5) % 60 }) {
                             Icon(
                                 imageVector = Icons.Default.KeyboardArrowUp,
-                                contentDescription = "Augmenter les minutes",
+                                contentDescription = strings["increase_minutes"],
                                 tint = SecondaryColor
                             )
                         }
@@ -900,7 +907,7 @@ fun TimePickerDialog(
                         }) {
                             Icon(
                                 imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = "Diminuer les minutes",
+                                contentDescription = strings["decrease_minutes"],
                                 tint = SecondaryColor
                             )
                         }
@@ -915,7 +922,7 @@ fun TimePickerDialog(
                     horizontalArrangement = Arrangement.End
                 ) {
                     Text(
-                        text = "Annuler",
+                        text = strings["cancel"],
                         color = SecondaryColor.copy(alpha = 0.7f),
                         modifier = Modifier
                             .clickable { onDismiss() }
@@ -935,7 +942,7 @@ fun TimePickerDialog(
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         Text(
-                            text = "Confirmer",
+                            text = strings["confirm"],
                             color = SecondaryColor
                         )
                     }
@@ -981,6 +988,7 @@ fun DatePickerDialog(
     onDateSelected: (LocalDate) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     var selectedDate by remember { mutableStateOf(initialDate) }
     val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
 
@@ -1020,7 +1028,7 @@ fun DatePickerDialog(
                     ) {
                         Icon(
                             imageVector = Icons.Default.KeyboardArrowUp,
-                            contentDescription = "Mois précédent",
+                            contentDescription = strings["previous_month"],
                             tint = if (displayedMonth > todayFirstOfMonth)
                                 SecondaryColor else SecondaryColor.copy(alpha = 0.3f),
                             modifier = Modifier.rotate(-90f)
@@ -1038,7 +1046,7 @@ fun DatePickerDialog(
                     IconButton(onClick = { displayedMonth = displayedMonth.plus(1, DateTimeUnit.MONTH) }) {
                         Icon(
                             imageVector = Icons.Default.KeyboardArrowUp,
-                            contentDescription = "Mois suivant",
+                            contentDescription = strings["next_month"],
                             tint = SecondaryColor,
                             modifier = Modifier.rotate(90f)
                         )
@@ -1144,7 +1152,7 @@ fun DatePickerDialog(
                     horizontalArrangement = Arrangement.End
                 ) {
                     Text(
-                        text = "Annuler",
+                        text = strings["cancel"],
                         color = SecondaryColor.copy(alpha = 0.7f),
                         modifier = Modifier
                             .clickable { onDismiss() }
@@ -1164,7 +1172,7 @@ fun DatePickerDialog(
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         Text(
-                            text = "Confirmer",
+                            text = strings["confirm"],
                             color = SecondaryColor
                         )
                     }

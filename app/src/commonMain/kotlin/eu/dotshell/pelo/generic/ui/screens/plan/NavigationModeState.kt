@@ -104,33 +104,6 @@ fun computeRemainingJourneySeconds(journey: JourneyResult, nowSeconds: Int): Int
     return (arrivalNormalized - nowNormalized).coerceAtLeast(0)
 }
 
-fun buildNavigationPathPoints(journey: JourneyResult): List<GeoPoint> {
-    val points = mutableListOf<GeoPoint>()
-
-    fun appendPointIfDistinct(point: GeoPoint) {
-        val last = points.lastOrNull()
-        if (last == null || last.latitude != point.latitude || last.longitude != point.longitude) {
-            points += point
-        }
-    }
-
-    journey.legs.filterNot { it.isWalking }.forEach { leg ->
-        if (isValidJourneyCoordinate(leg.fromLat, leg.fromLon)) {
-            appendPointIfDistinct(GeoPoint(leg.fromLat, leg.fromLon))
-        }
-        leg.intermediateStops.forEach { stop ->
-            if (isValidJourneyCoordinate(stop.lat, stop.lon)) {
-                appendPointIfDistinct(GeoPoint(stop.lat, stop.lon))
-            }
-        }
-        if (isValidJourneyCoordinate(leg.toLat, leg.toLon)) {
-            appendPointIfDistinct(GeoPoint(leg.toLat, leg.toLon))
-        }
-    }
-
-    return points
-}
-
 private fun normalizeTimeAroundReference(timeSeconds: Int, referenceSeconds: Int): Int {
     var normalized = timeSeconds
     while (normalized < referenceSeconds - DAY_SECONDS / 2) normalized += DAY_SECONDS

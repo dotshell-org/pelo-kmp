@@ -15,13 +15,6 @@ object MapStyleCompat {
         category = MapStyleCategory.STANDARD
     )
 
-    val DARK_MATTER = MapStyleData(
-        key = "dark_matter",
-        displayName = "Sombre",
-        styleUrl = "https://tiles.openfreemap.org/styles/dark",
-        category = MapStyleCategory.STANDARD
-    )
-
     /**
      * Compatibility function to replace MapStyle.getByCategory()
      */

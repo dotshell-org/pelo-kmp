@@ -32,6 +32,10 @@ actual class LocationProvider actual constructor(context: PlatformContext) {
 
     @Suppress("MissingPermission") // permission checked by the caller
     actual fun startUpdates(onLocation: (GeoPoint) -> Unit) {
+        // Idempotent: remove any previously registered callback first, otherwise a second
+        // startUpdates() leaks the old callback (it keeps receiving updates and stopUpdates()
+        // only ever removes the most recent one).
+        stopUpdates()
         try {
             val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000L).apply {
                 setMinUpdateIntervalMillis(3000L)

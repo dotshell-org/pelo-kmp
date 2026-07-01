@@ -34,15 +34,4 @@ class MapStyleRepository(
         settings.putString(keyMapStyle, style.key)
     }
 
-    /**
-     * Get the effective style considering offline state.
-     * If offline and the selected style is not downloaded, falls back to a downloaded style.
-     */
-    fun getEffectiveStyle(isOffline: Boolean, downloadedStyles: Set<String>): MapStyleData {
-        val selected = getSelectedStyle()
-        if (!isOffline) return selected
-        if (selected.key in downloadedStyles) return selected
-        return downloadedStyles.firstOrNull()?.let { mapStyleConfig.getMapStyleByKey(it) }
-            ?: mapStyleConfig.getDefaultMapStyle()
-    }
 }

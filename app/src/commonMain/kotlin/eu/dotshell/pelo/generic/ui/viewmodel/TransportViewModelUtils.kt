@@ -53,35 +53,6 @@ fun parseLineMentionsFromText(raw: String, lineRules: TransportLineRules): Set<S
         .toSet()
 }
 
-fun generateBezierCurve(start: List<Double>, end: List<Double>): List<List<Double>> {
-    val points = mutableListOf<List<Double>>()
-    points.add(start)
-
-    val midX = (start[0] + end[0]) / 2
-    val midY = (start[1] + end[1]) / 2
-
-    val dx = end[0] - start[0]
-    val dy = end[1] - start[1]
-
-    val length = kotlin.math.sqrt(dx * dx + dy * dy)
-    val perpx = -dy / length * length * 0.1
-    val perpy = dx / length * length * 0.1
-
-    val controlX = midX + perpx
-    val controlY = midY + perpy
-
-    val segments = 20
-    for (i in 1..segments) {
-        val t = i.toDouble() / segments
-        val x = (1 - t) * (1 - t) * start[0] + 2 * (1 - t) * t * controlX + t * t * end[0]
-        val y = (1 - t) * (1 - t) * start[1] + 2 * (1 - t) * t * controlY + t * t * end[1]
-        points.add(listOf(x, y))
-    }
-
-    points.add(end)
-    return points
-}
-
 fun findStopByCoordinates(
     stops: List<StopFeature>,
     targetLat: Double,

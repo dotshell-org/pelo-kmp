@@ -15,33 +15,9 @@ data class JourneyResult(
     fun formatArrivalTime(): String = formatTime(arrivalTime)
 
     private fun formatTime(seconds: Int): String {
-        val hours = seconds / 3600
+        val hours = (seconds / 3600) % 24
         val minutes = (seconds % 3600) / 60
         return "${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}"
     }
 
-    /**
-     * Extract all stop IDs from this journey (used for alert checking)
-     */
-    fun getAllStopIds(): Set<String> {
-        val stopIds = mutableSetOf<String>()
-        for (leg in legs) {
-            if (!leg.isWalking) {
-                stopIds.add(leg.fromStopId)
-                stopIds.add(leg.toStopId)
-                leg.intermediateStops.forEach { stop ->
-                    // Try to extract stop ID from intermediate stop name if available
-                    stopIds.add(stop.stopName)
-                }
-            }
-        }
-        return stopIds
-    }
-
-    /**
-     * Check if this journey passes through any of the problematic stops
-     */
-    fun passesThroughProblematicStops(problematicStopIds: Set<String>): Boolean {
-        return getAllStopIds().any { it in problematicStopIds }
-    }
 }

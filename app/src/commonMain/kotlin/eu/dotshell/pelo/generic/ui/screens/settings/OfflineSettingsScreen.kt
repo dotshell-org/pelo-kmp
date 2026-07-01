@@ -94,7 +94,7 @@ fun OfflineSettingsScreen(
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
-                text = "Mode hors ligne",
+                text = strings["offline_mode"],
                 color = SecondaryColor,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
@@ -102,9 +102,9 @@ fun OfflineSettingsScreen(
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = if (offlineDataInfo.isAvailable)
-                    "Les données hors ligne sont disponibles"
+                    strings["offline_available_message"]
                 else
-                    "Téléchargez les données pour utiliser l'appli sans connexion",
+                    strings["offline_download_message"],
                 color = Color.Gray,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center
@@ -118,7 +118,7 @@ fun OfflineSettingsScreen(
                 Spacer(modifier = Modifier.height(30.dp))
             }
 
-            CategoryHeader(Icons.Default.Map, "Fonds de carte")
+            CategoryHeader(Icons.Default.Map, strings["map_styles_category"])
 
             MapStyleSelectionCard(
                 selectedStyles = selectedMapStyles,
@@ -141,7 +141,7 @@ fun OfflineSettingsScreen(
             // Download Section
             when (val state = downloadState) {
                 is OfflineDownloadState.Downloading -> {
-                    DownloadProgressCard(state)
+                    DownloadProgressCard(state, strings)
                     Spacer(modifier = Modifier.height(12.dp))
                     TextButton(
                         onClick = { viewModel.cancelOfflineDownload() },
@@ -154,7 +154,7 @@ fun OfflineSettingsScreen(
                             tint = Color.Gray
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("Annuler", color = Color.Gray, fontSize = 14.sp)
+                        Text(strings["cancel"], color = Color.Gray, fontSize = 14.sp)
                     }
                 }
 
@@ -179,7 +179,7 @@ fun OfflineSettingsScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (offlineDataInfo.isAvailable) "Mettre à jour" else "Télécharger les données",
+                            text = if (offlineDataInfo.isAvailable) strings["update_button"] else strings["download_data"],
                             fontSize = 16.sp,
                             color = SecondaryColor,
                             modifier = Modifier.padding(vertical = 4.dp)
@@ -188,7 +188,7 @@ fun OfflineSettingsScreen(
 
                     if (state is OfflineDownloadState.Error) {
                         Text(
-                            state.message,
+                            translateOfflineErrorMessage(state.message, strings),
                             color = AccentColor,
                             fontSize = 13.sp,
                             modifier = Modifier.padding(top = 12.dp)
@@ -207,7 +207,7 @@ fun OfflineSettingsScreen(
                 .padding(start = 4.dp, top = 8.dp)
                 .align(Alignment.TopStart)
         ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour", tint = SecondaryColor)
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, strings["back"], tint = SecondaryColor)
         }
     }
 }
@@ -234,7 +234,7 @@ private fun CategoryHeader(icon: ImageVector, title: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DownloadProgressCard(state: OfflineDownloadState.Downloading) {
+private fun DownloadProgressCard(state: OfflineDownloadState.Downloading, strings: StringProvider) {
     val animatedProgress by animateFloatAsState(
         targetValue = state.progress.coerceIn(0f, 1f),
         animationSpec = tween(durationMillis = 600),
@@ -252,7 +252,7 @@ private fun DownloadProgressCard(state: OfflineDownloadState.Downloading) {
             Spacer(modifier = Modifier.height(7.dp))
 
             Text(
-                state.stepDescription,
+                translateOfflineStepDescription(state.stepDescription, strings),
                 color = SecondaryColor,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center,
@@ -369,13 +369,13 @@ private fun OfflineStatusCard(info: OfflineDataInfo) {
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            StatusRow("Dernière mise à jour", formatTimestamp(info.lastDownloadTimestamp))
+            StatusRow(strings["last_update_label"], formatTimestamp(info.lastDownloadTimestamp, strings))
             Spacer(modifier = Modifier.height(8.dp))
-            StatusRow("Espace utilisé", formatFileSize(info.totalSizeBytes))
+            StatusRow(strings["space_used_label"], formatFileSize(info.totalSizeBytes, strings))
             Spacer(modifier = Modifier.height(8.dp))
             StatusRow(
-                "Lignes de bus",
-                if (info.busLinesCount > 0) "${info.busLinesCount} lignes" else "Aucune"
+                strings["bus_lines_label"],
+                if (info.busLinesCount > 0) strings["bus_lines_value"].replace("%s", info.busLinesCount.toString()) else strings["no_bus_lines_label"]
             )
 
             if (info.isStale) {
@@ -392,7 +392,7 @@ private fun OfflineStatusCard(info: OfflineDataInfo) {
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Données anciennes — mise à jour recommandée",
+                        text = strings["stale_data_update_recommended"],
                         color = Color(0xFFFF9800),
                         fontSize = 13.sp
                     )
@@ -410,23 +410,6 @@ private fun StatusRow(label: String, value: String) {
     }
 }
 
-@Composable
-private fun FeatureRow(feature: String, available: Boolean) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = if (available) "✓" else "✕",
-            color = if (available) Color(0xFF4CAF50) else Color(0xFFEF4444),
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(feature, color = if (available) SecondaryColor else Color.Gray, fontSize = 14.sp)
-    }
-}
 
 @Composable
 private fun WavyLinearProgressIndicator(
@@ -513,26 +496,44 @@ private val FRENCH_MONTHS = listOf(
     "juil.", "août", "sept.", "oct.", "nov.", "déc."
 )
 
+private val ENGLISH_MONTHS = listOf(
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+)
+
 /**
  * Formats an epoch-millis timestamp as e.g. "5 juin 2026 à 14:30" (was Android SimpleDateFormat).
  */
-private fun formatTimestamp(timestamp: Long): String {
-    if (timestamp == 0L) return "Jamais"
+@Composable
+private fun formatTimestamp(timestamp: Long, strings: StringProvider): String {
+    if (timestamp == 0L) return strings["never"]
     val dt = Instant.fromEpochMilliseconds(timestamp)
         .toLocalDateTime(TimeZone.currentSystemDefault())
-    val month = FRENCH_MONTHS.getOrElse(dt.monthNumber - 1) { "" }
+    val isFrench = strings["never"] == "Jamais"
+    val months = if (isFrench) FRENCH_MONTHS else ENGLISH_MONTHS
+    val month = months.getOrElse(dt.monthNumber - 1) { "" }
     val hh = dt.hour.toString().padStart(2, '0')
     val mm = dt.minute.toString().padStart(2, '0')
-    return "${dt.dayOfMonth} $month ${dt.year} à $hh:$mm"
+    val dateStr = "${dt.dayOfMonth} $month ${dt.year}"
+    val timeStr = "$hh:$mm"
+    return strings["date_time_at"]
+        .replace("%1\$s", dateStr)
+        .replace("%2\$s", timeStr)
 }
 
 /**
- * Human-readable byte size in French units (was Android Formatter.formatFileSize, which is
+ * Human-readable byte size in French or English units (was Android Formatter.formatFileSize, which is
  * locale + Context-bound). Approximate (binary 1024 steps, one decimal from Mo up).
  */
-private fun formatFileSize(bytes: Long): String {
-    if (bytes <= 0) return "0 o"
-    val units = listOf("o", "Ko", "Mo", "Go", "To")
+@Composable
+private fun formatFileSize(bytes: Long, strings: StringProvider): String {
+    val isFrench = strings["never"] == "Jamais"
+    if (bytes <= 0) return if (isFrench) "0 o" else "0 B"
+    val units = if (isFrench) {
+        listOf("o", "Ko", "Mo", "Go", "To")
+    } else {
+        listOf("B", "KB", "MB", "GB", "TB")
+    }
     var value = bytes.toDouble()
     var i = 0
     while (value >= 1024.0 && i < units.size - 1) {
@@ -544,6 +545,59 @@ private fun formatFileSize(bytes: Long): String {
     } else {
         val whole = value.toLong()
         val decimal = ((value - whole) * 10).toLong()
-        "$whole,$decimal ${units[i]}"
+        if (isFrench) {
+            "$whole,$decimal ${units[i]}"
+        } else {
+            "$whole.$decimal ${units[i]}"
+        }
+    }
+}
+
+@Composable
+private fun translateOfflineStepDescription(step: String, strings: StringProvider): String {
+    return when {
+        step == "Téléchargement des données..." -> strings["offline_status_downloading_data"]
+        step == "Sauvegarde des données..." -> strings["offline_status_saving_data"]
+        step == "Lignes de bus..." -> strings["offline_status_bus_lines"]
+        step.startsWith("Lignes de bus (") && step.endsWith(")...") -> {
+            val progress = step.substringAfter("Lignes de bus (").substringBefore(")...")
+            strings["offline_status_bus_lines_progress"].replace("%s", progress)
+        }
+        step.startsWith("Tuiles ") && step.endsWith(")...") -> {
+            val body = step.removePrefix("Tuiles ").removeSuffix(")...")
+            val styleName = body.substringBeforeLast(" (")
+            val progress = body.substringAfterLast(" (")
+            val localizedStyleName = when (styleName) {
+                "Clair" -> strings["theme_light"]
+                "Sombre" -> strings["theme_dark"]
+                else -> styleName
+            }
+            strings["offline_status_map_tiles"]
+                .replace("%1\$s", localizedStyleName)
+                .replace("%2\$s", progress)
+        }
+        else -> step
+    }
+}
+
+@Composable
+private fun translateOfflineErrorMessage(message: String, strings: StringProvider): String {
+    return when {
+        message == "Mémoire insuffisante pour télécharger les lignes de bus" -> {
+            strings["offline_error_insufficient_memory"]
+        }
+        message.startsWith("Échec du téléchargement: ") -> {
+            val err = message.removePrefix("Échec du téléchargement: ")
+            strings["offline_error_download_failed"].replace("%s", err)
+        }
+        message.startsWith("Échec du téléchargement des lignes de bus: ") -> {
+            val err = message.removePrefix("Échec du téléchargement des lignes de bus: ")
+            strings["offline_error_bus_lines_failed"].replace("%s", err)
+        }
+        message.startsWith("Erreur inattendue: ") -> {
+            val err = message.removePrefix("Erreur inattendue: ")
+            strings["offline_error_unexpected"].replace("%s", err)
+        }
+        else -> message
     }
 }

@@ -179,7 +179,7 @@ class TripDetector(
             val d = GeometryUtils.distanceMeters(lat, lng, sLat, sLng)
             if (d <= bestDistance) {
                 bestDistance = d
-                bestId = stop.properties.nom
+                bestId = stop.properties.id.toString()
             }
         }
         return bestId

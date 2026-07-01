@@ -3,6 +3,7 @@ package eu.dotshell.pelo.generic.ui.components
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -271,21 +272,16 @@ fun MapCanvas(
     val allIconNamesToLoad = remember(iconNames, preloadedIconNames) {
         (preloadedIconNames + iconNames).distinct()
     }
-    // Resolve one Painter per icon. getPainter uses painterResource internally which
-    // is async. On first composition the painters may be in a loading state — that
-    // triggers one extra recomposition per painter per batch, after which they are
-    // all stable. The remember(iconNames) above prevents re-triggering when the
-    // render data object changes but carries identical icon names.
-    // iconPainters: the remember(iconNames) block returns a stable mutable map.
-    // The for-loop below calls getPainter for each name; getPainter uses
-    // painterResource internally which caches via its own remember — on subsequent
-    // recompositions with the same iconNames it returns the already-loaded Painter
-    // immediately (no state change → no cascade). The cast is safe: the mutable
-    // map is only mutated here, in the composition body, never inside a lambda.
-    @Suppress("UNCHECKED_CAST")
+    // Resolve one Painter per icon. getPainter() is @Composable (painterResource internally,
+    // which caches via its own remember, so identical iconNames return the loaded Painter with no
+    // cascade). The icon set varies with the visible lines, so each call is wrapped in key(name):
+    // without it, calling a @Composable a variable number of times across recompositions corrupts
+    // positional memoization / the slot table.
     val iconPainters = remember(allIconNamesToLoad) { HashMap<String, Painter>(allIconNamesToLoad.size) }
-    for (name in allIconNamesToLoad) {
-        iconPainters[name] = drawableProvider.getPainter(name)
+    allIconNamesToLoad.forEach { name ->
+        key(name) {
+            iconPainters[name] = drawableProvider.getPainter(name)
+        }
     }
 
     // Vehicle painters — call getPainter directly; painterResource caches internally.

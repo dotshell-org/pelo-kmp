@@ -24,6 +24,8 @@ import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.data.network.mapstyle.MapStyleData
+import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 import eu.dotshell.pelo.platform.provideMapStyleConfig
 import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
 import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
@@ -38,6 +40,7 @@ fun MapStyleSelectionSheet(
     onDismiss: () -> Unit,
     onStyleSelected: (MapStyleData) -> Unit
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     val mapStyleConfig = provideMapStyleConfig()
     val standardStyles = remember { mapStyleConfig.getStandardMapStyles() }
     val satelliteStyle = remember { mapStyleConfig.getSatelliteMapStyle() }
@@ -54,7 +57,7 @@ fun MapStyleSelectionSheet(
                 .padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
             Text(
-                text = "Thème",
+                text = strings["theme_title"],
                 color = PrimaryColor
             )
             Spacer(modifier = Modifier.size(16.dp))

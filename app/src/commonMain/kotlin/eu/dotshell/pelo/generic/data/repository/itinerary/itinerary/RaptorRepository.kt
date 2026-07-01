@@ -29,6 +29,8 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlin.concurrent.Volatile
 import kotlinx.datetime.isoDayNumber
+import kotlin.math.cos
+import kotlin.math.PI
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -70,6 +72,10 @@ class RaptorRepository private constructor(private val context: PlatformContext)
 
     // Performance: HashMap index for O(1) stop lookup by index position
     private var stopsByIndex: Map<Int, Stop> = emptyMap()
+
+    // Performance: Cache of stop names with active lines to avoid O(N^2) lookups in findNearestStops
+    @Volatile
+    private var stopsWithRoutes: Set<String> = emptySet()
 
     // Performance: Cache of normalized stop names to avoid repeated normalization during search
     private var normalizedStopNames: Map<Stop, String> = emptyMap()
@@ -373,6 +379,20 @@ class RaptorRepository private constructor(private val context: PlatformContext)
         stopIdsByNormalizedName = stopsCache
             .groupBy { stop -> SearchUtils.normalizeForSearch(stop.name) }
             .mapValues { (_, stops) -> stops.map { it.id }.distinct() }
+
+        // Build stopsWithRoutes cache for fast hasLinesForStop lookup
+        val period = raptorLibrary?.getCurrentPeriod()
+        if (period != null) {
+            val stops = getStopsForPeriod(period)
+            val routes = getRoutesForPeriod(period)
+            val routeIdsWithVariants = routes.map { it.id }.toSet()
+            stopsWithRoutes = stops
+                .filter { stop -> stop.routeIds.any { routeIdsWithVariants.contains(it) } }
+                .map { it.name.lowercase() }
+                .toSet()
+        } else {
+            stopsWithRoutes = emptySet()
+        }
     }
 
     /**
@@ -469,21 +489,6 @@ class RaptorRepository private constructor(private val context: PlatformContext)
             searchStopsByName(stopName).map { it.id }.take(maxIds)
         }
 
-    /**
-     * Get stop name by its ID.
-     * Useful for matching WFS stops (which have gid) to Raptor stops.
-     */
-    fun getStopNameById(stopId: Int): String? {
-        return stopsCache.find { it.id == stopId }?.name
-    }
-
-    /**
-     * Get all stops as a map of id to name.
-     * Useful for bulk enrichment of stop names.
-     */
-    fun getAllStopNamesById(): Map<Int, String> {
-        return stopsCache.associate { it.id to it.name }
-    }
 
     /**
      * Get all stops with their coordinates.
@@ -531,8 +536,8 @@ class RaptorRepository private constructor(private val context: PlatformContext)
      * @param stopName The name of the stop to check
      * @return true if the stop has at least one line, false otherwise
      */
-    private suspend fun hasLinesForStop(stopName: String): Boolean {
-        return getDesserteForStop(stopName)?.isNotEmpty() == true
+    private fun hasLinesForStop(stopName: String): Boolean {
+        return stopsWithRoutes.contains(stopName.lowercase())
     }
 
     /**
@@ -555,15 +560,19 @@ class RaptorRepository private constructor(private val context: PlatformContext)
             stopsCache
                 .map { stop ->
                     val latDiff = stop.lat - latitude
-                    val lonDiff = stop.lon - longitude
+                    // Scale longitude by cos(lat) so a degree of longitude isn't over-weighted
+                    // relative to a degree of latitude (~0.7 at Lyon's latitude).
+                    val lonDiff = (stop.lon - longitude) * cos(latitude * PI / 180.0)
                     val distance = sqrt(latDiff.pow(2) + lonDiff.pow(2))
                     stop to distance
                 }
                 .sortedBy { it.second }
                 // Group by stop name to get unique stop names (different platforms have same name)
                 .distinctBy { it.first.name }
-                .take(limit)
+                // Filter BEFORE take so we don't drop valid stops served by lines just because
+                // a closer name-less platform consumed a slot.
                 .filter { (stop, _) -> hasLinesForStop(stop.name) }
+                .take(limit)
                 .map { (stop, _) ->
                     RaptorStop(
                         id = stop.id,
@@ -600,7 +609,6 @@ class RaptorRepository private constructor(private val context: PlatformContext)
         blockedRouteNames: Set<String> = emptySet()
     ): List<JourneyResult> = withContext(Dispatchers.Default) {
         ensureInitialized()
-        ensureCorrectPeriod(date) // Auto-select period based on selected date
 
         // Early return for empty inputs to avoid unnecessary computation
         if (originStopIds.isEmpty() || destinationStopIds.isEmpty()) {
@@ -638,13 +646,21 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                 "getOptimizedPaths: Cache miss, calculating with Raptor for ${originStopIds.size} origin(s) -> ${destinationStopIds.size} destination(s)"
             )
 
-            // Level 3: Calculate with Raptor
-            val journeys = raptorLibrary?.getOptimizedPaths(
-                originStopIds = originStopIds,
-                destinationStopIds = destinationStopIds,
-                departureTime = depTime,
-                blockedRouteNames = blockedRouteNames
-            ) ?: emptyList()
+            // Period selection and the Raptor calculation share mutable period state (the
+            // library's active period and the stop index). Hold the mutex across both, and
+            // snapshot stopsByIndex while still locked: the @Volatile copy-on-write map captured
+            // here stays consistent with `journeys`' leg indices even if a concurrent calculation
+            // for another date flips the period right after we release the lock.
+            val (journeys, stopIndex) = mutex.withLock {
+                ensureCorrectPeriod(date) // Auto-select period based on selected date
+                val computed = raptorLibrary?.getOptimizedPaths(
+                    originStopIds = originStopIds,
+                    destinationStopIds = destinationStopIds,
+                    departureTime = depTime,
+                    blockedRouteNames = blockedRouteNames
+                ) ?: emptyList()
+                computed to stopsByIndex
+            }
 
             // Performance: Pre-allocate results list with estimated capacity
             val results = ArrayList<JourneyResult>(journeys.size)
@@ -658,9 +674,9 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                 var hasInvalidLeg = false
 
                 for (leg in legs) {
-                    // Use HashMap index for O(1) stop lookup
-                    val fromStop = stopsByIndex[leg.fromStopIndex]
-                    val toStop = stopsByIndex[leg.toStopIndex]
+                    // Use HashMap index for O(1) stop lookup (snapshot taken under the lock)
+                    val fromStop = stopIndex[leg.fromStopIndex]
+                    val toStop = stopIndex[leg.toStopIndex]
 
                     if (fromStop == null || toStop == null) {
                         if (DEBUG_LOGGING) {
@@ -679,7 +695,7 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                     val intermediateStops = ArrayList<IntermediateStop>(intermediateIndices.size)
 
                     for (idx in intermediateIndices.indices) {
-                        val stop = stopsByIndex[intermediateIndices[idx]]
+                        val stop = stopIndex[intermediateIndices[idx]]
                         val arrivalTime =
                             if (idx < intermediateTimes.size) intermediateTimes[idx] else null
                         if (stop != null && arrivalTime != null) {
@@ -770,14 +786,21 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                 return@withContext emptyList()
             }
 
-            // Use raptor-kt's arrive-by search
-            val journeys = raptorLibrary?.getOptimizedPathsArriveBy(
-                originStopIds = originStopIds,
-                destinationStopIds = destinationStopIds,
-                arrivalTime = arrivalTimeSeconds,
-                searchWindowMinutes = searchWindowMinutes,
-                blockedRouteNames = blockedRouteNames
-            ) ?: emptyList()
+            // Period selection + the arrive-by Raptor calc share mutable period state; hold the
+            // mutex across both and snapshot stopsByIndex while locked (see getOptimizedPaths).
+            // ensureCorrectPeriod was previously never called here, so arrive-by silently used
+            // whatever period was last set rather than the one for `date`.
+            val (journeys, stopIndex) = mutex.withLock {
+                ensureCorrectPeriod(date)
+                val computed = raptorLibrary?.getOptimizedPathsArriveBy(
+                    originStopIds = originStopIds,
+                    destinationStopIds = destinationStopIds,
+                    arrivalTime = arrivalTimeSeconds,
+                    searchWindowMinutes = searchWindowMinutes,
+                    blockedRouteNames = blockedRouteNames
+                ) ?: emptyList()
+                computed to stopsByIndex
+            }
 
             // Map results using the same logic as getOptimizedPaths
             val results = ArrayList<JourneyResult>(journeys.size)
@@ -789,8 +812,8 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                 var hasInvalidLeg = false
 
                 for (leg in legs) {
-                    val fromStop = stopsByIndex[leg.fromStopIndex]
-                    val toStop = stopsByIndex[leg.toStopIndex]
+                    val fromStop = stopIndex[leg.fromStopIndex]
+                    val toStop = stopIndex[leg.toStopIndex]
 
                     if (fromStop == null || toStop == null) {
                         if (DEBUG_LOGGING) {
@@ -808,7 +831,7 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                     val intermediateStops = ArrayList<IntermediateStop>(intermediateIndices.size)
 
                     for (idx in intermediateIndices.indices) {
-                        val stop = stopsByIndex[intermediateIndices[idx]]
+                        val stop = stopIndex[intermediateIndices[idx]]
                         val arrivalTime =
                             if (idx < intermediateTimes.size) intermediateTimes[idx] else null
                         if (stop != null && arrivalTime != null) {

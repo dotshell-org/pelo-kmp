@@ -54,6 +54,8 @@ import eu.dotshell.pelo.generic.ui.theme.Gray700
 import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
 import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModelInterface
+import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 
 /**
  * Dialog for creating a new favorite from predefined presets.
@@ -68,17 +70,26 @@ fun AddFavoriteDialog(
     viewModel: TransportViewModelInterface,
     initialStopName: String? = null
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    val presets = remember {
+    val homePreset = strings["preset_home"]
+    val workPreset = strings["preset_work"]
+    val schoolPreset = strings["preset_school"]
+    val shoppingPreset = strings["preset_shopping"]
+    val busPreset = strings["preset_bus_station"]
+    val trainPreset = strings["preset_train_station"]
+    val otherPreset = strings["preset_other"]
+
+    val presets = remember(homePreset, workPreset, schoolPreset, shoppingPreset, busPreset, trainPreset, otherPreset) {
         listOf(
-            FavoritePreset("Maison", "home"),
-            FavoritePreset("Travail", "work"),
-            FavoritePreset("Ecole", "school"),
-            FavoritePreset("Courses", "shopping"),
-            FavoritePreset("Gare routière", "bus"),
-            FavoritePreset("Gare ferroviaire", "train"),
-            FavoritePreset("Autre", "star")
+            FavoritePreset(homePreset, "home"),
+            FavoritePreset(workPreset, "work"),
+            FavoritePreset(schoolPreset, "school"),
+            FavoritePreset(shoppingPreset, "shopping"),
+            FavoritePreset(busPreset, "bus"),
+            FavoritePreset(trainPreset, "train"),
+            FavoritePreset(otherPreset, "star")
         )
     }
 
@@ -101,7 +112,7 @@ fun AddFavoriteDialog(
         }
     }
 
-    val isOtherSelected = selectedPreset?.name == "Autre"
+    val isOtherSelected = selectedPreset?.iconName == "star"
     val finalFavoriteTitle =
         if (isOtherSelected) customOtherTitle.trim() else (selectedPreset?.name ?: "")
 
@@ -126,7 +137,7 @@ fun AddFavoriteDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Nouveau favori",
+                    text = strings["favorite_new"],
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = PrimaryColor
@@ -134,7 +145,7 @@ fun AddFavoriteDialog(
                 IconButton(onClick = onDismiss) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Fermer",
+                        contentDescription = strings["close"],
                         tint = Gray700
                     )
                 }
@@ -144,7 +155,7 @@ fun AddFavoriteDialog(
 
             // Preset selection
             Text(
-                text = "Type de favori",
+                text = strings["favorite_type"],
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
                 color = PrimaryColor
@@ -162,7 +173,7 @@ fun AddFavoriteDialog(
                         isSelected = preset == selectedPreset,
                         onClick = {
                             selectedPreset = preset
-                            if (preset.name != "Autre") {
+                            if (preset.iconName != "star") {
                                 customOtherTitle = ""
                             }
                         }
@@ -173,7 +184,7 @@ fun AddFavoriteDialog(
             if (isOtherSelected) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Titre du favori",
+                    text = strings["favorite_title"],
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     color = PrimaryColor
@@ -196,7 +207,7 @@ fun AddFavoriteDialog(
                     decorationBox = { innerTextField ->
                         if (customOtherTitle.isBlank()) {
                             Text(
-                                text = "Ex: Salle de sport",
+                                text = strings["favorite_title_placeholder"],
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color.Gray
                             )
@@ -210,7 +221,7 @@ fun AddFavoriteDialog(
 
             // Stop selection
             Text(
-                text = "Arrêt associé",
+                text = strings["favorite_associated_stop"],
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
                 color = PrimaryColor
@@ -234,7 +245,7 @@ fun AddFavoriteDialog(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = selectedStop?.stopName ?: "Rechercher un arrêt",
+                    text = selectedStop?.stopName ?: strings["search_stop_placeholder"],
                     style = MaterialTheme.typography.bodyMedium,
                     color = SecondaryColor
                 )
@@ -265,7 +276,7 @@ fun AddFavoriteDialog(
                 enabled = selectedPreset != null && selectedStop != null && finalFavoriteTitle.isNotBlank()
             ) {
                 Text(
-                    text = "Créer le favori",
+                    text = strings["favorite_create"],
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -293,7 +304,7 @@ fun AddFavoriteDialog(
                     showHistory = false,
                     startExpanded = true,
                     showDarkOutline = false,
-                    searchPlaceholder = "Rechercher un arrêt",
+                    searchPlaceholder = strings["search_stop_placeholder"],
                     query = stopSearchOverlayQuery,
                     onQueryChange = { q ->
                         stopSearchOverlayQuery = q

@@ -8,27 +8,29 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 enum class Destination(
     val route: String,
-    val label: String,
+    // Resource keys (resolved via StringProvider at the render site — enum field initialisers
+    // can't call the @Composable provider).
+    val labelKey: String,
     val icon: ImageVector,
-    val contentDescription: String
+    val contentDescriptionKey: String
 ) {
     PLAN(
         route = "plan",
-        label = "Plan",
+        labelKey = "tab_plan",
         icon = Icons.Filled.Map,
-        contentDescription = "Plan Tab"
+        contentDescriptionKey = "tab_plan_cd"
     ),
     LINES(
         route = "lines",
-        label = "Lignes",
+        labelKey = "tab_lines",
         icon = Icons.Filled.Route,
-        contentDescription = "Lines Tab"
+        contentDescriptionKey = "tab_lines_cd"
     ),
     SETTINGS(
         route = "settings",
-        label = "Paramètres",
+        labelKey = "tab_settings",
         icon = Icons.Filled.Settings,
-        contentDescription = "Settings Tab"
+        contentDescriptionKey = "tab_settings_cd"
     );
 
     companion object {

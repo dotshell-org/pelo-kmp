@@ -7,8 +7,10 @@ import eu.dotshell.pelo.generic.data.telemetry.TelemetryService
 import eu.dotshell.pelo.generic.service.TransportServiceProvider
 import eu.dotshell.pelo.generic.utils.location.LocationPermissionManager
 import eu.dotshell.pelo.platform.BackgroundScheduler
+import eu.dotshell.pelo.platform.LanguageManager
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.Log
+import eu.dotshell.pelo.platform.ProvideAppLocale
 import eu.dotshell.pelo.platform.PlatformContext
 import platform.UIKit.UIViewController
 
@@ -36,9 +38,11 @@ fun MainViewController(): UIViewController {
     } catch (e: Exception) {
         Log.w("MainViewController", "Failed to initialize Telemetry: ${e.message}")
     }
-    
+    LanguageManager.init(IosPlatformContext)
+
     return ComposeUIViewController {
         CompositionLocalProvider(LocalPlatformContext provides IosPlatformContext) {
+            ProvideAppLocale(LanguageManager.current.tag) {
             App(
                 onNavigationModeChanged = { active ->
                     if (active) {
@@ -47,6 +51,7 @@ fun MainViewController(): UIViewController {
                     }
                 }
             )
+            }
         }
     }
 }

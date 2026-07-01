@@ -38,6 +38,8 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import kotlinx.datetime.DateTimeUnit
+import kotlinx.datetime.plus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -64,7 +66,11 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
     private val vehiclePositionsService = TransportServiceProvider.getVehiclePositionsService()
     private val lineRules = TransportServiceProvider.getTransportLineRules()
     internal val transportRepository: TransportRepository = TransportRepository(transportApi)
-    private val trafficAlertsRepository = TrafficAlertsRepository(transportApi, eu.dotshell.pelo.platform.Settings(context, "traffic_alerts_cache"))
+    private val trafficAlertsRepository = TrafficAlertsRepository(
+        transportApi,
+        eu.dotshell.pelo.platform.Settings(context, "traffic_alerts_cache"),
+        eu.dotshell.pelo.generic.data.offline.OfflineRepository(context)
+    )
     val userStopAlertsRepository by lazy {
         UserStopAlertsRepository(
             transportApi as eu.dotshell.pelo.specific.data.network.LyonKtorClient
@@ -400,7 +406,7 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         val unknownCount = sampleStops.count { it.properties.desserte.equals("UNKNOWN", ignoreCase = true) }
         val arretCount = sampleStops.count { it.properties.nom.startsWith("Arret ") || it.properties.nom.contains("Arrondissement") }
 
-        val shouldEnrich = strongStopCount == 0 && ratioNonBlank < 0.1 ||
+        val shouldEnrich = (strongStopCount == 0 && ratioNonBlank < 0.1) ||
                          unknownCount > sampleSize * 0.3 ||
                          (strongStopCount < sampleSize * 0.2 && unknownCount > sampleSize * 0.2) ||
                          arretCount > sampleSize * 0.05
@@ -886,18 +892,39 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
                 isPublicHoliday = isPublicHoliday
             )
             _allSchedules.value = allSchedulesForDay
-            if (allSchedulesForDay.isEmpty()) return@launch
 
             val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
             val nowMinutes = now.hour * 60 + now.minute
             val ordered = allSchedulesForDay.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
 
-            val nextThree = (
-                ordered.filter { schedule ->
+            val nextThree = ordered
+                .filter { schedule ->
                     val minutes = parseTimeToMinutes(schedule) ?: return@filter false
                     minutes >= nowMinutes
-                } + ordered
-            ).take(3)
+                }
+                .take(3)
+                .toMutableList()
+
+            if (nextThree.size < 3) {
+                // Fetch tomorrow's schedules to fill the list
+                val tomorrow = today.plus(1, DateTimeUnit.DAY)
+                val tomorrowIsSchoolHoliday = holidayDetector.isSchoolHoliday(tomorrow)
+                val tomorrowIsPublicHoliday = holidayDetector.isPublicHoliday(tomorrow)
+                val tomorrowSchedules = runCatching {
+                    schedulesRepository.getSchedules(
+                        lineName = resolveScheduleRouteName(lineName),
+                        stopName = stopName,
+                        directionId = directionId,
+                        isSchoolHoliday = tomorrowIsSchoolHoliday,
+                        isPublicHoliday = tomorrowIsPublicHoliday
+                    )
+                }.getOrDefault(emptyList())
+
+                val tomorrowOrdered = tomorrowSchedules.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+                val needed = 3 - nextThree.size
+                val tomorrowNext = tomorrowOrdered.take(needed)
+                nextThree.addAll(tomorrowNext)
+            }
 
             _nextSchedules.value = nextThree
         }
@@ -1202,45 +1229,6 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         return eu.dotshell.pelo.generic.ui.viewmodel.parseAlertTokens(raw, lineRules)
     }
 
-    private fun alertAffectsLine(alert: TrafficAlert, lineName: String): Boolean {
-        val target = normalizeLineToken(lineName)
-        if (target.isEmpty() || !isLikelyLineToken(target)) return false
-
-        // Check if the line is directly referenced in the alert's primary fields
-        val lineCodeTokens = parseAlertTokens(alert.lineCode)
-        val lineNameTokens = parseAlertTokens(alert.lineName)
-
-        // Only use objectList if the alert type specifically indicates it's about lines/routes
-        val shouldUseObjectList = alert.objectType.contains("ligne", ignoreCase = true) ||
-                alert.objectType.contains("line", ignoreCase = true) ||
-                alert.objectType.contains("route", ignoreCase = true)
-
-        val primaryTokens = buildSet {
-            addAll(lineCodeTokens)
-            addAll(lineNameTokens)
-            if (shouldUseObjectList) {
-                addAll(parseAlertTokens(alert.objectList))
-            }
-        }
-
-        // If we found the line in primary fields, it definitely affects this line
-        if (target in primaryTokens) {
-            return true
-        }
-
-        // Only check text fields if no primary fields matched
-        // This prevents false positives from mentions in message text
-        if (lineCodeTokens.isEmpty() && lineNameTokens.isEmpty() && !shouldUseObjectList) {
-            val textTokens = buildSet {
-                addAll(parseLineMentionsFromText(alert.title))
-                addAll(parseLineMentionsFromText(alert.message))
-            }
-            return target in textTokens
-        }
-
-        return false
-    }
-
     private fun parseTimeToMinutes(rawTime: String): Int? {
         return eu.dotshell.pelo.generic.ui.viewmodel.parseTimeToMinutes(rawTime)
     }
@@ -1261,10 +1249,6 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         vehiclePositionsJob?.cancel()
         globalLiveJob?.cancel()
         super.onCleared()
-    }
-
-    fun generateBezierCurve(start: List<Double>, end: List<Double>): List<List<Double>> {
-        return eu.dotshell.pelo.generic.ui.viewmodel.generateBezierCurve(start, end)
     }
 
     /**

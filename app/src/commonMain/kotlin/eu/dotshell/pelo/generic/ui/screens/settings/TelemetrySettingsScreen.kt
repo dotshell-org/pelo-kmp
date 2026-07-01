@@ -37,6 +37,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,7 +47,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -55,7 +56,6 @@ import eu.dotshell.pelo.generic.data.telemetry.PlaceRef
 import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
 import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import kotlinx.datetime.Instant
-import kotlinx.serialization.json.Json
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,15 +65,8 @@ fun TelemetrySettingsScreen(
     onWipeHistory: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     var showWipeConfirmDialog by remember { mutableStateOf(false) }
-
-    val prettyJson = remember {
-        Json {
-            prettyPrint = true
-            prettyPrintIndent = "  "
-            encodeDefaults = true
-        }
-    }
 
     if (showWipeConfirmDialog) {
         AlertDialog(
@@ -107,7 +100,7 @@ fun TelemetrySettingsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Confidentialité",
+                        text = strings["privacy_title"],
                         color = SecondaryColor,
                         fontWeight = FontWeight.Bold
                     )
@@ -116,7 +109,7 @@ fun TelemetrySettingsScreen(
                     IconButton(onClick = onBackClick) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Retour",
+                            contentDescription = strings["back"],
                             tint = SecondaryColor
                         )
                     }
@@ -157,7 +150,7 @@ fun TelemetrySettingsScreen(
                     )
                     Spacer(Modifier.width(12.dp))
                     Text(
-                        text = "Supprimer l'historique local",
+                        text = strings["delete_local_history"],
                         color = Color(0xFFEF4444),
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold
@@ -168,7 +161,7 @@ fun TelemetrySettingsScreen(
             Spacer(Modifier.height(24.dp))
 
             Text(
-                text = "Données collectées aujourd'hui",
+                text = strings["data_collected_today"],
                 color = SecondaryColor,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
@@ -179,7 +172,7 @@ fun TelemetrySettingsScreen(
 
             when (snapshot) {
                 null -> InfoCard(
-                    title = "Aucune donnée",
+                    title = strings["no_data"],
                     body = "Aucun événement n'a encore été enregistré."
                 )
                 else -> {
@@ -214,7 +207,7 @@ fun TelemetrySettingsScreen(
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text(text = "${snapshot.events.size} év.", color = SecondaryColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                Text(text = strings["events_count"].replace("%s", snapshot.events.size.toString()), color = SecondaryColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                             }
                         }
                     }
@@ -223,7 +216,7 @@ fun TelemetrySettingsScreen(
                     EventBreakdownCard(events = snapshot.events)
                     Spacer(Modifier.height(20.dp))
                     Text(
-                        text = "Journal des événements",
+                        text = strings["events_log"],
                         color = SecondaryColor,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
@@ -244,8 +237,9 @@ fun TelemetrySettingsScreen(
 
 @Composable
 private fun EventItem(event: TelemetryEvent) {
+    val strings = StringProvider(LocalPlatformContext.current)
     val (icon, color) = eventIconAndColor(event::class.simpleName ?: "Unknown")
-    val title = eventDescriptionLabel(event)
+    val title = eventDescriptionLabel(event, strings)
     val time = remember(event.at) {
         try {
             event.at.substringAfter('T').substringBefore('.')
@@ -282,7 +276,7 @@ private fun EventItem(event: TelemetryEvent) {
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
-                        text = "Type : ${event::class.simpleName}",
+                        text = strings["event_type"].replace("%s", event::class.simpleName ?: ""),
                         color = Color.Gray,
                         fontSize = 11.sp
                     )
@@ -295,7 +289,7 @@ private fun EventItem(event: TelemetryEvent) {
                 )
             }
 
-            val details = getEventDetails(event)
+            val details = getEventDetails(event, strings)
             if (details.isNotEmpty()) {
                 Spacer(Modifier.height(10.dp))
                 Column(
@@ -331,12 +325,8 @@ private fun EventItem(event: TelemetryEvent) {
 private fun EventBreakdownCard(events: List<TelemetryEvent>) {
     if (events.isEmpty()) return
 
-    val grouped = events.groupBy { eventShortLabel(it::class.simpleName ?: "Unknown") }
-        .map { (label, list) ->
-            val firstEvent = list.first()
-            val (icon, color) = eventIconAndColor(firstEvent::class.simpleName ?: "Unknown")
-            Triple(label, icon, list.size)
-        }
+    val strings = StringProvider(LocalPlatformContext.current)
+    val grouped = events.groupBy { it::class.simpleName ?: "Unknown" }
 
     Card(
         modifier = Modifier
@@ -346,9 +336,11 @@ private fun EventBreakdownCard(events: List<TelemetryEvent>) {
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("Résumé de la journée", color = SecondaryColor, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text(strings["telemetry_daily_summary"], color = SecondaryColor, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
             Spacer(Modifier.height(8.dp))
-            grouped.forEach { (label, icon, count) ->
+            grouped.forEach { (className, list) ->
+                val label = eventShortLabel(className, strings)
+                val (icon, color) = eventIconAndColor(className)
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -356,7 +348,7 @@ private fun EventBreakdownCard(events: List<TelemetryEvent>) {
                     Icon(icon, contentDescription = null, tint = SecondaryColor.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(10.dp))
                     Text(label, color = SecondaryColor, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                    Text("$count", color = SecondaryColor, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text("${list.size}", color = SecondaryColor, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
             }
         }
@@ -381,7 +373,7 @@ private fun InfoCard(title: String, body: String) {
 }
 
 private fun eventIconAndColor(simpleName: String): Pair<ImageVector, Color> = when (simpleName) {
-    "SessionOpened", "SessionClosed" -> Icons.Default.AccountCircle to Color(0xFF9CA3AF)
+    "SessionOpened", "SessionClosed" -> Icons.Default.AccountCircle to Color(0xFF10B981)
     "SearchStop", "StopClicked" -> Icons.Default.Place to Color(0xFFEF4444)
     "SearchLine", "LineClicked" -> Icons.Default.Map to Color(0xFF3B82F6)
     "SearchItinerary", "ItineraryCalculated", "ItineraryChosen" -> Icons.Default.Directions to Color(0xFFF59E0B)
@@ -389,86 +381,99 @@ private fun eventIconAndColor(simpleName: String): Pair<ImageVector, Color> = wh
     else -> Icons.Default.Notifications to Color(0xFF9CA3AF)
 }
 
-private fun eventShortLabel(simpleName: String): String = when (simpleName) {
-    "SessionOpened", "SessionClosed" -> "Sessions"
-    "SearchStop", "StopClicked" -> "Arrêts"
-    "SearchLine", "LineClicked" -> "Lignes"
-    "SearchItinerary", "ItineraryCalculated", "ItineraryChosen" -> "Itinéraires"
-    "AlertSubmitted", "AlertRead" -> "Alertes"
+@Composable
+private fun eventShortLabel(simpleName: String, strings: StringProvider): String = when (simpleName) {
+    "SessionOpened", "SessionClosed" -> strings["telemetry_category_sessions"]
+    "SearchStop", "StopClicked" -> strings["telemetry_category_stops"]
+    "SearchLine", "LineClicked" -> strings["telemetry_category_lines"]
+    "SearchItinerary", "ItineraryCalculated", "ItineraryChosen" -> strings["telemetry_category_itineraries"]
+    "AlertSubmitted", "AlertRead" -> strings["telemetry_category_alerts"]
     else -> simpleName
 }
 
-private fun eventDescriptionLabel(event: TelemetryEvent): String = when (event) {
-    is TelemetryEvent.SessionOpened -> "Session démarrée"
-    is TelemetryEvent.SessionClosed -> "Session terminée"
-    is TelemetryEvent.SearchStop -> "Recherche d'arrêt"
-    is TelemetryEvent.SearchLine -> "Recherche de ligne"
-    is TelemetryEvent.SearchItinerary -> "Recherche d'itinéraire"
-    is TelemetryEvent.ItineraryCalculated -> "Itinéraire calculé"
-    is TelemetryEvent.ItineraryChosen -> "Itinéraire sélectionné"
-    is TelemetryEvent.TripCompleted -> "Trajet complété"
-    is TelemetryEvent.LineClicked -> "Ligne consultée"
-    is TelemetryEvent.StopClicked -> "Arrêt consulté"
-    is TelemetryEvent.AlertSubmitted -> "Signalement envoyé"
-    is TelemetryEvent.AlertRead -> "Alerte lue"
+@Composable
+private fun eventDescriptionLabel(event: TelemetryEvent, strings: StringProvider): String = when (event) {
+    is TelemetryEvent.SessionOpened -> strings["telemetry_event_session_opened"]
+    is TelemetryEvent.SessionClosed -> strings["telemetry_event_session_closed"]
+    is TelemetryEvent.SearchStop -> strings["telemetry_event_search_stop"]
+    is TelemetryEvent.SearchLine -> strings["telemetry_event_search_line"]
+    is TelemetryEvent.SearchItinerary -> strings["telemetry_event_search_itinerary"]
+    is TelemetryEvent.ItineraryCalculated -> strings["telemetry_event_itinerary_calculated"]
+    is TelemetryEvent.ItineraryChosen -> strings["telemetry_event_itinerary_chosen"]
+    is TelemetryEvent.TripCompleted -> strings["telemetry_event_trip_completed"]
+    is TelemetryEvent.LineClicked -> strings["telemetry_event_line_clicked"]
+    is TelemetryEvent.StopClicked -> strings["telemetry_event_stop_clicked"]
+    is TelemetryEvent.AlertSubmitted -> strings["telemetry_event_alert_submitted"]
+    is TelemetryEvent.AlertRead -> strings["telemetry_event_alert_read"]
 }
 
-private fun getEventDetails(event: TelemetryEvent): List<Pair<String, String>> = when (event) {
-    is TelemetryEvent.SessionOpened -> listOf("ID session" to event.sessionId.take(8) + "...")
+@Composable
+private fun getEventDetails(event: TelemetryEvent, strings: StringProvider): List<Pair<String, String>> = when (event) {
+    is TelemetryEvent.SessionOpened -> listOf(strings["telemetry_detail_session_id"] to event.sessionId.take(8) + "...")
     is TelemetryEvent.SessionClosed -> listOf(
-        "ID session" to event.sessionId.take(8) + "...",
-        "Durée" to formatSessionDuration(event.openedAt, event.closedAt)
+        strings["telemetry_detail_session_id"] to event.sessionId.take(8) + "...",
+        strings["telemetry_detail_duration"] to formatSessionDuration(event.openedAt, event.closedAt)
     )
-    is TelemetryEvent.SearchStop -> listOf("ID Arrêt" to event.stopId)
-    is TelemetryEvent.SearchLine -> listOf("Ligne" to event.lineId)
+    is TelemetryEvent.SearchStop -> listOf(strings["telemetry_detail_stop_id"] to event.stopId)
+    is TelemetryEvent.SearchLine -> listOf(strings["telemetry_detail_line"] to event.lineId)
     is TelemetryEvent.SearchItinerary -> listOf(
-        "Départ" to formatPlaceRef(event.originRef),
-        "Arrivée" to formatPlaceRef(event.destRef)
+        strings["telemetry_detail_departure"] to formatPlaceRef(event.originRef),
+        strings["telemetry_detail_arrival"] to formatPlaceRef(event.destRef)
     )
     is TelemetryEvent.ItineraryCalculated -> listOf(
-        "Départ" to formatPlaceRef(event.origin),
-        "Arrivée" to formatPlaceRef(event.dest),
-        "Options proposées" to "${event.options.size}"
+        strings["telemetry_detail_departure"] to formatPlaceRef(event.origin),
+        strings["telemetry_detail_arrival"] to formatPlaceRef(event.dest),
+        strings["telemetry_detail_options_proposed"] to "${event.options.size}"
     )
     is TelemetryEvent.ItineraryChosen -> listOf(
-        "Index option" to "${event.optionIndex + 1}"
+        strings["telemetry_detail_option_index"] to "${event.optionIndex + 1}"
     )
     is TelemetryEvent.TripCompleted -> listOf(
-        "Durée" to formatSessionDuration(event.startedAt, event.endedAt),
-        "Arrêts traversés" to "${event.stopsPassed.size}"
+        strings["telemetry_detail_duration"] to formatSessionDuration(event.startedAt, event.endedAt),
+        strings["telemetry_detail_stops_passed"] to "${event.stopsPassed.size}"
     )
     is TelemetryEvent.LineClicked -> listOf(
-        "Ligne" to event.lineId,
-        "Contexte" to translateContext(event.context)
+        strings["telemetry_detail_line"] to event.lineId,
+        strings["telemetry_detail_context"] to translateContext(event.context, strings)
     )
     is TelemetryEvent.StopClicked -> listOf(
-        "Arrêt" to event.stopId,
-        "Contexte" to translateContext(event.context)
+        strings["telemetry_detail_stop"] to event.stopId,
+        strings["telemetry_detail_context"] to translateContext(event.context, strings)
     )
     is TelemetryEvent.AlertSubmitted -> buildList {
-        add("Type" to translateAlertKind(event.kind))
-        event.stopId?.let { add("Arrêt" to it) }
-        event.lineId?.let { add("Ligne" to it) }
+        add(strings["telemetry_detail_type"] to translateAlertKind(event.kind, strings))
+        event.stopId?.let { add(strings["telemetry_detail_stop"] to it) }
+        event.lineId?.let { add(strings["telemetry_detail_line"] to it) }
     }
-    is TelemetryEvent.AlertRead -> listOf("ID Alerte" to event.alertId)
+    is TelemetryEvent.AlertRead -> listOf(strings["telemetry_detail_alert_id"] to event.alertId)
 }
 
 private fun formatPlaceRef(ref: PlaceRef): String {
     return ref.stopId ?: (ref.h3?.take(10) ?: "Inconnu")
 }
 
-private fun translateContext(ctx: String): String = when (ctx) {
-    "map" -> "Carte"
-    "search" -> "Recherche"
-    "itinerary" -> "Itinéraire"
-    "favorites" -> "Favoris"
+@Composable
+private fun translateContext(ctx: String, strings: StringProvider): String = when (ctx) {
+    "map" -> strings["telemetry_context_map"]
+    "search" -> strings["telemetry_context_search"]
+    "itinerary" -> strings["telemetry_context_itinerary"]
+    "favorites" -> strings["telemetry_context_favorites"]
     else -> ctx
 }
 
-private fun translateAlertKind(kind: String): String = when (kind) {
-    "crowded" -> "Forte affluence"
-    "incident" -> "Incident/Perturbation"
-    "elevator" -> "Ascenseur en panne"
+@Composable
+private fun translateAlertKind(kind: String, strings: StringProvider): String = when (kind) {
+    "closure" -> strings["alert_type_closure"]
+    "delay" -> strings["alert_type_delay"]
+    "elevator" -> strings["alert_type_elevator"]
+    "crowding" -> strings["alert_type_crowding"]
+    "works" -> strings["alert_type_works"]
+    "strike" -> strings["alert_type_strike"]
+    "fire" -> strings["alert_type_fire"]
+    "interruption" -> strings["alert_type_interruption"]
+    "congestion" -> strings["alert_type_congestion"]
+    "crowded" -> strings["telemetry_alert_crowded"]
+    "incident" -> strings["telemetry_alert_incident"]
     else -> kind
 }
 

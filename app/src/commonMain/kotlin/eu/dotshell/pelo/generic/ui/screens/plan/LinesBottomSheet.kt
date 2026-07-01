@@ -56,6 +56,7 @@ import eu.dotshell.pelo.generic.utils.LineColorHelper
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 
 /**
  * Bottom Sheet qui affiche toutes les lignes organisées par catégories
@@ -67,7 +68,12 @@ fun LinesBottomSheet(
     modifier: Modifier = Modifier,
     viewModel: TransportViewModelInterface? = null
 ) {
-    val drawableProvider = DrawableProvider(LocalPlatformContext.current)
+    val platformContext = LocalPlatformContext.current
+    // Remembered: DrawableProvider has identity equality, so re-creating it every recomposition
+    // made the remember(allLines, drawableProvider) key below change each pass and re-ran the
+    // (filter + bucket + natural sort) categorizeLines() on every keystroke.
+    val drawableProvider = remember(platformContext) { DrawableProvider(platformContext) }
+    val strings = StringProvider(platformContext)
     var searchQuery by remember { mutableStateOf("") }
 
     // State pour gérer le scroll
@@ -202,8 +208,24 @@ fun LinesBottomSheet(
                     is CategoryItem -> {
                         Column {
                             Spacer(modifier = Modifier.height(8.dp))
+                            val categoryText = when (item.category) {
+                                "Métro" -> strings["category_metro"]
+                                "Funiculaire" -> strings["category_funicular"]
+                                "Tramway" -> strings["category_tramway"]
+                                "Navigone" -> strings["category_navigone"]
+                                "Chrono" -> strings["category_chrono"]
+                                "Pleine Lune" -> strings["category_pleine_lune"]
+                                "Gare Express" -> strings["category_gare_express"]
+                                "Navette" -> strings["category_navette"]
+                                "Soyeuse" -> strings["category_soyeuse"]
+                                "Zone Industrielle" -> strings["category_zone_industrielle"]
+                                "Bus" -> strings["category_bus"]
+                                "Cars du Rhône TCL unifié" -> strings["category_cars_du_rhone"]
+                                "Junior Direct" -> strings["category_junior_direct"]
+                                else -> item.category
+                            }
                             Text(
-                                text = item.category,
+                                text = categoryText,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = PrimaryColor,
@@ -285,7 +307,7 @@ fun LinesBottomSheet(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Aucune ligne trouvée",
+                            text = strings["no_lines_found"],
                             color = Color.Gray,
                             style = MaterialTheme.typography.bodyLarge
                         )
@@ -307,6 +329,7 @@ private fun LineChip(
     alertSeverity: TrafficAlertSeverity? = null,
     drawableProvider: DrawableProvider
 ) {
+    val strings = StringProvider(LocalPlatformContext.current)
     val drawableName = remember(lineName) { LineIconResolver.getDrawableNameForLineName(lineName) }
     val hasIcon = remember(drawableName, drawableProvider) {
         drawableProvider.hasDrawable(drawableName)
@@ -329,7 +352,7 @@ private fun LineChip(
                 // Use official TCL icon
                 Icon(
                     painter = drawableProvider.getPainter(drawableName),
-                    contentDescription = "Ligne $lineName",
+                    contentDescription = strings["line_label"].replace("%s", lineName),
                     modifier = Modifier.size(64.dp),
                     tint = Color.Unspecified
                 )
