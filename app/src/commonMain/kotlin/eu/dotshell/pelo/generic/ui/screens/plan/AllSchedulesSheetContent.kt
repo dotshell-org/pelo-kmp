@@ -42,9 +42,6 @@ import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.data.models.ui.AllSchedulesInfo
 import eu.dotshell.pelo.generic.ui.theme.Orange500
 import eu.dotshell.pelo.generic.ui.theme.AccentColor
-import eu.dotshell.pelo.generic.ui.theme.Gray700
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import eu.dotshell.pelo.generic.utils.LineColorHelper
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.platform.DrawableProvider
@@ -58,10 +55,10 @@ private fun getLineColor(lineName: String): Color {
     return Color(LineColorHelper.getColorForLineString(lineName))
 }
 
-private fun getAllDayScheduleColor(hour: String, minute: String): Color {
-    val hourInt = hour.toIntOrNull() ?: return PrimaryColor
-    val minuteInt = minute.toIntOrNull() ?: return PrimaryColor
-    if (hourInt !in 0..23 || minuteInt !in 0..59) return PrimaryColor
+private fun getAllDayScheduleColor(hour: String, minute: String, defaultColor: Color): Color {
+    val hourInt = hour.toIntOrNull() ?: return defaultColor
+    val minuteInt = minute.toIntOrNull() ?: return defaultColor
+    if (hourInt !in 0..23 || minuteInt !in 0..59) return defaultColor
 
     val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
     val nowMinutes = now.hour * 60 + now.minute
@@ -72,7 +69,7 @@ private fun getAllDayScheduleColor(hour: String, minute: String): Color {
         diffMinutes < 0 -> Color.Gray
         diffMinutes < 2 -> AccentColor
         diffMinutes < 15 -> Orange500
-        else -> PrimaryColor
+        else -> defaultColor
     }
 }
 
@@ -119,7 +116,7 @@ fun AllSchedulesSheetContent(
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = strings["back"],
-                    tint = Gray700
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Spacer(modifier = Modifier.width(8.dp))
@@ -142,7 +139,8 @@ fun AllSchedulesSheetContent(
                         text = allSchedulesInfo.lineName,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = SecondaryColor
+                        // Contrast on the fixed line-color badge — not theme-driven.
+                        color = Color.White
                     )
                 }
             }
@@ -151,7 +149,7 @@ fun AllSchedulesSheetContent(
                 text = stationName,
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
-                color = PrimaryColor
+                color = MaterialTheme.colorScheme.onSurface
             )
         }
 
@@ -171,8 +169,8 @@ fun AllSchedulesSheetContent(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (selectedDirection == directionId) getLineColor(
                                 allSchedulesInfo.lineName
-                            ) else Color.LightGray,
-                            contentColor = if (selectedDirection == directionId) SecondaryColor else Color.DarkGray
+                            ) else MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (selectedDirection == directionId) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                         ),
                         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
                         modifier = Modifier
@@ -218,7 +216,7 @@ fun AllSchedulesSheetContent(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         minutesList.forEach { minute ->
-                            val minuteColor = getAllDayScheduleColor(hour, minute)
+                            val minuteColor = getAllDayScheduleColor(hour, minute, MaterialTheme.colorScheme.onSurface)
                             Text(
                                 text = minute,
                                 style = MaterialTheme.typography.bodyLarge,
@@ -229,7 +227,7 @@ fun AllSchedulesSheetContent(
                     }
                 }
                 if (index < list.lastIndex) {
-                    HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 } else {
                     Spacer(modifier = Modifier.height(32.dp))
                 }

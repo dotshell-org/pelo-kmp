@@ -1,7 +1,6 @@
 package eu.dotshell.pelo.generic.ui.components.favorites
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,24 +21,23 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import androidx.compose.material3.MaterialTheme
+import eu.dotshell.pelo.generic.ui.theme.floatingControlBorder
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
 
 @Composable
 fun AddFavoriteItem(
     onClick: () -> Unit,
-    textStyle: TextStyle,
-    isDarkMode: Boolean = false
+    textStyle: TextStyle
 ) {
     val strings = StringProvider(LocalPlatformContext.current)
     Row(
         modifier = Modifier
-            .shadow(4.dp, RoundedCornerShape(20.dp))
+            .shadow(2.dp, RoundedCornerShape(20.dp))
             .clip(RoundedCornerShape(20.dp))
-            .background(PrimaryColor)
-            .then(if (isDarkMode) Modifier.border(1.dp, Color(0xFF9CA3AF), RoundedCornerShape(20.dp)) else Modifier)
+            .background(MaterialTheme.colorScheme.surface)
+            .floatingControlBorder(RoundedCornerShape(20.dp))
             .combinedClickable(onClick = onClick)
             .padding(start = 15.dp, end = 16.dp, top = 12.dp, bottom = 12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -47,7 +45,7 @@ fun AddFavoriteItem(
         Icon(
             imageVector = Icons.Default.Add,
             contentDescription = strings["favorite_add"],
-            tint = SecondaryColor,
+            tint = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.size(16.dp)
         )
         Spacer(modifier = Modifier.width(4.dp))

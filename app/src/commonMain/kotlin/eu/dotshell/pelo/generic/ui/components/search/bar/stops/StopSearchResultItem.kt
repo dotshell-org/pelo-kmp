@@ -26,9 +26,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.data.models.search.StationSearchResult
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
-import eu.dotshell.pelo.generic.ui.theme.Stone900
+import androidx.compose.material3.MaterialTheme
+
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
 import eu.dotshell.pelo.platform.provideTransportLineRules
@@ -46,7 +45,7 @@ fun StopSearchResultItem(
                 Spacer(modifier = Modifier.size(6.dp))
                 Text(
                     result.stopName,
-                    color = SecondaryColor,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     fontWeight = FontWeight.Bold
@@ -83,20 +82,20 @@ fun StopSearchResultItem(
                 modifier = Modifier
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(Stone900)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                     .clickable(onClick = onClick)
             ) {
                 Icon(
                     imageVector = Icons.Default.Directions,
                     contentDescription = strings["itinerary"],
-                    tint = SecondaryColor,
+                    tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier
                         .size(17.dp)
                         .align(Alignment.Center)
                 )
             }
         },
-        colors = ListItemDefaults.colors(containerColor = PrimaryColor),
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier
             .clickable(onClick = onOptionsClick)
             .fillMaxWidth()

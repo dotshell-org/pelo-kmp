@@ -44,9 +44,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.dotshell.pelo.generic.data.config.ItineraryOptionData
+import androidx.compose.material3.MaterialTheme
 import eu.dotshell.pelo.generic.ui.theme.AccentColor
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,7 +74,7 @@ fun ItinerarySettingsScreen(
                 title = {
                     Text(
                         text = screenTitle,
-                        color = SecondaryColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -84,16 +83,16 @@ fun ItinerarySettingsScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = strings["back"],
-                            tint = SecondaryColor,
+                            tint = MaterialTheme.colorScheme.onSurface,
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = PrimaryColor
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
-        containerColor = PrimaryColor
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -147,13 +146,13 @@ private fun ItineraryLineCategorySection(
             Icon(
                 imageVector = Icons.Default.Euro,
                 contentDescription = null,
-                tint = SecondaryColor,
+                tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.size(20.dp)
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = sectionTitle,
-                color = SecondaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold
             )
@@ -162,7 +161,7 @@ private fun ItineraryLineCategorySection(
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
-                containerColor = Color(0xFF1C1C1E)
+                containerColor = MaterialTheme.colorScheme.surfaceContainer
             ),
             shape = RoundedCornerShape(12.dp)
         ) {
@@ -181,7 +180,7 @@ private fun ItineraryLineCategorySection(
                                 .fillMaxWidth()
                                 .padding(start = 56.dp)
                                 .height(0.5.dp)
-                                .background(Color(0xFF3A3A3C))
+                                .background(MaterialTheme.colorScheme.outlineVariant)
                         )
                     }
                 }
@@ -211,7 +210,7 @@ private fun ItineraryLineItem(
                 .clip(RoundedCornerShape(8.dp))
                 .border(
                     width = if (isSelected) 0.dp else 2.dp,
-                    color = if (isSelected) Color.Transparent else Color(0xFF8E8E93),
+                    color = if (isSelected) Color.Transparent else MaterialTheme.colorScheme.outline,
                     shape = RoundedCornerShape(8.dp)
                 )
                 .background(
@@ -224,7 +223,8 @@ private fun ItineraryLineItem(
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = strings["selected"],
-                    tint = SecondaryColor,
+                    // Checkmark painted on the accent-filled box — not theme-driven.
+                    tint = Color.White,
                     modifier = Modifier.size(16.dp)
                 )
             }
@@ -235,13 +235,13 @@ private fun ItineraryLineItem(
         Column {
             Text(
                 text = title,
-                color = SecondaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 16.sp,
                 fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal
             )
             Text(
                 text = subtitle,
-                color = Color(0xFFAAAAAA),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 13.sp
             )
         }

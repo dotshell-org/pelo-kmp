@@ -1,6 +1,9 @@
 package eu.dotshell.pelo.generic.ui.screens.onboarding
 
 import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import eu.dotshell.pelo.generic.ui.theme.isAppInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -44,8 +47,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.dotshell.pelo.generic.data.config.AboutSectionData
 import eu.dotshell.pelo.generic.data.config.ConsentConfigData
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
 
@@ -64,17 +67,20 @@ fun TermsConsentScreen(
     val acknowledgementLinkText = consent.acknowledgementLinkText
     val privacyAcknowledgementText = consent.privacyAcknowledgementLabel
     val privacyAcknowledgementLinkText = consent.privacyAcknowledgementLinkText
-    val acknowledgementAnnotated = remember(acknowledgementText, acknowledgementLinkText) {
-        buildConsentAnnotated(acknowledgementText, acknowledgementLinkText, "TERMS")
+    val consentLinkColor = MaterialTheme.colorScheme.onSurface
+    val acknowledgementAnnotated = remember(acknowledgementText, acknowledgementLinkText, consentLinkColor) {
+        buildConsentAnnotated(acknowledgementText, acknowledgementLinkText, "TERMS", consentLinkColor)
     }
     val privacyAcknowledgementAnnotated = remember(
         privacyAcknowledgementText,
-        privacyAcknowledgementLinkText
+        privacyAcknowledgementLinkText,
+        consentLinkColor
     ) {
         buildConsentAnnotated(
             privacyAcknowledgementText,
             privacyAcknowledgementLinkText,
-            "PRIVACY"
+            "PRIVACY",
+            consentLinkColor
         )
     }
 
@@ -104,7 +110,7 @@ fun TermsConsentScreen(
 
     val drawableProvider = DrawableProvider(LocalPlatformContext.current)
 
-    Scaffold(containerColor = PrimaryColor) { paddingValues ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { paddingValues ->
         Column(
             modifier = modifier
                 .fillMaxSize()
@@ -117,9 +123,23 @@ fun TermsConsentScreen(
                     .padding(top = 8.dp)
                     .verticalScroll(rememberScrollState())
             ) {
+                // In light mode the logo is shown in negative so it reads on the light background.
+                val invertColorFilter = remember {
+                    ColorFilter.colorMatrix(
+                        ColorMatrix(
+                            floatArrayOf(
+                                -1f, 0f, 0f, 0f, 255f,
+                                0f, -1f, 0f, 0f, 255f,
+                                0f, 0f, -1f, 0f, 255f,
+                                0f, 0f, 0f, 1f, 0f,
+                            )
+                        )
+                    )
+                }
                 Image(
                     painter = drawableProvider.getPainter("ic_launcher_foreground"),
                     contentDescription = "Logo Pelo",
+                    colorFilter = if (isAppInDarkTheme()) null else invertColorFilter,
                     modifier = Modifier
                         .size(160.dp)
                         .padding(bottom = 20.dp)
@@ -130,13 +150,13 @@ fun TermsConsentScreen(
                     Icon(
                         Icons.Filled.Lock,
                         contentDescription = null,
-                        tint = SecondaryColor,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(28.dp)
                     )
                     Spacer(Modifier.size(12.dp))
                     Text(
                         text = consent.title,
-                        color = SecondaryColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp
                     )
@@ -146,7 +166,7 @@ fun TermsConsentScreen(
 
                 Text(
                     text = consent.intro,
-                    color = SecondaryColor,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 14.sp,
                     lineHeight = 20.sp
                 )
@@ -188,10 +208,10 @@ fun TermsConsentScreen(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = hasAcknowledgedTerms && hasAcknowledgedPrivacy,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = SecondaryColor,
-                        contentColor = PrimaryColor,
-                        disabledContainerColor = SecondaryColor.copy(alpha = 0.4f),
-                        disabledContentColor = PrimaryColor.copy(alpha = 0.7f)
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                        disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                     )
                 ) {
                     Text(consent.acceptLabel, fontWeight = FontWeight.SemiBold)
@@ -218,9 +238,9 @@ private fun ConsentCheckboxRow(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = CheckboxDefaults.colors(
-                checkedColor = SecondaryColor,
-                checkmarkColor = PrimaryColor,
-                uncheckedColor = SecondaryColor.copy(alpha = 0.7f)
+                checkedColor = MaterialTheme.colorScheme.primary,
+                checkmarkColor = MaterialTheme.colorScheme.onPrimary,
+                uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
             )
         )
         Spacer(Modifier.size(8.dp))
@@ -228,7 +248,7 @@ private fun ConsentCheckboxRow(
             text = annotatedText,
             modifier = Modifier.weight(1f),
             style = TextStyle(
-                color = SecondaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
                 lineHeight = 20.sp
             ),
@@ -248,7 +268,8 @@ private fun ConsentCheckboxRow(
 private fun buildConsentAnnotated(
     text: String,
     linkText: String,
-    tag: String
+    tag: String,
+    linkColor: Color
 ): AnnotatedString {
     val linkStart = text.indexOf(linkText)
     return if (linkStart < 0) {
@@ -259,7 +280,7 @@ private fun buildConsentAnnotated(
             pushStringAnnotation(tag = tag, annotation = "details")
             withStyle(
                 SpanStyle(
-                    color = SecondaryColor,
+                    color = linkColor,
                     fontWeight = FontWeight.SemiBold,
                     textDecoration = TextDecoration.Underline
                 )
@@ -287,7 +308,7 @@ private fun TermsConsentDetailsScreen(
                 title = {
                     Text(
                         text = title,
-                        color = SecondaryColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -296,16 +317,16 @@ private fun TermsConsentDetailsScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = SecondaryColor
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = PrimaryColor
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
-        containerColor = PrimaryColor
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -317,14 +338,14 @@ private fun TermsConsentDetailsScreen(
             sections.forEach { section ->
                 Text(
                     text = section.title,
-                    color = SecondaryColor,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(bottom = 6.dp)
                 )
                 Text(
                     text = section.content,
-                    color = SecondaryColor,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
                     modifier = Modifier.padding(bottom = 16.dp)

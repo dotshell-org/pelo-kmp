@@ -22,8 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.dotshell.pelo.generic.data.config.AboutSectionData
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import androidx.compose.material3.MaterialTheme
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
 
@@ -43,7 +42,7 @@ fun LegalScreen(
                 title = {
                     Text(
                         text = strings["legal_title"],
-                        color = SecondaryColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -52,16 +51,16 @@ fun LegalScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = strings["back"],
-                            tint = SecondaryColor
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = PrimaryColor
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
-        containerColor = PrimaryColor
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -95,14 +94,14 @@ fun LegalScreen(
                 }
                 Text(
                     text = resolvedTitle,
-                    color = SecondaryColor,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(bottom = 6.dp)
                 )
                 Text(
                     text = resolvedContent,
-                    color = SecondaryColor,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
                     modifier = Modifier.padding(bottom = 16.dp)

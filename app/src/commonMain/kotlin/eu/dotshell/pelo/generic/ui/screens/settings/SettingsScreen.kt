@@ -4,6 +4,9 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import eu.dotshell.pelo.generic.ui.theme.isAppInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -51,8 +54,7 @@ import androidx.compose.ui.unit.sp
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import androidx.compose.material3.MaterialTheme
 import kotlinx.coroutines.delay
 
 @Composable
@@ -68,6 +70,7 @@ fun SettingsScreen(
     onApiHealthClick: () -> Unit = {},
     onTelemetryClick: () -> Unit = {},
     onAboutClick: () -> Unit = {},
+    onThemeClick: () -> Unit = {},
     isAboutMenu: Boolean = false
 ) {
     var clickCount by remember { mutableIntStateOf(0) }
@@ -97,7 +100,7 @@ fun SettingsScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(PrimaryColor)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -115,9 +118,25 @@ fun SettingsScreen(
                 label = "logo_rotation"
             )
 
+            // In light mode the logo is shown in negative so it reads on the light background.
+            val invertColorFilter = remember {
+                ColorFilter.colorMatrix(
+                    ColorMatrix(
+                        floatArrayOf(
+                            -1f, 0f, 0f, 0f, 255f,
+                            0f, -1f, 0f, 0f, 255f,
+                            0f, 0f, -1f, 0f, 255f,
+                            0f, 0f, 0f, 1f, 0f,
+                        )
+                    )
+                )
+            }
+            val logoColorFilter = if (isAppInDarkTheme()) null else invertColorFilter
+
             Image(
                 painter = drawableProvider.getPainter("ic_launcher_foreground"),
                 contentDescription = strings["logo_pelo"],
+                colorFilter = logoColorFilter,
                 modifier = Modifier
                     .size(200.dp)
                     .padding(bottom = 48.dp)
@@ -139,17 +158,17 @@ fun SettingsScreen(
                     onClick = null,
                     showChevron = false
                 )
-                HorizontalDivider(color = Color(0xFF3A3A3C))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 SettingsMenuRow(
                     title = strings["legal_title"],
                     onClick = onLegalClick
                 )
-                HorizontalDivider(color = Color(0xFF3A3A3C))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 SettingsMenuRow(
                     title = strings["credits_title"],
                     onClick = onCreditsClick
                 )
-                HorizontalDivider(color = Color(0xFF3A3A3C))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 SettingsMenuRow(
                     title = strings["contact_title"],
                     onClick = onContactClick
@@ -159,17 +178,22 @@ fun SettingsScreen(
                     title = strings["itinerary"],
                     onClick = onItineraryClick
                 )
-                HorizontalDivider(color = Color(0xFF3A3A3C))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 SettingsMenuRow(
                     title = strings["offline_mode"],
                     onClick = onOfflineClick
                 )
-                HorizontalDivider(color = Color(0xFF3A3A3C))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                SettingsMenuRow(
+                    title = strings["theme_settings_title"],
+                    onClick = onThemeClick
+                )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 SettingsMenuRow(
                     title = strings["privacy_title"],
                     onClick = onTelemetryClick
                 )
-                HorizontalDivider(color = Color(0xFF3A3A3C))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 SettingsMenuRow(
                     title = strings["about_title"],
                     onClick = onAboutClick
@@ -190,7 +214,7 @@ fun SettingsScreen(
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                 contentDescription = strings["back"],
-                tint = SecondaryColor
+                tint = MaterialTheme.colorScheme.onSurface
             )
         }
     }
@@ -208,7 +232,7 @@ private fun SettingsMenuRow(
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val pressedBackgroundColor by animateColorAsState(
-        targetValue = if (onClick != null && isPressed) Color(0xFF1C1C1E) else PrimaryColor,
+        targetValue = if (onClick != null && isPressed) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.background,
         animationSpec = tween(durationMillis = 120),
         label = "settings_menu_press"
     )
@@ -245,14 +269,14 @@ private fun SettingsMenuRow(
             ) {
                 Text(
                     text = title,
-                    color = SecondaryColor,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Medium
                 )
                 if (!subtitle.isNullOrBlank()) {
                     Text(
                         text = subtitle,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 14.sp,
                         modifier = Modifier.padding(top = 4.dp)
                     )
@@ -262,7 +286,7 @@ private fun SettingsMenuRow(
                 Icon(
                     imageVector = Icons.Filled.ChevronRight,
                     contentDescription = strings["next_arrow"],
-                    tint = SecondaryColor
+                    tint = MaterialTheme.colorScheme.onSurface
                 )
             }
         }

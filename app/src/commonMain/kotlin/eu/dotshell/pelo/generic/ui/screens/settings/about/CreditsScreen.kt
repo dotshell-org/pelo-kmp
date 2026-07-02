@@ -28,8 +28,8 @@ import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import androidx.compose.material3.MaterialTheme
+import eu.dotshell.pelo.generic.ui.theme.TransportThemeProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
 
@@ -48,7 +48,7 @@ fun CreditsScreen(
                 title = {
                     Text(
                         text = strings["credits_title"],
-                        color = SecondaryColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -57,16 +57,16 @@ fun CreditsScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = strings["back"],
-                            tint = SecondaryColor
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = PrimaryColor
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
-        containerColor = PrimaryColor
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         val uriHandler = LocalUriHandler.current
 
@@ -79,7 +79,7 @@ fun CreditsScreen(
         ) {
             Text(
                 text = strings["credits_transport_data_title"],
-                color = SecondaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -87,7 +87,7 @@ fun CreditsScreen(
 
             Text(
                 text = strings["credits_transport_data_content"],
-                color = SecondaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -113,7 +113,7 @@ fun CreditsScreen(
 
             Text(
                 text = strings["credits_cartography_title"],
-                color = SecondaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(bottom = 8.dp, top = 8.dp)
@@ -121,7 +121,7 @@ fun CreditsScreen(
 
             Text(
                 text = strings["credits_cartography_content"],
-                color = SecondaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -166,7 +166,7 @@ fun CreditsScreen(
 
             Text(
                 text = strings["credits_development_title"],
-                color = SecondaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(bottom = 8.dp, top = 8.dp)
@@ -174,7 +174,7 @@ fun CreditsScreen(
 
             Text(
                 text = strings["credits_development_content"],
-                color = SecondaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -214,7 +214,7 @@ private fun ClickableLink(
     ) {
         Text(
             text = label,
-            color = Color(0xFF3B82F6),
+            color = TransportThemeProvider.getTheme().linkColor,
             fontSize = 14.sp,
             fontWeight = FontWeight.Medium
         )
@@ -222,7 +222,7 @@ private fun ClickableLink(
         Icon(
             imageVector = Icons.AutoMirrored.Filled.OpenInNew,
             contentDescription = strings["credits_open_link"],
-            tint = Color(0xFF3B82F6),
+            tint = TransportThemeProvider.getTheme().linkColor,
             modifier = Modifier
                 .padding(top = 2.dp)
                 .width(14.dp)

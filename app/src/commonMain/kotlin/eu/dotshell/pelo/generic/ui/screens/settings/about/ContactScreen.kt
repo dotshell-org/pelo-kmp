@@ -27,8 +27,8 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import androidx.compose.material3.MaterialTheme
+import eu.dotshell.pelo.generic.ui.theme.TransportThemeProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
 
@@ -48,7 +48,7 @@ fun ContactScreen(
                 title = {
                     Text(
                         text = strings["contact_title"],
-                        color = SecondaryColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -57,16 +57,16 @@ fun ContactScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = strings["back"],
-                            tint = SecondaryColor
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = PrimaryColor
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
-        containerColor = PrimaryColor
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -77,7 +77,7 @@ fun ContactScreen(
         ) {
             Text(
                 text = strings["contact_header"],
-                color = SecondaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -85,7 +85,7 @@ fun ContactScreen(
 
             Text(
                 text = strings["contact_subtitle"],
-                color = SecondaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
                 modifier = Modifier.padding(bottom = 24.dp)
@@ -95,7 +95,7 @@ fun ContactScreen(
 
             Text(
                 text = strings["contact_bug_title"],
-                color = SecondaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -103,7 +103,7 @@ fun ContactScreen(
 
             Text(
                 text = strings["contact_bug_content"],
-                color = SecondaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
                 lineHeight = 20.sp,
                 modifier = Modifier.padding(bottom = 24.dp)
@@ -113,13 +113,13 @@ fun ContactScreen(
                 onClick = { uriHandler.openUri("https://dotshell.eu/contact") },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color(0xFF3B82F6)
+                    containerColor = TransportThemeProvider.getTheme().linkColor
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
                     text = strings["contact_title"],
-                    color = SecondaryColor,
+                    color = Color.White,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.padding(vertical = 8.dp)

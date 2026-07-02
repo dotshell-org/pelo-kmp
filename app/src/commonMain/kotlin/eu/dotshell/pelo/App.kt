@@ -67,6 +67,9 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
@@ -98,6 +101,7 @@ import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.ItineraryPre
 import eu.dotshell.pelo.generic.data.repository.offline.mapstyle.MapStyleRepository
 import eu.dotshell.pelo.generic.service.TransportServiceProvider
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
+import eu.dotshell.pelo.generic.utils.map.MapStyleUtils
 import eu.dotshell.pelo.generic.utils.map.toVehiclesGeoJson
 import eu.dotshell.pelo.generic.utils.map.toItinerariesGeoJson
 import eu.dotshell.pelo.generic.utils.map.calculateJourneyTrace
@@ -126,6 +130,7 @@ import eu.dotshell.pelo.generic.ui.screens.settings.ItinerarySettingsScreen
 import eu.dotshell.pelo.generic.ui.screens.settings.OfflineSettingsScreen
 import eu.dotshell.pelo.generic.ui.screens.settings.SettingsScreen
 import eu.dotshell.pelo.generic.ui.screens.settings.TelemetrySettingsScreen
+import eu.dotshell.pelo.generic.ui.screens.settings.ThemeSettingsScreen
 import eu.dotshell.pelo.generic.ui.screens.onboarding.TermsConsentGate
 import eu.dotshell.pelo.generic.ui.screens.onboarding.TelemetryOptInGate
 import eu.dotshell.pelo.generic.ui.screens.settings.about.ContactScreen
@@ -133,14 +138,21 @@ import eu.dotshell.pelo.generic.ui.screens.settings.about.CreditsScreen
 import eu.dotshell.pelo.generic.ui.screens.settings.about.LegalScreen
 
 import eu.dotshell.pelo.generic.ui.theme.AccentColor
+import eu.dotshell.pelo.generic.ui.theme.bottomSheetContainerColor
+import eu.dotshell.pelo.generic.ui.theme.floatingControlBorder
+import eu.dotshell.pelo.generic.ui.theme.isAppInDarkTheme
+import eu.dotshell.pelo.generic.ui.theme.PeloAppTheme
 import eu.dotshell.pelo.generic.ui.theme.PeloTheme
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import eu.dotshell.pelo.generic.ui.theme.ThemeController
+import eu.dotshell.pelo.generic.ui.theme.LocalThemeController
+import eu.dotshell.pelo.generic.data.repository.offline.theme.ThemeMode
+import eu.dotshell.pelo.generic.data.repository.offline.theme.ThemePreferenceRepository
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportLinesUiState
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportStopsUiState
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModel
 import eu.dotshell.pelo.generic.ui.viewmodel.findStopByCoordinates
 import eu.dotshell.pelo.generic.utils.location.GeoPoint
+import eu.dotshell.pelo.generic.utils.location.LocationPermissionSignal
 import eu.dotshell.pelo.generic.utils.location.LocationProvider
 import eu.dotshell.pelo.generic.service.NavigationModeController
 import eu.dotshell.pelo.generic.service.NavigationModeUiState
@@ -160,7 +172,10 @@ import kotlinx.coroutines.withContext
 import org.maplibre.spatialk.geojson.Position
 
 @Composable
-fun App(onNavigationModeChanged: (Boolean) -> Unit = {}) {
+fun App(
+    onNavigationModeChanged: (Boolean) -> Unit = {},
+    onConsentAccepted: () -> Unit = {},
+) {
     val context = LocalPlatformContext.current
     var viewModel by remember { mutableStateOf<TransportViewModel?>(null) }
     var isInitializing by remember { mutableStateOf(true) }
@@ -193,33 +208,51 @@ fun App(onNavigationModeChanged: (Boolean) -> Unit = {}) {
         }
     }
 
-    PeloTheme {
-        TermsConsentGate {
-            TelemetryOptInGate {
-                Box(Modifier.fillMaxSize()) {
-                    val vm = viewModel
-                    if (vm != null) {
-                        RootScaffold(vm, onNavigationModeChanged)
-                    } else {
-                        Box(Modifier.fillMaxSize().background(Color.White))
-                    }
+    val themeRepo = remember(context) { ThemePreferenceRepository(context) }
+    var themeMode by remember { mutableStateOf(themeRepo.getThemeMode()) }
+    val darkTheme = when (themeMode) {
+        ThemeMode.AUTO -> isSystemInDarkTheme()
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK -> true
+    }
 
-                    if (isInitializing) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(16.dp)
-                                .background(
-                                    Color.White.copy(alpha = 0.85f),
-                                    RoundedCornerShape(999.dp)
+    CompositionLocalProvider(
+        LocalThemeController provides ThemeController(
+            themeMode = themeMode,
+            setThemeMode = { newMode ->
+                themeMode = newMode
+                themeRepo.saveThemeMode(newMode)
+            }
+        )
+    ) {
+        PeloTheme(darkTheme = darkTheme) {
+            TermsConsentGate(onConsentSatisfied = onConsentAccepted) {
+                TelemetryOptInGate {
+                    Box(Modifier.fillMaxSize()) {
+                        val vm = viewModel
+                        if (vm != null) {
+                            RootScaffold(vm, onNavigationModeChanged)
+                        } else {
+                            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+                        }
+
+                        if (isInitializing) {
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(16.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                        RoundedCornerShape(999.dp)
+                                    )
+                                    .padding(12.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
-                                .padding(12.dp)
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(20.dp),
-                                strokeWidth = 2.dp,
-                                color = PrimaryColor
-                            )
+                            }
                         }
                     }
                 }
@@ -275,14 +308,19 @@ private fun RootScaffold(
     )
     val navigationController = remember(context) { NavigationModeController(context) }
     val navigationState by navigationController.uiState.collectAsState()
-    DisposableEffect(locationProvider, navigationController) {
+    DisposableEffect(navigationController) {
+        onDispose { navigationController.dispose() }
+    }
+    // Re-subscribe to location whenever the permission is (re)granted — e.g. right after the user
+    // accepts the runtime prompt — so a fix is picked up without restarting the app.
+    val locationPermissionGranted by LocationPermissionSignal.granted.collectAsState()
+    DisposableEffect(locationProvider, locationPermissionGranted) {
         locationProvider.startUpdates { p ->
             userLocation = Position(latitude = p.latitude, longitude = p.longitude)
             navigationController.onLocationFix(GeoPoint(latitude = p.latitude, longitude = p.longitude))
         }
         onDispose {
             locationProvider.stopUpdates()
-            navigationController.dispose()
         }
     }
 
@@ -783,7 +821,7 @@ private fun RootScaffold(
             }
 
             if (!navigationState.isActive) {
-                NavigationBar(containerColor = PrimaryColor) {
+                NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                     val tabStrings = StringProvider(LocalPlatformContext.current)
                     Destination.entries.forEach { destination ->
                         NavigationBarItem(
@@ -807,10 +845,12 @@ private fun RootScaffold(
                             label = { Text(tabStrings[destination.labelKey]) },
                             colors = NavigationBarItemDefaults.colors(
                                 indicatorColor = AccentColor,
-                                selectedIconColor = SecondaryColor,
-                                unselectedIconColor = SecondaryColor,
-                                selectedTextColor = SecondaryColor,
-                                unselectedTextColor = SecondaryColor,
+                                // The selected icon sits on the red indicator, so it stays white in
+                                // both themes; the label sits on the navbar surface, so it follows it.
+                                selectedIconColor = Color.White,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                selectedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             ),
                         )
                     }
@@ -848,7 +888,8 @@ private fun RootScaffold(
                     modifier = Modifier
                         .size(36.dp)
                         .shadow(4.dp, CircleShape)
-                        .background(Color.White, CircleShape)
+                        .background(MaterialTheme.colorScheme.surface, CircleShape)
+                        .floatingControlBorder(CircleShape)
                         .clickable {
                             val tmp = itineraryDeparture; itineraryDeparture = itineraryArrival; itineraryArrival = tmp
                         },
@@ -857,7 +898,7 @@ private fun RootScaffold(
                     Icon(
                         imageVector = Icons.Filled.SwapVert,
                         contentDescription = "Inverser",
-                        tint = Color.Black,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -891,7 +932,8 @@ private fun RootScaffold(
             val allLines = remember(linesUiState, stopsUiState) { viewModel.getAllAvailableLines() }
             ModalBottomSheet(
                 onDismissRequest = { showLinesSheet = false },
-                containerColor = SecondaryColor,
+                containerColor = bottomSheetContainerColor(),
+                contentColor = MaterialTheme.colorScheme.onSurface,
                 sheetState = linesSheetState,
             ) {
                 LinesBottomSheet(
@@ -1045,8 +1087,11 @@ private fun PlanContent(
     var searchHistory by remember { mutableStateOf(searchHistoryRepo.getSearchHistory()) }
     val linesState by viewModel.uiState.collectAsState()
     val lineRules = remember { TransportServiceProvider.getTransportLineRules() }
-    val mapStyleRepo = remember { MapStyleRepository(context, TransportServiceProvider.getMapStyleConfig()) }
+    val mapStyleConfig = remember { TransportServiceProvider.getMapStyleConfig() }
+    val mapStyleRepo = remember { MapStyleRepository(context, mapStyleConfig) }
     var selectedMapStyle by remember { mutableStateOf(mapStyleRepo.getSelectedStyle()) }
+    // The merged "Standard" basemap resolves to positron (light) or dark_matter (dark) from the app theme.
+    val effectiveMapStyle = MapStyleUtils.resolveForTheme(selectedMapStyle, isAppInDarkTheme(), mapStyleConfig)
     var showStyleSheet by remember { mutableStateOf(false) }
     var searchExpanded by remember { mutableStateOf(false) }
 
@@ -1083,6 +1128,8 @@ private fun PlanContent(
             modifier = Modifier.fillMaxSize(),
             scaffoldState = bsScaffoldState,
             sheetPeekHeight = sheetPeekHeight,
+            sheetContainerColor = bottomSheetContainerColor(),
+            sheetContentColor = MaterialTheme.colorScheme.onSurface,
             sheetContent = {
                 sheetContent()
             }
@@ -1091,7 +1138,7 @@ private fun PlanContent(
                 Log.i("PeloApp", "PlanContent: before MapCanvas")
                 MapCanvas(
                     modifier = Modifier.fillMaxSize(),
-                    styleUrl = selectedMapStyle.styleUrl,
+                    styleUrl = effectiveMapStyle.styleUrl,
                     initialLatitude = 45.75,
                     initialLongitude = 4.85,
                     initialZoom = 12.0,
@@ -1126,7 +1173,8 @@ private fun PlanContent(
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
-                                    .background(Color.Black, CircleShape)
+                                    .background(MaterialTheme.colorScheme.surface, CircleShape)
+                                    .floatingControlBorder(CircleShape)
                                     .clickable {
                                         scope.launch {
                                             cameraState.animateTo(
@@ -1197,7 +1245,9 @@ private fun PlanContent(
                         Box(
                             modifier = Modifier
                                 .size(56.dp)
-                                .background(Color.Black, CircleShape)
+                                .shadow(4.dp, CircleShape)
+                                .background(MaterialTheme.colorScheme.surface, CircleShape)
+                                .floatingControlBorder(CircleShape)
                                 .clickable { onFabClick(isAtCenteringTarget) },
                             contentAlignment = Alignment.Center
                         ) {
@@ -1209,6 +1259,9 @@ private fun PlanContent(
                                     modifier = Modifier.size(30.dp)
                                 )
                             } else {
+                                // Ring on the dark FAB is white; on the white FAB it matches the blue
+                                // dot (so the marker reads as a solid blue dot rather than white-on-white).
+                                val locationRingColor = if (isAppInDarkTheme()) Color.White else Color(0xFF3B82F6)
                                 Canvas(modifier = Modifier.size(18.dp)) {
                                     val radius = size.minDimension / 2f
                                     drawCircle(
@@ -1216,7 +1269,7 @@ private fun PlanContent(
                                         radius = radius
                                     )
                                     drawCircle(
-                                        color = Color.White,
+                                        color = locationRingColor,
                                         radius = radius,
                                         style = Stroke(width = 3.dp.toPx())
                                     )
@@ -1233,7 +1286,7 @@ private fun PlanContent(
                 Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .then(if (searchExpanded) Modifier.background(Color.Black) else Modifier)
+                    .then(if (searchExpanded) Modifier.background(MaterialTheme.colorScheme.surface) else Modifier)
                     .windowInsetsPadding(WindowInsets.statusBars)
             ) {
                 Column {
@@ -1288,14 +1341,17 @@ private fun PlanContent(
                             val buttonColor = when {
                                 hasVehicles -> Color(0xFFEF4444)
                                 isActiveNoVehicles -> Color(0xFF9CA3AF)
-                                else -> PrimaryColor
+                                else -> MaterialTheme.colorScheme.surface
                             }
+                            // White reads on the red/grey active states; onSurface on the themed idle state.
+                            val buttonContentColor = if (hasVehicles || isActiveNoVehicles) Color.White else MaterialTheme.colorScheme.onSurface
 
                             Row(
                                 modifier = Modifier
-                                    .shadow(4.dp, RoundedCornerShape(20.dp))
+                                    .shadow(2.dp, RoundedCornerShape(20.dp))
                                     .clip(RoundedCornerShape(20.dp))
-                                    .background(PrimaryColor)
+                                    .background(MaterialTheme.colorScheme.surface)
+                                    .floatingControlBorder(RoundedCornerShape(20.dp))
                                     .clickable { showStyleSheet = true }
                                     .height(40.dp)
                                     .padding(horizontal = 16.dp),
@@ -1304,7 +1360,7 @@ private fun PlanContent(
                                 Icon(
                                     Icons.Filled.Layers,
                                     contentDescription = "Style de carte",
-                                    tint = SecondaryColor,
+                                    tint = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -1312,9 +1368,10 @@ private fun PlanContent(
                             if (selectedLineName.isNullOrBlank() || lineRules.isLiveTrackableLine(selectedLineName)) {
                                 Row(
                                     modifier = Modifier
-                                        .shadow(4.dp, RoundedCornerShape(20.dp))
+                                        .shadow(2.dp, RoundedCornerShape(20.dp))
                                         .clip(RoundedCornerShape(20.dp))
                                         .background(buttonColor)
+                                        .floatingControlBorder(RoundedCornerShape(20.dp))
                                         .clickable {
                                             if (isLiveModeEnabled) {
                                                 if (isLiveTrackingEnabled) viewModel.stopLiveTracking()
@@ -1336,13 +1393,13 @@ private fun PlanContent(
                                             .size(8.dp)
                                             .graphicsLayer { translationY = dotOffset }
                                     ) {
-                                        drawCircle(color = SecondaryColor)
+                                        drawCircle(color = buttonContentColor)
                                     }
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
                                         text = "LIVE",
-                                        fontWeight = FontWeight.Bold,
-                                        color = SecondaryColor,
+                                        fontWeight = FontWeight.Medium,
+                                        color = buttonContentColor,
                                         fontSize = 14.sp
                                     )
                                 }
@@ -1432,6 +1489,7 @@ private fun SettingsTab(viewModel: TransportViewModel, modifier: Modifier = Modi
                     },
                 )
             }
+            "theme" -> ThemeSettingsScreen(onBackClick = navigateBack)
             "about" -> SettingsScreen(
                 versionName = appVersionName(context),
                 onBackClick = navigateBack,
@@ -1441,6 +1499,7 @@ private fun SettingsTab(viewModel: TransportViewModel, modifier: Modifier = Modi
                 onContactClick = { navigateTo("contact") },
                 onOfflineClick = {},
                 onTelemetryClick = {},
+                onThemeClick = {},
 
                 isAboutMenu = true
             )
@@ -1454,6 +1513,7 @@ private fun SettingsTab(viewModel: TransportViewModel, modifier: Modifier = Modi
                 onOfflineClick = { navigateTo("offline") },
                 onTelemetryClick = { navigateTo("telemetry") },
                 onAboutClick = { navigateTo("about") },
+                onThemeClick = { navigateTo("theme") },
 
                 isAboutMenu = false
             )

@@ -44,9 +44,8 @@ import eu.dotshell.pelo.generic.data.offline.OfflineDownloadState
 import eu.dotshell.pelo.generic.data.offline.OfflineRepository
 import eu.dotshell.pelo.generic.data.repository.offline.mapstyle.MapStyleCompat
 import eu.dotshell.pelo.generic.service.TransportServiceProvider
+import androidx.compose.material3.MaterialTheme
 import eu.dotshell.pelo.generic.ui.theme.AccentColor
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModel
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
@@ -74,7 +73,7 @@ fun OfflineSettingsScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(PrimaryColor)
+            .background(MaterialTheme.colorScheme.background)
     ) {
         Column(
             modifier = Modifier
@@ -89,13 +88,13 @@ fun OfflineSettingsScreen(
             Icon(
                 imageVector = if (offlineDataInfo.isAvailable) Icons.Filled.CheckCircle else Icons.Filled.CloudOff,
                 contentDescription = if (offlineDataInfo.isAvailable) strings["offline_available"] else strings["offline_unavailable"],
-                tint = if (offlineDataInfo.isAvailable) Color(0xFF4CAF50) else Color.Gray,
+                tint = if (offlineDataInfo.isAvailable) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(48.dp)
             )
             Spacer(modifier = Modifier.height(12.dp))
             Text(
                 text = strings["offline_mode"],
-                color = SecondaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -105,7 +104,7 @@ fun OfflineSettingsScreen(
                     strings["offline_available_message"]
                 else
                     strings["offline_download_message"],
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center
             )
@@ -151,10 +150,10 @@ fun OfflineSettingsScreen(
                             Icons.Filled.Close,
                             contentDescription = strings["cancel_download"],
                             modifier = Modifier.size(18.dp),
-                            tint = Color.Gray
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text(strings["cancel"], color = Color.Gray, fontSize = 14.sp)
+                        Text(strings["cancel"], color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
                     }
                 }
 
@@ -167,7 +166,7 @@ fun OfflineSettingsScreen(
                             .alpha(if (isOffline) 0.5f else 1f),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = AccentColor,
-                            disabledContainerColor = Color(0xFF3A3A3C)
+                            disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
@@ -175,13 +174,14 @@ fun OfflineSettingsScreen(
                             Icons.Filled.CloudDownload,
                             strings["download_data"],
                             modifier = Modifier.size(20.dp),
-                            tint = SecondaryColor
+                            // Content on the accent-filled button — not theme-driven.
+                            tint = Color.White
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = if (offlineDataInfo.isAvailable) strings["update_button"] else strings["download_data"],
                             fontSize = 16.sp,
-                            color = SecondaryColor,
+                            color = Color.White,
                             modifier = Modifier.padding(vertical = 4.dp)
                         )
                     }
@@ -207,7 +207,7 @@ fun OfflineSettingsScreen(
                 .padding(start = 4.dp, top = 8.dp)
                 .align(Alignment.TopStart)
         ) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, strings["back"], tint = SecondaryColor)
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, strings["back"], tint = MaterialTheme.colorScheme.onSurface)
         }
     }
 }
@@ -224,11 +224,11 @@ private fun CategoryHeader(icon: ImageVector, title: String) {
         Icon(
             icon,
             strings["category_header"],
-            tint = SecondaryColor,
+            tint = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.size(20.dp)
         )
         Spacer(Modifier.width(8.dp))
-        Text(title, color = SecondaryColor, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(title, color = MaterialTheme.colorScheme.onSurface, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
@@ -245,7 +245,7 @@ private fun DownloadProgressCard(state: OfflineDownloadState.Downloading, string
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -253,7 +253,7 @@ private fun DownloadProgressCard(state: OfflineDownloadState.Downloading, string
 
             Text(
                 translateOfflineStepDescription(state.stepDescription, strings),
-                color = SecondaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 14.sp,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
@@ -265,7 +265,7 @@ private fun DownloadProgressCard(state: OfflineDownloadState.Downloading, string
                 progress = animatedProgress,
                 modifier = Modifier.fillMaxWidth(),
                 indicatorColor = progressColor,
-                trackColor = Color(0xFF3A3A3C)
+                trackColor = MaterialTheme.colorScheme.surfaceVariant
             )
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -284,7 +284,7 @@ private fun MapStyleSelectionCard(
     val strings = StringProvider(LocalPlatformContext.current)
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column {
@@ -315,7 +315,7 @@ private fun MapStyleSelectionCard(
                             .clip(RoundedCornerShape(6.dp))
                             .border(
                                 2.dp,
-                                if (isSelected) Color.Transparent else Color(0xFF8E8E93),
+                                if (isSelected) Color.Transparent else MaterialTheme.colorScheme.outline,
                                 RoundedCornerShape(6.dp)
                             )
                             .background(if (isSelected) AccentColor else Color.Transparent),
@@ -324,7 +324,7 @@ private fun MapStyleSelectionCard(
                         if (isSelected) Icon(
                             Icons.Default.Check,
                             strings["selected"],
-                            tint = SecondaryColor,
+                            tint = Color.White,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -332,7 +332,7 @@ private fun MapStyleSelectionCard(
                     Spacer(modifier = Modifier.width(16.dp))
                     Text(
                         style.displayName,
-                        color = SecondaryColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 15.sp,
                         modifier = Modifier.weight(1f)
                     )
@@ -352,7 +352,7 @@ private fun MapStyleSelectionCard(
                             .fillMaxWidth()
                             .padding(start = 56.dp)
                             .height(0.5.dp)
-                            .background(Color(0xFF3A3A3C))
+                            .background(MaterialTheme.colorScheme.outlineVariant)
                     )
                 }
             }
@@ -365,7 +365,7 @@ private fun OfflineStatusCard(info: OfflineDataInfo) {
     val strings = StringProvider(LocalPlatformContext.current)
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -405,8 +405,8 @@ private fun OfflineStatusCard(info: OfflineDataInfo) {
 @Composable
 private fun StatusRow(label: String, value: String) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(label, color = Color.Gray, fontSize = 14.sp)
-        Text(value, color = SecondaryColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+        Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
+        Text(value, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Medium)
     }
 }
 

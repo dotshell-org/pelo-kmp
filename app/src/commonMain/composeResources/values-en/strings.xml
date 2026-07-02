@@ -63,6 +63,13 @@
     <string name="offline_mode">Offline mode</string>
     <string name="privacy_title">Privacy</string>
     <string name="about_title">About</string>
+    <string name="theme_settings_title">Appearance</string>
+    <string name="theme_mode_auto">Automatic</string>
+    <string name="theme_mode_auto_subtitle">Follow system</string>
+    <string name="theme_mode_light">Light</string>
+    <string name="theme_mode_light_subtitle">Always light</string>
+    <string name="theme_mode_dark">Dark</string>
+    <string name="theme_mode_dark_subtitle">Always dark</string>
     <string name="next_arrow">Next</string>
     <string name="delete_local_history">Delete local history</string>
     <string name="data_collected_today">Data collected today</string>
@@ -110,6 +117,7 @@
     <string name="date_time_at">%1$s at %2$s</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
+    <string name="map_style_standard">Standard</string>
     <string name="special_fare_lines">Special fare lines</string>
     <string name="school_lines">School lines</string>
     <string name="alert_type_closure">Closed Stop</string>

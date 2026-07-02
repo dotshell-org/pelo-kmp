@@ -29,8 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.dotshell.pelo.generic.data.config.TelemetryDisclosureData
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import androidx.compose.material3.MaterialTheme
 
 /**
  * One-shot consent screen presented on the first launch (and again if the schema version
@@ -46,7 +45,7 @@ fun TelemetryOptInScreen(
     onDecline: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Scaffold(containerColor = PrimaryColor) { paddingValues ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background) { paddingValues ->
         Column(
             modifier = modifier
                 .fillMaxSize()
@@ -60,13 +59,13 @@ fun TelemetryOptInScreen(
                 Icon(
                     Icons.Filled.Lock,
                     contentDescription = null,
-                    tint = SecondaryColor,
+                    tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(28.dp)
                 )
                 Spacer(Modifier.size(12.dp))
                 Text(
                     text = disclosure.title,
-                    color = SecondaryColor,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold,
                     fontSize = 22.sp
                 )
@@ -77,7 +76,7 @@ fun TelemetryOptInScreen(
             if (disclosure.body.isNotBlank()) {
                 Text(
                     text = disclosure.body,
-                    color = SecondaryColor,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 14.sp,
                     lineHeight = 20.sp
                 )
@@ -91,7 +90,7 @@ fun TelemetryOptInScreen(
 
             Spacer(Modifier.height(16.dp))
 
-            HorizontalDivider(color = SecondaryColor.copy(alpha = 0.3f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f))
 
             Spacer(Modifier.height(16.dp))
 
@@ -109,7 +108,7 @@ fun TelemetryOptInScreen(
                 ) {
                     Text(
                         text = disclosure.privacyNote,
-                        color = SecondaryColor.copy(alpha = 0.85f),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
                         fontSize = 12.sp,
                         lineHeight = 17.sp
                     )
@@ -122,8 +121,8 @@ fun TelemetryOptInScreen(
                 onClick = onAccept,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = SecondaryColor,
-                    contentColor = PrimaryColor
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
                 Text("Activer le partage", fontWeight = FontWeight.SemiBold)
@@ -134,7 +133,7 @@ fun TelemetryOptInScreen(
             OutlinedButton(
                 onClick = onDecline,
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = SecondaryColor)
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)
             ) {
                 Text("Plus tard")
             }
@@ -149,7 +148,7 @@ private fun DisclosureGroup(heading: String, items: List<String>) {
     if (items.isEmpty()) return
     Text(
         text = heading,
-        color = SecondaryColor,
+        color = MaterialTheme.colorScheme.onSurface,
         fontWeight = FontWeight.SemiBold,
         fontSize = 15.sp,
         modifier = Modifier.padding(bottom = 8.dp)
@@ -160,7 +159,7 @@ private fun DisclosureGroup(heading: String, items: List<String>) {
                 Icon(
                     Icons.Filled.CheckCircle,
                     contentDescription = null,
-                    tint = SecondaryColor.copy(alpha = 0.85f),
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
                     modifier = Modifier
                         .size(16.dp)
                         .padding(top = 3.dp)
@@ -168,7 +167,7 @@ private fun DisclosureGroup(heading: String, items: List<String>) {
                 Spacer(Modifier.size(8.dp))
                 Text(
                     text = item,
-                    color = SecondaryColor,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 13.sp,
                     lineHeight = 19.sp
                 )

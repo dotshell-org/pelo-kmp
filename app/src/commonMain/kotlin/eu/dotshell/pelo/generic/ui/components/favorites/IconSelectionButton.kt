@@ -24,8 +24,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.ui.theme.AccentColor
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 
 /**
  * Icon selection button
@@ -43,8 +41,8 @@ fun IconSelectionButton(
         modifier = Modifier
             .clip(RoundedCornerShape(24.dp))
             .clickable(onClick = onClick)
-            .background(if (isSelected) Color(0x1A000000) else Color.Transparent)
-            .border(1.dp, if (isSelected) PrimaryColor else Color.Gray, RoundedCornerShape(24.dp))
+            .background(if (isSelected) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f) else Color.Transparent)
+            .border(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline, RoundedCornerShape(24.dp))
             .padding(horizontal = 10.dp, vertical = 8.dp),
         contentAlignment = Alignment.CenterStart
     ) {
@@ -53,13 +51,13 @@ fun IconSelectionButton(
                 modifier = Modifier
                     .size(24.dp)
                     .clip(CircleShape)
-                    .background(PrimaryColor),
+                    .background(MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = iconName,
-                    tint = SecondaryColor,
+                    tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(14.dp)
                 )
             }
@@ -67,7 +65,7 @@ fun IconSelectionButton(
             Text(
                 text = label,
                 style = MaterialTheme.typography.bodySmall,
-                color = PrimaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
             )
             if (isSelected) {
@@ -82,7 +80,7 @@ fun IconSelectionButton(
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = "Selected",
-                        tint = SecondaryColor,
+                        tint = Color.White,
                         modifier = Modifier.size(12.dp)
                     )
                 }

@@ -13,7 +13,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import androidx.compose.material3.MaterialTheme
 
 @Composable
 fun SectionHeader(icon: ImageVector, text: String) {
@@ -24,13 +24,13 @@ fun SectionHeader(icon: ImageVector, text: String) {
         Icon(
             imageVector = icon,
             contentDescription = text,
-            tint = SecondaryColor.copy(alpha = 0.6f),
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
             modifier = Modifier.size(16.dp)
         )
         Spacer(modifier = Modifier.size(8.dp))
         Text(
             text = text,
-            color = SecondaryColor.copy(alpha = 0.6f),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium
         )

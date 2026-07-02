@@ -7,6 +7,7 @@ import eu.dotshell.pelo.platform.ioDispatcher
 import eu.dotshell.pelo.platform.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,8 +52,6 @@ import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.ItineraryPre
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
 import eu.dotshell.pelo.generic.data.models.itinerary.SelectedStop
 import eu.dotshell.pelo.generic.data.models.itinerary.TimeMode
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModel
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.generic.utils.search.SearchUtils
@@ -497,6 +496,10 @@ fun InlineItinerarySheetContent(
         onSelectedJourneyChanged(selectedJourney)
     }
 
+    // Drive the itinerary result palette from the app theme: light palette in light
+    // mode (dark text on the light sheet), dark palette in dark mode (light text on
+    // the dark sheet). The BottomSheetScaffold container is MaterialTheme surface.
+    val useLightColors = !isSystemInDarkTheme()
     val showSearchBars = selectedJourney == null
 
     Column(
@@ -519,7 +522,7 @@ fun InlineItinerarySheetContent(
                     text = strings["itinerary"],
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = PrimaryColor,
+                    color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(start = 16.dp)
                 )
             } else {
@@ -557,7 +560,8 @@ fun InlineItinerarySheetContent(
                                     text = leg.routeName ?: "?",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = SecondaryColor
+                                    // Contrast on the fixed line-color badge — not theme-driven.
+                                    color = Color.White
                                 )
                             }
                         }
@@ -566,7 +570,7 @@ fun InlineItinerarySheetContent(
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                                 contentDescription = null,
-                                tint = PrimaryColor,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(24.dp)
                             )
                         }
@@ -588,7 +592,7 @@ fun InlineItinerarySheetContent(
                 Icon(
                     Icons.Default.Close,
                     contentDescription = if (selectedJourney != null) "Retour" else "Fermer",
-                    tint = PrimaryColor
+                    tint = MaterialTheme.colorScheme.onSurface
                 )
             }
         }
@@ -604,7 +608,7 @@ fun InlineItinerarySheetContent(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    CircularProgressIndicator(color = PrimaryColor)
+                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             } else if (errorText != null) {
                 Column(
@@ -614,7 +618,7 @@ fun InlineItinerarySheetContent(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(text = errorText.orEmpty(), color = PrimaryColor)
+                    Text(text = errorText.orEmpty(), color = MaterialTheme.colorScheme.onSurface)
                 }
             } else {
                 val avoidedSignatures = remember(journeysAvoidingAlerts) {
@@ -643,7 +647,7 @@ fun InlineItinerarySheetContent(
                                     selectedTimeSeconds = null
                                     selectedDate = null
                                 },
-                                useLightColors = true
+                                useLightColors = useLightColors
                             )
                             Spacer(modifier = Modifier.height(10.dp))
                         }
@@ -659,7 +663,7 @@ fun InlineItinerarySheetContent(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 6.dp),
-                                useLightColors = true,
+                                useLightColors = useLightColors,
                                 showAvoidedAlertsBadge = true,
                                 avoidedAlertsLabel = avoidedJourney.label
                             )
@@ -677,7 +681,7 @@ fun InlineItinerarySheetContent(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 6.dp),
-                                useLightColors = true
+                                useLightColors = useLightColors
                             )
                         }
                     }
@@ -707,7 +711,7 @@ fun InlineItinerarySheetContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
-                    useLightColors = true,
+                    useLightColors = useLightColors,
                     scrollAllContent = true
                 )
             }

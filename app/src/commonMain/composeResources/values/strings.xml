@@ -63,6 +63,13 @@
     <string name="offline_mode">Mode hors ligne</string>
     <string name="privacy_title">Confidentialité</string>
     <string name="about_title">À propos</string>
+    <string name="theme_settings_title">Apparence</string>
+    <string name="theme_mode_auto">Automatique</string>
+    <string name="theme_mode_auto_subtitle">Suivre le système</string>
+    <string name="theme_mode_light">Clair</string>
+    <string name="theme_mode_light_subtitle">Toujours clair</string>
+    <string name="theme_mode_dark">Sombre</string>
+    <string name="theme_mode_dark_subtitle">Toujours sombre</string>
     <string name="next_arrow">Suivant</string>
     <string name="delete_local_history">Supprimer l\'historique local</string>
     <string name="data_collected_today">Données collectées aujourd\'hui</string>
@@ -110,6 +117,7 @@
     <string name="date_time_at">%1$s à %2$s</string>
     <string name="theme_light">Clair</string>
     <string name="theme_dark">Sombre</string>
+    <string name="map_style_standard">Standard</string>
     <string name="special_fare_lines">Lignes à tarification spéciale</string>
     <string name="school_lines">Lignes scolaires</string>
     <string name="alert_type_closure">Arrêt Fermé</string>

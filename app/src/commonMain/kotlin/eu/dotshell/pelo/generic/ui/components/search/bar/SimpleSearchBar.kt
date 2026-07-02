@@ -45,6 +45,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -68,9 +69,9 @@ import eu.dotshell.pelo.generic.data.models.search.UnifiedSearchResult
 import eu.dotshell.pelo.generic.ui.components.search.bar.lines.LineSearchResultItem
 import eu.dotshell.pelo.generic.ui.components.search.bar.stops.StopSearchPickerListItem
 import eu.dotshell.pelo.generic.ui.components.search.bar.stops.StopSearchResultItem
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
+import androidx.compose.material3.MaterialTheme
 import eu.dotshell.pelo.generic.ui.theme.AccentColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import eu.dotshell.pelo.generic.ui.theme.floatingControlBorder
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -212,7 +213,7 @@ fun SimpleSearchBar(
     Box(
         modifier = (if (expanded) Modifier
             .fillMaxSize()
-            .background(PrimaryColor) else modifier)
+            .background(MaterialTheme.colorScheme.surface) else modifier)
             .semantics { isTraversalGroup = true }
             .padding(0.dp)
             .clickable(
@@ -245,7 +246,7 @@ fun SimpleSearchBar(
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = { submitFirstResult() }),
-                        placeholder = { Text(placeholder, color = SecondaryColor) },
+                        placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium) },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Search,
@@ -255,27 +256,33 @@ fun SimpleSearchBar(
                             )
                         },
                         colors = TextFieldDefaults.colors(
-                            focusedTextColor = SecondaryColor,
-                            unfocusedTextColor = SecondaryColor,
-                            cursorColor = SecondaryColor,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            cursorColor = MaterialTheme.colorScheme.onSurface,
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
                             disabledIndicatorColor = Color.Transparent,
-                            focusedContainerColor = PrimaryColor,
-                            unfocusedContainerColor = PrimaryColor,
-                            focusedPlaceholderColor = SecondaryColor.copy(alpha = 0.6f),
-                            unfocusedPlaceholderColor = SecondaryColor.copy(alpha = 0.6f)
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                            focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
                     )
                 } else {
                     SearchBarDefaults.InputField(
-                        modifier = if (showDarkOutline) {
-                            Modifier
-                                .clip(RoundedCornerShape(28.dp))
-                                .border(1.dp, Color.Gray, RoundedCornerShape(28.dp))
-                        } else {
-                            Modifier
-                        },
+                        // Light border in dark mode so the dark search bar stays legible on the
+                        // dark map; the dark outline handles a dark map under the light theme.
+                        modifier = Modifier
+                            .floatingControlBorder(RoundedCornerShape(28.dp))
+                            .then(
+                                if (showDarkOutline) {
+                                    Modifier
+                                        .clip(RoundedCornerShape(28.dp))
+                                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(28.dp))
+                                } else {
+                                    Modifier
+                                }
+                            ),
                         query = queryText,
                         onQueryChange = { q -> setQueryText(q) },
                         onSearch = { submitFirstResult() },
@@ -285,7 +292,7 @@ fun SimpleSearchBar(
                                 setExpandedState(shouldExpand)
                             }
                         },
-                        placeholder = { Text(placeholder, color = SecondaryColor) },
+                        placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium) },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Search,
@@ -294,16 +301,16 @@ fun SimpleSearchBar(
                             )
                         },
                         colors = TextFieldDefaults.colors(
-                            focusedTextColor = SecondaryColor,
-                            unfocusedTextColor = SecondaryColor,
-                            cursorColor = SecondaryColor,
+                            focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                            cursorColor = MaterialTheme.colorScheme.onSurface,
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
                             disabledIndicatorColor = Color.Transparent,
-                            focusedContainerColor = PrimaryColor,
-                            unfocusedContainerColor = PrimaryColor,
-                            focusedPlaceholderColor = SecondaryColor.copy(alpha = 0.6f),
-                            unfocusedPlaceholderColor = SecondaryColor.copy(alpha = 0.6f)
+                            focusedContainerColor = MaterialTheme.colorScheme.surface,
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                            focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
                     )
                 }
@@ -315,9 +322,11 @@ fun SimpleSearchBar(
                 }
             },
             colors = SearchBarDefaults.colors(
-                containerColor = PrimaryColor,
+                containerColor = MaterialTheme.colorScheme.surface,
                 dividerColor = Color.Transparent
-            )
+            ),
+            // Small drop shadow on the collapsed bar; none when expanded (it fills the screen).
+            shadowElevation = if (expanded) 0.dp else 2.dp
         ) {
             val lazyListState = rememberLazyListState()
 
@@ -441,12 +450,12 @@ fun SimpleSearchBar(
                             headlineContent = {
                                 Text(
                                     "Aucun résultat",
-                                    color = SecondaryColor.copy(alpha = 0.6f),
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                     textAlign = TextAlign.Center,
                                     modifier = Modifier.fillMaxWidth()
                                 )
                             },
-                            colors = ListItemDefaults.colors(containerColor = PrimaryColor),
+                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
                             modifier = Modifier.fillMaxWidth()
                         )
                     }

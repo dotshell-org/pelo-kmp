@@ -26,8 +26,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
@@ -59,7 +57,7 @@ fun NavigationModeOverlay(
                     .fillMaxWidth()
                     .height(132.dp)
                     .clip(topShape)
-                    .background(PrimaryColor)
+                    .background(MaterialTheme.colorScheme.surface)
             ) {
                 Row(
                     modifier = Modifier
@@ -81,7 +79,7 @@ fun NavigationModeOverlay(
                             Icon(
                                 imageVector = Icons.Filled.ArrowDownward,
                                 contentDescription = null,
-                                tint = Color(0xFF9CA3AF),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(24.dp)
                             )
                             NavigationLineIcon(
@@ -100,12 +98,12 @@ fun NavigationModeOverlay(
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
                             text = state.directionText,
-                            color = Color(0xFF9CA3AF),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodySmall
                         )
                         Text(
                             text = state.actionText,
-                            color = SecondaryColor,
+                            color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Normal
                         )
@@ -117,7 +115,7 @@ fun NavigationModeOverlay(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(bottomStart = 14.dp, bottomEnd = 14.dp))
-                        .background(Color(0xFF292524))
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 5.dp),
@@ -127,7 +125,7 @@ fun NavigationModeOverlay(
                         Text(
                             text = strings["next_up"],
                             fontSize = 16.sp,
-                            color = SecondaryColor,
+                            color = MaterialTheme.colorScheme.onSurface,
                             style = MaterialTheme.typography.bodySmall
                         )
                         NavigationLineIcon(
@@ -145,7 +143,7 @@ fun NavigationModeOverlay(
                 .fillMaxWidth()
                 .height(108.dp)
                 .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                .background(PrimaryColor)
+                .background(MaterialTheme.colorScheme.surface)
                 .padding(bottom = 12.dp)
         ) {
             Column(
@@ -154,12 +152,12 @@ fun NavigationModeOverlay(
             ) {
                 Text(
                     text = state.remainingTimeText,
-                    color = SecondaryColor,
+                    color = MaterialTheme.colorScheme.onSurface,
                     style = MaterialTheme.typography.headlineMedium
                 )
                 Text(
                     text = state.arrivalTimeText,
-                    color = Color(0xFF9CA3AF),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Normal
                 )
@@ -168,13 +166,13 @@ fun NavigationModeOverlay(
             Icon(
                 imageVector = Icons.Filled.Close,
                 contentDescription = strings["back"],
-                tint = SecondaryColor,
+                tint = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .padding(start = 20.dp)
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF292524))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .clickable { onClose() }
                     .padding(8.dp)
             )
@@ -189,7 +187,7 @@ fun NavigationModeOverlay(
                     .padding(end = 20.dp)
                     .size(48.dp)
                     .clip(CircleShape)
-                    .background(Color(0xFF292524))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .clickable { onReportAlert() }
                     .padding(10.dp)
             )

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -24,11 +25,12 @@ import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.data.network.mapstyle.MapStyleData
+import eu.dotshell.pelo.generic.ui.theme.bottomSheetContainerColor
+import eu.dotshell.pelo.generic.ui.theme.isAppInDarkTheme
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
 import eu.dotshell.pelo.platform.provideMapStyleConfig
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import eu.dotshell.pelo.generic.utils.map.MapStyleUtils
 import eu.dotshell.pelo.generic.utils.map.MapStyleUtils.mapStyleLabel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,13 +44,25 @@ fun MapStyleSelectionSheet(
 ) {
     val strings = StringProvider(LocalPlatformContext.current)
     val mapStyleConfig = provideMapStyleConfig()
+    val darkTheme = isAppInDarkTheme()
     val standardStyles = remember { mapStyleConfig.getStandardMapStyles() }
     val satelliteStyle = remember { mapStyleConfig.getSatelliteMapStyle() }
-    val allStyles = remember { standardStyles + satelliteStyle }
+    // The light/dark basemaps are merged into a single "Standard" tile that follows the app theme.
+    val allStyles = remember(darkTheme, standardStyles, satelliteStyle) {
+        val adaptiveStandard = MapStyleUtils.resolveForTheme(
+            standardStyles.first { MapStyleUtils.isAdaptiveStandardKey(it.key) },
+            darkTheme,
+            mapStyleConfig
+        )
+        listOf(adaptiveStandard) +
+            standardStyles.filterNot { MapStyleUtils.isAdaptiveStandardKey(it.key) } +
+            satelliteStyle
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = SecondaryColor,
+        containerColor = bottomSheetContainerColor(),
+        contentColor = MaterialTheme.colorScheme.onSurface,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ) {
         Column(
@@ -58,7 +72,7 @@ fun MapStyleSelectionSheet(
         ) {
             Text(
                 text = strings["theme_title"],
-                color = PrimaryColor
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.size(16.dp))
 
@@ -69,7 +83,11 @@ fun MapStyleSelectionSheet(
             ) {
                 allStyles.forEach { style ->
                     val enabled = !isOffline || style.key in downloadedMapStyles
-                    val isSelected = style.key == selectedMapStyle.key
+                    val isSelected = if (MapStyleUtils.isAdaptiveStandardKey(style.key)) {
+                        MapStyleUtils.isAdaptiveStandardKey(selectedMapStyle.key)
+                    } else {
+                        style.key == selectedMapStyle.key
+                    }
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -80,7 +98,7 @@ fun MapStyleSelectionSheet(
                                 .clip(RoundedCornerShape(14.dp))
                                 .border(
                                     2.dp,
-                                    if (isSelected) Color(0xFF3B82F6) else Color.Transparent,
+                                    if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                                     RoundedCornerShape(14.dp)
                                 )
                                 .padding(2.dp)
@@ -94,7 +112,7 @@ fun MapStyleSelectionSheet(
 
                         Text(
                             text = mapStyleLabel(style),
-                            color = if (enabled) PrimaryColor else Color(0xFF9CA3AF)
+                            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }

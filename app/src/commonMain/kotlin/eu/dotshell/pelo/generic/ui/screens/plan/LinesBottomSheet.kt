@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PriorityHigh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import eu.dotshell.pelo.generic.ui.theme.bottomSheetContainerColor
 import eu.dotshell.pelo.generic.utils.search.SearchUtils
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -48,8 +49,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.dotshell.pelo.generic.data.models.realtime.alerts.official.AlertSeverity
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import eu.dotshell.pelo.generic.data.models.realtime.alerts.official.AlertSeverity as TrafficAlertSeverity
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModelInterface
 import eu.dotshell.pelo.generic.utils.LineColorHelper
@@ -175,7 +174,7 @@ fun LinesBottomSheet(
         modifier = modifier
             .fillMaxWidth()
             .fillMaxHeight(0.9f)
-            .background(SecondaryColor, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+            .background(bottomSheetContainerColor(), RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
             .padding(16.dp)
     ) {
         // List of lines by category
@@ -228,7 +227,7 @@ fun LinesBottomSheet(
                                 text = categoryText,
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = PrimaryColor,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(top = 4.dp, bottom = 4.dp)
@@ -308,7 +307,7 @@ fun LinesBottomSheet(
                     ) {
                         Text(
                             text = strings["no_lines_found"],
-                            color = Color.Gray,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             style = MaterialTheme.typography.bodyLarge
                         )
                     }
@@ -359,7 +358,8 @@ private fun LineChip(
             } else {
                 // Fallback if icon doesn't exist
                 val backgroundColor = Color(LineColorHelper.getColorForLineString(lineName))
-                val textColor = if (lineName.uppercase() == "T3") PrimaryColor else SecondaryColor
+                // Contrast color painted on the fixed line-color badge — must NOT follow the theme.
+                val textColor = if (lineName.uppercase() == "T3") Color.Black else Color.White
 
                 Box(
                     modifier = Modifier
@@ -412,7 +412,7 @@ private fun AlertBadge(
             // Use a text-based "i" to avoid the double circle from Icons.Default.Info
             Text(
                 text = "i",
-                color = SecondaryColor,
+                color = Color.White,
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 11.sp,
@@ -425,7 +425,7 @@ private fun AlertBadge(
             Icon(
                 imageVector = Icons.Default.PriorityHigh,
                 contentDescription = null,
-                tint = SecondaryColor,
+                tint = Color.White,
                 modifier = Modifier.size(12.dp)
             )
         }

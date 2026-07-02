@@ -1,6 +1,5 @@
 package eu.dotshell.pelo.generic.ui.theme
 
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 /**
@@ -48,10 +47,4 @@ interface TransportTheme {
      * Color used for clickable links (defaults to #4285F4 when no config provided)
      */
     val linkColor: Color
-
-    /**
-     * Applies the theme to the composition
-     */
-    @Composable
-    fun ApplyTheme(content: @Composable () -> Unit)
 }

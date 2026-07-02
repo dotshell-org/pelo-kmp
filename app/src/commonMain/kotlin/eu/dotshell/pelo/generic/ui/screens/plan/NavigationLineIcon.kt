@@ -14,7 +14,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import eu.dotshell.pelo.generic.utils.LineColorHelper
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.platform.DrawableProvider
@@ -46,7 +45,8 @@ fun NavigationLineIcon(
         ) {
             Text(
                 text = lineName.ifBlank { "?" }.take(3),
-                color = SecondaryColor,
+                // Contrast on the fixed line-color badge — not theme-driven.
+                color = Color.White,
                 fontWeight = FontWeight.Bold
             )
         }

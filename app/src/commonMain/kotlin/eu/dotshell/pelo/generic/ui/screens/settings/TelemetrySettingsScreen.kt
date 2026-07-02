@@ -53,8 +53,7 @@ import androidx.compose.ui.unit.sp
 import eu.dotshell.pelo.generic.data.telemetry.DailyReportState
 import eu.dotshell.pelo.generic.data.telemetry.TelemetryEvent
 import eu.dotshell.pelo.generic.data.telemetry.PlaceRef
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import androidx.compose.material3.MaterialTheme
 import kotlinx.datetime.Instant
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,17 +79,17 @@ fun TelemetrySettingsScreen(
                         showWipeConfirmDialog = false
                     }
                 ) {
-                    Text("Oui", color = Color(0xFFEF4444))
+                    Text("Oui", color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showWipeConfirmDialog = false }) {
-                    Text("Non", color = SecondaryColor)
+                    Text("Non", color = MaterialTheme.colorScheme.onSurface)
                 }
             },
-            containerColor = Color(0xFF1C1C1E),
-            titleContentColor = SecondaryColor,
-            textContentColor = Color.Gray
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            titleContentColor = MaterialTheme.colorScheme.onSurface,
+            textContentColor = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
 
@@ -101,7 +100,7 @@ fun TelemetrySettingsScreen(
                 title = {
                     Text(
                         text = strings["privacy_title"],
-                        color = SecondaryColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold
                     )
                 },
@@ -110,16 +109,16 @@ fun TelemetrySettingsScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = strings["back"],
-                            tint = SecondaryColor
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = PrimaryColor
+                    containerColor = MaterialTheme.colorScheme.background
                 )
             )
         },
-        containerColor = PrimaryColor
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -133,7 +132,7 @@ fun TelemetrySettingsScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(onClick = { showWipeConfirmDialog = true }),
-                colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Row(
@@ -145,13 +144,13 @@ fun TelemetrySettingsScreen(
                     Icon(
                         imageVector = Icons.Default.Delete,
                         contentDescription = null,
-                        tint = Color(0xFFEF4444),
+                        tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(Modifier.width(12.dp))
                     Text(
                         text = strings["delete_local_history"],
-                        color = Color(0xFFEF4444),
+                        color = MaterialTheme.colorScheme.error,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -162,7 +161,7 @@ fun TelemetrySettingsScreen(
 
             Text(
                 text = strings["data_collected_today"],
-                color = SecondaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -183,7 +182,7 @@ fun TelemetrySettingsScreen(
                     ) {
                         Card(
                             modifier = Modifier.weight(1f),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Row(
@@ -192,13 +191,13 @@ fun TelemetrySettingsScreen(
                             ) {
                                 Icon(Icons.Default.Info, contentDescription = null, tint = Color(0xFF3B82F6), modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text(text = snapshot.day, color = SecondaryColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                Text(text = snapshot.day, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                             }
                         }
 
                         Card(
                             modifier = Modifier.weight(1f),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
                             shape = RoundedCornerShape(12.dp)
                         ) {
                             Row(
@@ -207,7 +206,7 @@ fun TelemetrySettingsScreen(
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.List, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text(text = strings["events_count"].replace("%s", snapshot.events.size.toString()), color = SecondaryColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                                Text(text = strings["events_count"].replace("%s", snapshot.events.size.toString()), color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Medium)
                             }
                         }
                     }
@@ -217,7 +216,7 @@ fun TelemetrySettingsScreen(
                     Spacer(Modifier.height(20.dp))
                     Text(
                         text = strings["events_log"],
-                        color = SecondaryColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.Bold,
                         fontSize = 18.sp,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -252,7 +251,7 @@ private fun EventItem(event: TelemetryEvent) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp, vertical = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
@@ -270,20 +269,20 @@ private fun EventItem(event: TelemetryEvent) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
-                        color = SecondaryColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(Modifier.height(2.dp))
                     Text(
                         text = strings["event_type"].replace("%s", event::class.simpleName ?: ""),
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 11.sp
                     )
                 }
                 Text(
                     text = time,
-                    color = Color.Gray,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )
@@ -304,13 +303,13 @@ private fun EventItem(event: TelemetryEvent) {
                         ) {
                             Text(
                                 text = "$key :",
-                                color = Color.Gray,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium
                             )
                             Text(
                                 text = value,
-                                color = SecondaryColor.copy(alpha = 0.8f),
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                                 fontSize = 12.sp
                             )
                         }
@@ -332,11 +331,11 @@ private fun EventBreakdownCard(events: List<TelemetryEvent>) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(strings["telemetry_daily_summary"], color = SecondaryColor, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text(strings["telemetry_daily_summary"], color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
             Spacer(Modifier.height(8.dp))
             grouped.forEach { (className, list) ->
                 val label = eventShortLabel(className, strings)
@@ -345,10 +344,10 @@ private fun EventBreakdownCard(events: List<TelemetryEvent>) {
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(icon, contentDescription = null, tint = SecondaryColor.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
+                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(10.dp))
-                    Text(label, color = SecondaryColor, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                    Text("${list.size}", color = SecondaryColor, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(label, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp, modifier = Modifier.weight(1f))
+                    Text("${list.size}", color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 }
             }
         }
@@ -361,13 +360,13 @@ private fun InfoCard(title: String, body: String) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1C1C1E)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(title, color = SecondaryColor, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Text(title, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
             Spacer(Modifier.height(6.dp))
-            Text(body, color = Color.Gray, fontSize = 13.sp, lineHeight = 18.sp)
+            Text(body, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, lineHeight = 18.sp)
         }
     }
 }

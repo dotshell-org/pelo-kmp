@@ -18,8 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.data.models.search.LineSearchResult
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import androidx.compose.material3.MaterialTheme
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
@@ -61,7 +60,7 @@ fun LineSearchResultItem(
                 Column(modifier = Modifier.padding(start = 10.dp)) {
                     Text(
                         "${lineResult.category} ${lineResult.lineName}",
-                        color = SecondaryColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         fontWeight = FontWeight.Bold
@@ -69,7 +68,7 @@ fun LineSearchResultItem(
                 }
             }
         },
-        colors = ListItemDefaults.colors(containerColor = PrimaryColor),
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier
             .clickable(onClick = onClick)
             .fillMaxWidth()

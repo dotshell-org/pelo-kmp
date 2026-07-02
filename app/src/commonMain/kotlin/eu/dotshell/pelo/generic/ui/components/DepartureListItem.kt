@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.ui.theme.Gray700
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.generic.utils.schedule.DepartureManager
 import eu.dotshell.pelo.platform.DrawableProvider
@@ -75,7 +74,7 @@ fun DepartureListItem(
                 Text(
                     text = directionName,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = PrimaryColor,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1
                 )
                 Text(

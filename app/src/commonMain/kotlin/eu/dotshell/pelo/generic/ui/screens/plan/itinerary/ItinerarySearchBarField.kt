@@ -12,9 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import eu.dotshell.pelo.generic.data.models.itinerary.SelectedStop
+import androidx.compose.material3.MaterialTheme
 import eu.dotshell.pelo.generic.ui.theme.AccentColor
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -40,7 +39,7 @@ fun ItinerarySearchBarField(
                 placeholder = {
                     Text(
                         text = placeholder,
-                        color = SecondaryColor
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 },
                 leadingIcon = {
@@ -51,23 +50,23 @@ fun ItinerarySearchBarField(
                     )
                 },
                 colors = TextFieldDefaults.colors(
-                    focusedTextColor = SecondaryColor,
-                    unfocusedTextColor = SecondaryColor,
-                    cursorColor = SecondaryColor,
+                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                    cursorColor = MaterialTheme.colorScheme.onSurface,
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent,
                     disabledIndicatorColor = Color.Transparent,
-                    focusedContainerColor = PrimaryColor,
-                    unfocusedContainerColor = PrimaryColor,
-                    focusedPlaceholderColor = SecondaryColor.copy(alpha = 0.6f),
-                    unfocusedPlaceholderColor = SecondaryColor.copy(alpha = 0.6f)
+                    focusedContainerColor = MaterialTheme.colorScheme.surface,
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             )
         },
         expanded = false,
         onExpandedChange = { if (it) onClick() },
         colors = SearchBarDefaults.colors(
-            containerColor = PrimaryColor,
+            containerColor = MaterialTheme.colorScheme.surface,
             dividerColor = Color.Transparent
         )
     ) {}

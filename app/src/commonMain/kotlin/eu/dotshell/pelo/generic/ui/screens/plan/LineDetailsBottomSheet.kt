@@ -46,6 +46,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import eu.dotshell.pelo.generic.ui.theme.bottomSheetContainerColor
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
@@ -74,12 +75,9 @@ import eu.dotshell.pelo.generic.data.models.gtfs.LineStopInfo
 import eu.dotshell.pelo.generic.data.models.realtime.alerts.official.TrafficAlert
 import eu.dotshell.pelo.generic.data.telemetry.TelemetryEvent
 import eu.dotshell.pelo.generic.data.telemetry.emitTelemetryEvent
-import eu.dotshell.pelo.generic.ui.theme.Gray700
 import eu.dotshell.pelo.generic.ui.theme.Green500
 import eu.dotshell.pelo.generic.ui.theme.Orange500
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
 import eu.dotshell.pelo.generic.ui.theme.AccentColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportLinesUiState
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModelInterface
 import eu.dotshell.pelo.generic.utils.LineColorHelper
@@ -333,7 +331,7 @@ fun LineDetailsBottomSheet(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = strings["back_to_station"],
-                            tint = Gray700
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                     Spacer(modifier = Modifier.width(8.dp))
@@ -373,7 +371,8 @@ fun LineDetailsBottomSheet(
                                         text = lineInfo.lineName,
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
-                                        color = SecondaryColor
+                                        // Contrast on the fixed line-color badge — not theme-driven.
+                                        color = Color.White
                                     )
                                 }
                             }
@@ -392,7 +391,7 @@ fun LineDetailsBottomSheet(
                             text = lineInfo.currentStationName,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            color = PrimaryColor,
+                            color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1f),
                             onTextLayout = { result ->
                                 onHeaderLineCountChanged(result.lineCount)
@@ -459,7 +458,7 @@ fun LineDetailsBottomSheet(
                             ) {
                                 Text(
                                     text = strings["no_stops_for_line"],
-                                    color = Gray700
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -491,7 +490,8 @@ fun LineDetailsBottomSheet(
             ModalBottomSheet(
                 onDismissRequest = onDismiss,
                 sheetState = sheetState,
-                containerColor = SecondaryColor
+                containerColor = bottomSheetContainerColor(),
+                contentColor = MaterialTheme.colorScheme.onSurface
             ) {
                 content()
             }
@@ -518,7 +518,7 @@ private fun TrafficAlertsSection(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color(0xFFF5F5F5))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
             .padding(horizontal = 24.dp, vertical = 16.dp)
     ) {
         // Show staleness indicator when offline
@@ -528,7 +528,7 @@ private fun TrafficAlertsSection(
             }
             Text(
                 text = strings["last_update"].replace("%s", agoText),
-                color = Color.Gray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 fontSize = 12.sp,
                 fontStyle = FontStyle.Italic,
                 modifier = Modifier.padding(bottom = 8.dp)
@@ -585,14 +585,14 @@ private fun TrafficAlertsSection(
                         text = alert.title,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold,
-                        color = PrimaryColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f)
                     )
 
                     Icon(
                         imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                         contentDescription = if (isExpanded) "Réduire" else "Développer",
-                        tint = Color.Gray,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -603,7 +603,7 @@ private fun TrafficAlertsSection(
                     Text(
                         text = alert.message,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.DarkGray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -619,7 +619,7 @@ private fun TrafficAlertsSection(
                             .replace("%1\$s", formatDate(alert.startDate))
                             .replace("%2\$s", formatDate(alert.endDate)),
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color.Gray,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontStyle = FontStyle.Italic
                     )
                 }
@@ -627,7 +627,7 @@ private fun TrafficAlertsSection(
 
             if (index < alerts.size - 1) {
                 HorizontalDivider(
-                    color = Color.LightGray,
+                    color = MaterialTheme.colorScheme.outlineVariant,
                     thickness = 1.dp,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -688,7 +688,7 @@ private fun AlertBadge(
             // Use a text-based "i" to avoid the double circle from Icons.Default.Info
             Text(
                 text = "i",
-                color = SecondaryColor,
+                color = Color.White,
                 style = MaterialTheme.typography.bodySmall.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 8.sp,
@@ -701,7 +701,7 @@ private fun AlertBadge(
             Icon(
                 imageVector = Icons.Filled.PriorityHigh,
                 contentDescription = null,
-                tint = SecondaryColor,
+                tint = Color.White,
                 modifier = Modifier.size(10.dp)
             )
         }
@@ -788,7 +788,7 @@ private fun NextSchedulesSection(
                 text = strings["direction"],
                 textAlign = TextAlign.Left,
                 fontSize = 22.sp,
-                color = PrimaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -806,8 +806,8 @@ private fun NextSchedulesSection(
                     Button(
                         onClick = { onDirectionChange(directionId) },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (selectedDirection == directionId) lineColor else Color.LightGray,
-                            contentColor = if (selectedDirection == directionId) SecondaryColor else Color.DarkGray
+                            containerColor = if (selectedDirection == directionId) lineColor else MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = if (selectedDirection == directionId) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                         ),
                         contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
                         modifier = Modifier
@@ -826,7 +826,7 @@ private fun NextSchedulesSection(
             Text(
                 text = strings["no_schedule_at_stop"],
                 textAlign = TextAlign.Left,
-                color = Color.DarkGray,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(start = 12.dp, bottom = 16.dp)
@@ -838,7 +838,7 @@ private fun NextSchedulesSection(
                 text = strings["next_departures"],
                 textAlign = TextAlign.Left,
                 fontSize = 22.sp,
-                color = PrimaryColor,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -886,7 +886,7 @@ private fun NextSchedulesSection(
                 Icon(
                     imageVector = Icons.Default.ChevronRight,
                     contentDescription = strings["see_all"],
-                    tint = Gray700
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -939,7 +939,7 @@ private fun StopItemWithLine(
                 modifier = Modifier
                     .size(16.dp)
                     .clip(CircleShape)
-                    .background(if (stop.isCurrentStop) lineColor else SecondaryColor)
+                    .background(if (stop.isCurrentStop) lineColor else bottomSheetContainerColor())
                     .border(
                         width = if (stop.isCurrentStop) 0.dp else 3.dp,
                         color = lineColor,
@@ -968,7 +968,7 @@ private fun StopItemWithLine(
             Text(
                 text = stop.stopName,
                 style = MaterialTheme.typography.bodyLarge,
-                color = if (stop.isCurrentStop) lineColor else PrimaryColor,
+                color = if (stop.isCurrentStop) lineColor else MaterialTheme.colorScheme.onSurface,
                 fontWeight = if (stop.isCurrentStop) FontWeight.Bold else FontWeight.Normal,
                 modifier = Modifier.weight(1f, fill = false)
             )

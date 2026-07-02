@@ -18,8 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.data.models.search.StationSearchResult
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import androidx.compose.material3.MaterialTheme
 
 @Composable
 fun StopSearchPickerListItem(
@@ -32,7 +31,7 @@ fun StopSearchPickerListItem(
                 Spacer(modifier = Modifier.size(6.dp))
                 Text(
                     result.stopName,
-                    color = SecondaryColor,
+                    color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     fontWeight = FontWeight.Bold
@@ -51,7 +50,7 @@ fun StopSearchPickerListItem(
                 Spacer(modifier = Modifier.size(4.dp))
             }
         },
-        colors = ListItemDefaults.colors(containerColor = PrimaryColor),
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier
             .clickable(onClick = onClick)
             .fillMaxWidth()

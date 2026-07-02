@@ -31,8 +31,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.dotshell.pelo.generic.data.config.AboutData
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import androidx.compose.material3.MaterialTheme
 import eu.dotshell.pelo.generic.ui.theme.TransportThemeProvider
 
 class GenericAboutScreen(private val data: AboutData) : AboutScreenContract {
@@ -52,7 +51,7 @@ class GenericAboutScreen(private val data: AboutData) : AboutScreenContract {
     ) {
         Scaffold(
             topBar = { AboutTopBar(screenTitle, onBackClick) },
-            containerColor = PrimaryColor
+            containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
             Column(
                 modifier = Modifier
@@ -76,12 +75,12 @@ class GenericAboutScreen(private val data: AboutData) : AboutScreenContract {
                 .fillMaxSize(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = text, color = SecondaryColor, fontSize = 18.sp)
+            Text(text = text, color = MaterialTheme.colorScheme.onSurface, fontSize = 18.sp)
             Spacer(modifier = Modifier.weight(1f))
             Icon(
                 Icons.AutoMirrored.Filled.OpenInNew,
                 data.labels.openContentDescription,
-                tint = SecondaryColor
+                tint = MaterialTheme.colorScheme.onSurface
             )
         }
     }
@@ -97,7 +96,7 @@ class GenericAboutScreen(private val data: AboutData) : AboutScreenContract {
 
         Scaffold(
             topBar = { AboutTopBar(data.labels.creditsTitle, onBackClick) },
-            containerColor = PrimaryColor
+            containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
             val uriHandler = LocalUriHandler.current
 
@@ -111,7 +110,7 @@ class GenericAboutScreen(private val data: AboutData) : AboutScreenContract {
                 sections.forEach { section ->
                     Text(
                         text = section.title,
-                        color = SecondaryColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -119,7 +118,7 @@ class GenericAboutScreen(private val data: AboutData) : AboutScreenContract {
 
                     Text(
                         text = section.content,
-                        color = SecondaryColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 14.sp,
                         lineHeight = 20.sp,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -162,7 +161,7 @@ class GenericAboutScreen(private val data: AboutData) : AboutScreenContract {
 
         Scaffold(
             topBar = { AboutTopBar(data.labels.legalTitle, onBackClick) },
-            containerColor = PrimaryColor
+            containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
             Column(
                 modifier = Modifier
@@ -174,7 +173,7 @@ class GenericAboutScreen(private val data: AboutData) : AboutScreenContract {
                 sections.forEach { section ->
                     Text(
                         text = section.title,
-                        color = SecondaryColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(bottom = 6.dp)
@@ -182,7 +181,7 @@ class GenericAboutScreen(private val data: AboutData) : AboutScreenContract {
 
                     Text(
                         text = section.content,
-                        color = SecondaryColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 14.sp,
                         lineHeight = 20.sp,
                         modifier = Modifier.padding(bottom = 16.dp)
@@ -200,7 +199,7 @@ class GenericAboutScreen(private val data: AboutData) : AboutScreenContract {
 
         Scaffold(
             topBar = { AboutTopBar(data.labels.contactTitle, onBackClick) },
-            containerColor = PrimaryColor
+            containerColor = MaterialTheme.colorScheme.background
         ) { paddingValues ->
             Column(
                 modifier = Modifier
@@ -219,7 +218,7 @@ class GenericAboutScreen(private val data: AboutData) : AboutScreenContract {
                 if (contactInfo.socialMedia.isNotEmpty()) {
                     Text(
                         text = data.labels.socialMediaSectionTitle,
-                        color = SecondaryColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
@@ -240,7 +239,7 @@ class GenericAboutScreen(private val data: AboutData) : AboutScreenContract {
             title = {
                 Text(
                     text = title,
-                    color = SecondaryColor,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Bold
                 )
             },
@@ -249,11 +248,11 @@ class GenericAboutScreen(private val data: AboutData) : AboutScreenContract {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         data.labels.backContentDescription,
-                        tint = SecondaryColor
+                        tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
             },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = PrimaryColor)
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background)
         )
     }
 
@@ -263,7 +262,7 @@ class GenericAboutScreen(private val data: AboutData) : AboutScreenContract {
         val color = linkColor
 
         Column(modifier = Modifier.padding(vertical = 8.dp)) {
-            Text(text = label, color = SecondaryColor, fontSize = 14.sp)
+            Text(text = label, color = MaterialTheme.colorScheme.onSurface, fontSize = 14.sp)
             Row(
                 modifier = Modifier
                     .clickable { uriHandler.openUri(url) }

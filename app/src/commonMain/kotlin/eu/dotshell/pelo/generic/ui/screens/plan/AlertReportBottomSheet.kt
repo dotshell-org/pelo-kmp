@@ -39,6 +39,8 @@ import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import eu.dotshell.pelo.generic.ui.theme.bottomSheetContainerColor
+import eu.dotshell.pelo.generic.ui.theme.searchFieldContainerColor
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -69,7 +71,6 @@ import eu.dotshell.pelo.generic.ui.theme.Red700
 import eu.dotshell.pelo.generic.ui.theme.Red800
 import eu.dotshell.pelo.generic.ui.theme.Red900
 import eu.dotshell.pelo.generic.ui.theme.Red950
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModelInterface
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.generic.utils.LineColorHelper
@@ -118,7 +119,8 @@ fun AlertReportBottomSheet(
     
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = Color.White,
+        containerColor = bottomSheetContainerColor(),
+        contentColor = MaterialTheme.colorScheme.onSurface,
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Column(
@@ -132,14 +134,14 @@ fun AlertReportBottomSheet(
                 Text(
                     text = strings["alert_report_title"],
                     style = MaterialTheme.typography.headlineSmall,
-                    color = Color.Black,
+                    color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Normal,
                     modifier = Modifier.padding(bottom = 16.dp, start = 8.dp)
                 )
 
                 Text(
                     text = strings["alert_report_search_hint"],
-                    color = Color.Black,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 16.dp, start = 8.dp)
                 )
 
@@ -148,7 +150,7 @@ fun AlertReportBottomSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(CircleShape)
-                        .background(Color.Black)
+                        .background(searchFieldContainerColor())
                         .clickable {
                             Log.i("AlertReportBS", "Opening search. Query reset.")
                             searchQuery = "" // Reset query when opening
@@ -160,14 +162,14 @@ fun AlertReportBottomSheet(
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = null,
-                        tint = Color.Red,
+                        tint = MaterialTheme.colorScheme.error,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = strings["search"],
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
@@ -177,7 +179,7 @@ fun AlertReportBottomSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(CircleShape)
-                        .background(Color(0xFFE5E7EB))
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
                         .clickable(enabled = nearestStopCandidate != null) {
                             nearestStopCandidate?.let {
                                 selectedStop = it
@@ -190,14 +192,14 @@ fun AlertReportBottomSheet(
                     Icon(
                         imageVector = Icons.Default.MyLocation,
                         contentDescription = null,
-                        tint = Color.Black,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
                         modifier = Modifier.size(22.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = strings["nearest_stop"],
                         style = MaterialTheme.typography.bodyMedium,
-                        color = Color.Black,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -212,7 +214,7 @@ fun AlertReportBottomSheet(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = strings["back"],
-                        tint = Color.Black,
+                        tint = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier
                             .size(24.dp)
                             .clickable {
@@ -252,7 +254,8 @@ fun AlertReportBottomSheet(
                             ) {
                                 Text(
                                     text = lineName.ifBlank { "?" }.take(3),
-                                    color = SecondaryColor,
+                                    // Contrast on the fixed line-color badge — not theme-driven.
+                                    color = Color.White,
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
@@ -262,7 +265,7 @@ fun AlertReportBottomSheet(
                         Text(
                             text = selectedStopLocal.stopName,
                             style = MaterialTheme.typography.headlineSmall,
-                            color = Color.Black,
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -385,7 +388,7 @@ fun AlertReportBottomSheet(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.primary)
+                    .background(MaterialTheme.colorScheme.background)
             ) {
                 TransportSearchBar(
                     onSearchStops = { query -> viewModel.searchStops(query) },
@@ -467,7 +470,7 @@ fun AlertButton(
         Text(
             text = localizedLabel,
             style = MaterialTheme.typography.bodySmall,
-            color = Color.Black,
+            color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
             softWrap = false,
             overflow = TextOverflow.Visible
