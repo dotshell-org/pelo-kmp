@@ -27,6 +27,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import eu.dotshell.pelo.generic.ui.theme.bottomSheetContainerColor
+import eu.dotshell.pelo.generic.ui.theme.searchFieldContainerColor
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -120,7 +122,8 @@ fun AddFavoriteDialog(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface
+        containerColor = bottomSheetContainerColor(),
+        contentColor = MaterialTheme.colorScheme.onSurface
     ) {
         Column(
             modifier = Modifier
@@ -229,7 +232,7 @@ fun AddFavoriteDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(28.dp))
-                    .background(MaterialTheme.colorScheme.primary)
+                    .background(searchFieldContainerColor())
                     .clickable { showStopSearchFullscreen = true }
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -237,14 +240,14 @@ fun AddFavoriteDialog(
                 Icon(
                     imageVector = Icons.Default.Search,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onPrimary,
+                    tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = selectedStop?.stopName ?: strings["search_stop_placeholder"],
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimary
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
 

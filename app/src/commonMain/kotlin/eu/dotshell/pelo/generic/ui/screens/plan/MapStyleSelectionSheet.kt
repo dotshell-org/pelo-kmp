@@ -25,9 +25,12 @@ import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.data.network.mapstyle.MapStyleData
+import eu.dotshell.pelo.generic.ui.theme.bottomSheetContainerColor
+import eu.dotshell.pelo.generic.ui.theme.isAppInDarkTheme
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
 import eu.dotshell.pelo.platform.provideMapStyleConfig
+import eu.dotshell.pelo.generic.utils.map.MapStyleUtils
 import eu.dotshell.pelo.generic.utils.map.MapStyleUtils.mapStyleLabel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -41,13 +44,25 @@ fun MapStyleSelectionSheet(
 ) {
     val strings = StringProvider(LocalPlatformContext.current)
     val mapStyleConfig = provideMapStyleConfig()
+    val darkTheme = isAppInDarkTheme()
     val standardStyles = remember { mapStyleConfig.getStandardMapStyles() }
     val satelliteStyle = remember { mapStyleConfig.getSatelliteMapStyle() }
-    val allStyles = remember { standardStyles + satelliteStyle }
+    // The light/dark basemaps are merged into a single "Standard" tile that follows the app theme.
+    val allStyles = remember(darkTheme, standardStyles, satelliteStyle) {
+        val adaptiveStandard = MapStyleUtils.resolveForTheme(
+            standardStyles.first { MapStyleUtils.isAdaptiveStandardKey(it.key) },
+            darkTheme,
+            mapStyleConfig
+        )
+        listOf(adaptiveStandard) +
+            standardStyles.filterNot { MapStyleUtils.isAdaptiveStandardKey(it.key) } +
+            satelliteStyle
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = bottomSheetContainerColor(),
+        contentColor = MaterialTheme.colorScheme.onSurface,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ) {
         Column(
@@ -68,7 +83,11 @@ fun MapStyleSelectionSheet(
             ) {
                 allStyles.forEach { style ->
                     val enabled = !isOffline || style.key in downloadedMapStyles
-                    val isSelected = style.key == selectedMapStyle.key
+                    val isSelected = if (MapStyleUtils.isAdaptiveStandardKey(style.key)) {
+                        MapStyleUtils.isAdaptiveStandardKey(selectedMapStyle.key)
+                    } else {
+                        style.key == selectedMapStyle.key
+                    }
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,

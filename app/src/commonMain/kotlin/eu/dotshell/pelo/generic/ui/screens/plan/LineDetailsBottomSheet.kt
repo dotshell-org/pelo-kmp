@@ -46,6 +46,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import eu.dotshell.pelo.generic.ui.theme.bottomSheetContainerColor
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
@@ -489,7 +490,8 @@ fun LineDetailsBottomSheet(
             ModalBottomSheet(
                 onDismissRequest = onDismiss,
                 sheetState = sheetState,
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = bottomSheetContainerColor(),
+                contentColor = MaterialTheme.colorScheme.onSurface
             ) {
                 content()
             }
@@ -937,7 +939,7 @@ private fun StopItemWithLine(
                 modifier = Modifier
                     .size(16.dp)
                     .clip(CircleShape)
-                    .background(if (stop.isCurrentStop) lineColor else MaterialTheme.colorScheme.surface)
+                    .background(if (stop.isCurrentStop) lineColor else bottomSheetContainerColor())
                     .border(
                         width = if (stop.isCurrentStop) 0.dp else 3.dp,
                         color = lineColor,

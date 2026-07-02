@@ -117,6 +117,7 @@
     <string name="date_time_at">%1$s à %2$s</string>
     <string name="theme_light">Clair</string>
     <string name="theme_dark">Sombre</string>
+    <string name="map_style_standard">Standard</string>
     <string name="special_fare_lines">Lignes à tarification spéciale</string>
     <string name="school_lines">Lignes scolaires</string>
     <string name="alert_type_closure">Arrêt Fermé</string>

@@ -22,6 +22,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import eu.dotshell.pelo.generic.ui.theme.bottomSheetContainerColor
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.SheetState
@@ -300,7 +301,8 @@ fun StationBottomSheet(
             ModalBottomSheet(
                 onDismissRequest = onDismiss,
                 sheetState = sheetState,
-                containerColor = MaterialTheme.colorScheme.surface
+                containerColor = bottomSheetContainerColor(),
+                contentColor = MaterialTheme.colorScheme.onSurface
             ) {
                 content()
             }

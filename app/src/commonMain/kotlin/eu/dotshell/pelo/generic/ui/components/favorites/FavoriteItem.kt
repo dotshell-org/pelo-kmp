@@ -1,7 +1,6 @@
 package eu.dotshell.pelo.generic.ui.components.favorites
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,6 +21,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.data.models.stops.Favorite
 import androidx.compose.material3.MaterialTheme
+import eu.dotshell.pelo.generic.ui.theme.floatingControlBorder
 
 /**
  * Individual favorite item in the favorites bar
@@ -31,23 +31,16 @@ fun FavoriteItem(
     favorite: Favorite,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
-    textStyle: TextStyle,
-    isDarkMode: Boolean = false
+    textStyle: TextStyle
 ) {
     val icon = favoriteIcon(favorite.iconName)
 
     Row(
         modifier = Modifier
-            .shadow(4.dp, RoundedCornerShape(20.dp))
+            .shadow(2.dp, RoundedCornerShape(20.dp))
             .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surface)
-            .then(
-                if (isDarkMode) Modifier.border(
-                    1.dp,
-                    MaterialTheme.colorScheme.outlineVariant,
-                    RoundedCornerShape(20.dp)
-                ) else Modifier
-            )
+            .floatingControlBorder(RoundedCornerShape(20.dp))
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick

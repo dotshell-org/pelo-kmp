@@ -101,6 +101,7 @@ import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.ItineraryPre
 import eu.dotshell.pelo.generic.data.repository.offline.mapstyle.MapStyleRepository
 import eu.dotshell.pelo.generic.service.TransportServiceProvider
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
+import eu.dotshell.pelo.generic.utils.map.MapStyleUtils
 import eu.dotshell.pelo.generic.utils.map.toVehiclesGeoJson
 import eu.dotshell.pelo.generic.utils.map.toItinerariesGeoJson
 import eu.dotshell.pelo.generic.utils.map.calculateJourneyTrace
@@ -137,6 +138,9 @@ import eu.dotshell.pelo.generic.ui.screens.settings.about.CreditsScreen
 import eu.dotshell.pelo.generic.ui.screens.settings.about.LegalScreen
 
 import eu.dotshell.pelo.generic.ui.theme.AccentColor
+import eu.dotshell.pelo.generic.ui.theme.bottomSheetContainerColor
+import eu.dotshell.pelo.generic.ui.theme.floatingControlBorder
+import eu.dotshell.pelo.generic.ui.theme.isAppInDarkTheme
 import eu.dotshell.pelo.generic.ui.theme.PeloAppTheme
 import eu.dotshell.pelo.generic.ui.theme.PeloTheme
 import eu.dotshell.pelo.generic.ui.theme.ThemeController
@@ -148,6 +152,7 @@ import eu.dotshell.pelo.generic.ui.viewmodel.TransportStopsUiState
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModel
 import eu.dotshell.pelo.generic.ui.viewmodel.findStopByCoordinates
 import eu.dotshell.pelo.generic.utils.location.GeoPoint
+import eu.dotshell.pelo.generic.utils.location.LocationPermissionSignal
 import eu.dotshell.pelo.generic.utils.location.LocationProvider
 import eu.dotshell.pelo.generic.service.NavigationModeController
 import eu.dotshell.pelo.generic.service.NavigationModeUiState
@@ -167,7 +172,10 @@ import kotlinx.coroutines.withContext
 import org.maplibre.spatialk.geojson.Position
 
 @Composable
-fun App(onNavigationModeChanged: (Boolean) -> Unit = {}) {
+fun App(
+    onNavigationModeChanged: (Boolean) -> Unit = {},
+    onConsentAccepted: () -> Unit = {},
+) {
     val context = LocalPlatformContext.current
     var viewModel by remember { mutableStateOf<TransportViewModel?>(null) }
     var isInitializing by remember { mutableStateOf(true) }
@@ -218,7 +226,7 @@ fun App(onNavigationModeChanged: (Boolean) -> Unit = {}) {
         )
     ) {
         PeloTheme(darkTheme = darkTheme) {
-            TermsConsentGate {
+            TermsConsentGate(onConsentSatisfied = onConsentAccepted) {
                 TelemetryOptInGate {
                     Box(Modifier.fillMaxSize()) {
                         val vm = viewModel
@@ -300,14 +308,19 @@ private fun RootScaffold(
     )
     val navigationController = remember(context) { NavigationModeController(context) }
     val navigationState by navigationController.uiState.collectAsState()
-    DisposableEffect(locationProvider, navigationController) {
+    DisposableEffect(navigationController) {
+        onDispose { navigationController.dispose() }
+    }
+    // Re-subscribe to location whenever the permission is (re)granted — e.g. right after the user
+    // accepts the runtime prompt — so a fix is picked up without restarting the app.
+    val locationPermissionGranted by LocationPermissionSignal.granted.collectAsState()
+    DisposableEffect(locationProvider, locationPermissionGranted) {
         locationProvider.startUpdates { p ->
             userLocation = Position(latitude = p.latitude, longitude = p.longitude)
             navigationController.onLocationFix(GeoPoint(latitude = p.latitude, longitude = p.longitude))
         }
         onDispose {
             locationProvider.stopUpdates()
-            navigationController.dispose()
         }
     }
 
@@ -832,7 +845,9 @@ private fun RootScaffold(
                             label = { Text(tabStrings[destination.labelKey]) },
                             colors = NavigationBarItemDefaults.colors(
                                 indicatorColor = AccentColor,
-                                selectedIconColor = MaterialTheme.colorScheme.onSurface,
+                                // The selected icon sits on the red indicator, so it stays white in
+                                // both themes; the label sits on the navbar surface, so it follows it.
+                                selectedIconColor = Color.White,
                                 unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                 selectedTextColor = MaterialTheme.colorScheme.onSurface,
                                 unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -874,6 +889,7 @@ private fun RootScaffold(
                         .size(36.dp)
                         .shadow(4.dp, CircleShape)
                         .background(MaterialTheme.colorScheme.surface, CircleShape)
+                        .floatingControlBorder(CircleShape)
                         .clickable {
                             val tmp = itineraryDeparture; itineraryDeparture = itineraryArrival; itineraryArrival = tmp
                         },
@@ -916,7 +932,8 @@ private fun RootScaffold(
             val allLines = remember(linesUiState, stopsUiState) { viewModel.getAllAvailableLines() }
             ModalBottomSheet(
                 onDismissRequest = { showLinesSheet = false },
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = bottomSheetContainerColor(),
+                contentColor = MaterialTheme.colorScheme.onSurface,
                 sheetState = linesSheetState,
             ) {
                 LinesBottomSheet(
@@ -1070,8 +1087,11 @@ private fun PlanContent(
     var searchHistory by remember { mutableStateOf(searchHistoryRepo.getSearchHistory()) }
     val linesState by viewModel.uiState.collectAsState()
     val lineRules = remember { TransportServiceProvider.getTransportLineRules() }
-    val mapStyleRepo = remember { MapStyleRepository(context, TransportServiceProvider.getMapStyleConfig()) }
+    val mapStyleConfig = remember { TransportServiceProvider.getMapStyleConfig() }
+    val mapStyleRepo = remember { MapStyleRepository(context, mapStyleConfig) }
     var selectedMapStyle by remember { mutableStateOf(mapStyleRepo.getSelectedStyle()) }
+    // The merged "Standard" basemap resolves to positron (light) or dark_matter (dark) from the app theme.
+    val effectiveMapStyle = MapStyleUtils.resolveForTheme(selectedMapStyle, isAppInDarkTheme(), mapStyleConfig)
     var showStyleSheet by remember { mutableStateOf(false) }
     var searchExpanded by remember { mutableStateOf(false) }
 
@@ -1108,6 +1128,8 @@ private fun PlanContent(
             modifier = Modifier.fillMaxSize(),
             scaffoldState = bsScaffoldState,
             sheetPeekHeight = sheetPeekHeight,
+            sheetContainerColor = bottomSheetContainerColor(),
+            sheetContentColor = MaterialTheme.colorScheme.onSurface,
             sheetContent = {
                 sheetContent()
             }
@@ -1116,7 +1138,7 @@ private fun PlanContent(
                 Log.i("PeloApp", "PlanContent: before MapCanvas")
                 MapCanvas(
                     modifier = Modifier.fillMaxSize(),
-                    styleUrl = selectedMapStyle.styleUrl,
+                    styleUrl = effectiveMapStyle.styleUrl,
                     initialLatitude = 45.75,
                     initialLongitude = 4.85,
                     initialZoom = 12.0,
@@ -1152,6 +1174,7 @@ private fun PlanContent(
                                 modifier = Modifier
                                     .size(48.dp)
                                     .background(MaterialTheme.colorScheme.surface, CircleShape)
+                                    .floatingControlBorder(CircleShape)
                                     .clickable {
                                         scope.launch {
                                             cameraState.animateTo(
@@ -1222,7 +1245,9 @@ private fun PlanContent(
                         Box(
                             modifier = Modifier
                                 .size(56.dp)
-                                .background(Color.Black, CircleShape)
+                                .shadow(4.dp, CircleShape)
+                                .background(MaterialTheme.colorScheme.surface, CircleShape)
+                                .floatingControlBorder(CircleShape)
                                 .clickable { onFabClick(isAtCenteringTarget) },
                             contentAlignment = Alignment.Center
                         ) {
@@ -1234,6 +1259,9 @@ private fun PlanContent(
                                     modifier = Modifier.size(30.dp)
                                 )
                             } else {
+                                // Ring on the dark FAB is white; on the white FAB it matches the blue
+                                // dot (so the marker reads as a solid blue dot rather than white-on-white).
+                                val locationRingColor = if (isAppInDarkTheme()) Color.White else Color(0xFF3B82F6)
                                 Canvas(modifier = Modifier.size(18.dp)) {
                                     val radius = size.minDimension / 2f
                                     drawCircle(
@@ -1241,7 +1269,7 @@ private fun PlanContent(
                                         radius = radius
                                     )
                                     drawCircle(
-                                        color = Color.White,
+                                        color = locationRingColor,
                                         radius = radius,
                                         style = Stroke(width = 3.dp.toPx())
                                     )
@@ -1323,6 +1351,7 @@ private fun PlanContent(
                                     .shadow(2.dp, RoundedCornerShape(20.dp))
                                     .clip(RoundedCornerShape(20.dp))
                                     .background(MaterialTheme.colorScheme.surface)
+                                    .floatingControlBorder(RoundedCornerShape(20.dp))
                                     .clickable { showStyleSheet = true }
                                     .height(40.dp)
                                     .padding(horizontal = 16.dp),
@@ -1342,6 +1371,7 @@ private fun PlanContent(
                                         .shadow(2.dp, RoundedCornerShape(20.dp))
                                         .clip(RoundedCornerShape(20.dp))
                                         .background(buttonColor)
+                                        .floatingControlBorder(RoundedCornerShape(20.dp))
                                         .clickable {
                                             if (isLiveModeEnabled) {
                                                 if (isLiveTrackingEnabled) viewModel.stopLiveTracking()

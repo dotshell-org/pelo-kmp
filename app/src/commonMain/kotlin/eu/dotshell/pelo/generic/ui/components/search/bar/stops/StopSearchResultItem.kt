@@ -27,7 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.data.models.search.StationSearchResult
 import androidx.compose.material3.MaterialTheme
-import eu.dotshell.pelo.generic.ui.theme.Stone900
+
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
 import eu.dotshell.pelo.platform.provideTransportLineRules
@@ -82,7 +82,7 @@ fun StopSearchResultItem(
                 modifier = Modifier
                     .size(34.dp)
                     .clip(CircleShape)
-                    .background(Stone900)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
                     .clickable(onClick = onClick)
             ) {
                 Icon(

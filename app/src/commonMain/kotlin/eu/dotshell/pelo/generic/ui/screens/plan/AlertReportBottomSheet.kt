@@ -39,6 +39,8 @@ import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import eu.dotshell.pelo.generic.ui.theme.bottomSheetContainerColor
+import eu.dotshell.pelo.generic.ui.theme.searchFieldContainerColor
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -117,7 +119,8 @@ fun AlertReportBottomSheet(
     
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surface,
+        containerColor = bottomSheetContainerColor(),
+        contentColor = MaterialTheme.colorScheme.onSurface,
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Column(
@@ -147,7 +150,7 @@ fun AlertReportBottomSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
+                        .background(searchFieldContainerColor())
                         .clickable {
                             Log.i("AlertReportBS", "Opening search. Query reset.")
                             searchQuery = "" // Reset query when opening
@@ -166,7 +169,7 @@ fun AlertReportBottomSheet(
                     Text(
                         text = strings["search"],
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimary
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 

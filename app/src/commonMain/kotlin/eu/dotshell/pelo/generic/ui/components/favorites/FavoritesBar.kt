@@ -48,7 +48,6 @@ import androidx.compose.material3.MaterialTheme
  * @param favorites List of user favorites to display
  * @param onFavoriteClick Callback when a favorite is clicked
  * @param modifier Modifier for the component
- * @param isDarkMode Whether dark map theme is enabled (should use map theme, not system theme)
  */
 @Composable
 fun FavoritesBar(
@@ -56,13 +55,12 @@ fun FavoritesBar(
     onAddFavoriteClick: () -> Unit,
     onFavoriteClick: (Favorite) -> Unit,
     onRemoveFavoriteClick: (Favorite) -> Unit,
-    modifier: Modifier = Modifier,
-    isDarkMode: Boolean = false
+    modifier: Modifier = Modifier
 ) {
     var favoriteToDelete by remember { mutableStateOf<Favorite?>(null) }
     val chipTextStyle = TextStyle(
         fontSize = 14.sp,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.Medium,
         color = MaterialTheme.colorScheme.onSurface
     )
 
@@ -106,15 +104,13 @@ fun FavoritesBar(
                         favorite = favorite,
                         onClick = { onFavoriteClick(favorite) },
                         onLongClick = { favoriteToDelete = favorite },
-                        textStyle = chipTextStyle,
-                        isDarkMode = isDarkMode
+                        textStyle = chipTextStyle
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                 }
                 AddFavoriteItem(
                     onClick = onAddFavoriteClick,
-                    textStyle = chipTextStyle,
-                    isDarkMode = isDarkMode
+                    textStyle = chipTextStyle
                 )
             }
         } else {
@@ -134,15 +130,13 @@ fun FavoritesBar(
                         favorite = favorite,
                         onClick = { onFavoriteClick(favorite) },
                         onLongClick = { favoriteToDelete = favorite },
-                        textStyle = chipTextStyle,
-                        isDarkMode = isDarkMode
+                        textStyle = chipTextStyle
                     )
                 }
                 item {
                     AddFavoriteItem(
                         onClick = onAddFavoriteClick,
-                        textStyle = chipTextStyle,
-                        isDarkMode = isDarkMode
+                        textStyle = chipTextStyle
                     )
                 }
             }

@@ -292,3 +292,7 @@ val Rose950 = Color(0xFF4C0519)
 val PrimaryColor = Color.Black
 val SecondaryColor = Color.White
 val AccentColor = Red500
+
+// Neutral (non-bluish) dark gray used for bottom sheets in dark mode, so they read as a
+// distinct surface above the pure-black navbar and map rather than blending into them.
+val DarkSheetSurface = Color(0xFF181818)

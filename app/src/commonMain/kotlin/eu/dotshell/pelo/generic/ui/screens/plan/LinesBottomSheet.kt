@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PriorityHigh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import eu.dotshell.pelo.generic.ui.theme.bottomSheetContainerColor
 import eu.dotshell.pelo.generic.utils.search.SearchUtils
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -173,7 +174,7 @@ fun LinesBottomSheet(
         modifier = modifier
             .fillMaxWidth()
             .fillMaxHeight(0.9f)
-            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+            .background(bottomSheetContainerColor(), RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
             .padding(16.dp)
     ) {
         // List of lines by category

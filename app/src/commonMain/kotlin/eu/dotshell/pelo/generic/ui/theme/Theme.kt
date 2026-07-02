@@ -6,6 +6,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import eu.dotshell.pelo.generic.data.repository.offline.theme.ThemeMode
 
 val LightColorScheme = lightColorScheme(
     primary = Gray900,
@@ -53,15 +54,17 @@ val DarkColorScheme = darkColorScheme(
     onBackground = Color.White,
     surface = Color.Black,
     onSurface = Color.White,
-    surfaceVariant = Gray900,
-    onSurfaceVariant = Gray400,
+    // Neutral (non-bluish) grays for dark-mode surfaces/containers: the Gray* palette is
+    // blue-tinted, so buttons and cards (direction selector, settings) use Neutral* instead.
+    surfaceVariant = Neutral800,
+    onSurfaceVariant = Neutral400,
     surfaceContainerLowest = Color.Black,
-    surfaceContainerLow = Gray950,
-    surfaceContainer = Gray900,
-    surfaceContainerHigh = Gray800,
-    surfaceContainerHighest = Gray700,
-    outline = Gray800,
-    outlineVariant = Gray700,
+    surfaceContainerLow = Neutral950,
+    surfaceContainer = Neutral900,
+    surfaceContainerHigh = Neutral800,
+    surfaceContainerHighest = Neutral700,
+    outline = Neutral800,
+    outlineVariant = Neutral700,
     error = Red400,
     onError = Color.White,
     errorContainer = Red800,
@@ -82,3 +85,34 @@ fun PeloTheme(
         content = content
     )
 }
+
+/**
+ * The effective dark/light state of the app, derived from the user's [ThemeMode] selection
+ * exposed via [LocalThemeController]. Use this below the theme provider when a component needs
+ * to branch on light vs dark independently of the [MaterialTheme] color scheme.
+ */
+@Composable
+fun isAppInDarkTheme(): Boolean = when (LocalThemeController.current.themeMode) {
+    ThemeMode.AUTO -> isSystemInDarkTheme()
+    ThemeMode.LIGHT -> false
+    ThemeMode.DARK -> true
+}
+
+/**
+ * Container color for bottom sheets. In dark mode this is a neutral dark gray (not pure black,
+ * not bluish) so sheets stand out as a distinct surface above the black navbar and map; in light
+ * mode it is the standard light surface.
+ */
+@Composable
+fun bottomSheetContainerColor(): Color =
+    if (isAppInDarkTheme()) DarkSheetSurface else MaterialTheme.colorScheme.surface
+
+/**
+ * Container color for the inline "search field" chips shown inside sheets/dialogs. A neutral
+ * (non-bluish) filled-input tone that contrasts with the sheet in both themes and follows the app
+ * theme, instead of inverting the way [androidx.compose.material3.ColorScheme.primary] would
+ * (dark in light mode, light in dark mode).
+ */
+@Composable
+fun searchFieldContainerColor(): Color =
+    if (isAppInDarkTheme()) Color(0xFF2A2A2A) else Color(0xFFF3F4F6)

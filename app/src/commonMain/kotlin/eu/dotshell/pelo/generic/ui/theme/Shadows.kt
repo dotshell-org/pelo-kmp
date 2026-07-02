@@ -1,5 +1,6 @@
 package eu.dotshell.pelo.generic.ui.theme
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.runtime.Composable
@@ -17,7 +18,7 @@ import androidx.compose.ui.unit.dp
  */
 
 // Shadow elevation levels (in dp)
-val ShadowElevation = object {
+object ShadowElevation {
     val none: Dp = 0.dp
     val small: Dp = 2.dp
     val medium: Dp = 4.dp
@@ -25,17 +26,6 @@ val ShadowElevation = object {
     val xlarge: Dp = 12.dp
 }
 
-/**
- * Standard shadow alpha values based on elevation
- */
-private fun getShadowAlpha(elevation: Dp): Float {
-    return when {
-        elevation <= ShadowElevation.small -> 0.12f
-        elevation <= ShadowElevation.medium -> 0.16f
-        elevation <= ShadowElevation.large -> 0.20f
-        else -> 0.24f
-    }
-}
 
 /**
  * Standard button elevation modifier
@@ -44,8 +34,7 @@ private fun getShadowAlpha(elevation: Dp): Float {
 fun Modifier.buttonElevation(
     elevation: Dp = ShadowElevation.medium
 ): Modifier = this.graphicsLayer {
-    shadowElevation = elevation
-    shadowColor = Color.Black.copy(alpha = getShadowAlpha(elevation))
+    shadowElevation = elevation.value
     shape = RectangleShape
     clip = false
 }
@@ -57,8 +46,7 @@ fun Modifier.buttonElevation(
 fun Modifier.cardElevation(
     elevation: Dp = ShadowElevation.medium
 ): Modifier = this.graphicsLayer {
-    shadowElevation = elevation
-    shadowColor = Color.Black.copy(alpha = getShadowAlpha(elevation))
+    shadowElevation = elevation.value
     shape = RectangleShape
     clip = false
 }
@@ -68,8 +56,7 @@ fun Modifier.cardElevation(
  * Higher elevation for FABs
  */
 fun Modifier.fabElevation(): Modifier = this.graphicsLayer {
-    shadowElevation = ShadowElevation.xlarge
-    shadowColor = Color.Black.copy(alpha = getShadowAlpha(ShadowElevation.xlarge))
+    shadowElevation = ShadowElevation.xlarge.value
     shape = RectangleShape
     clip = false
 }
@@ -87,8 +74,7 @@ fun ElevatedSurface(
     Box(
         modifier = Modifier
             .graphicsLayer {
-                this.shadowElevation = elevation
-                this.shadowColor = Color.Black.copy(alpha = getShadowAlpha(elevation))
+                this.shadowElevation = elevation.value
                 this.shape = shape
                 this.clip = false
             }
@@ -101,11 +87,23 @@ fun ElevatedSurface(
  * Standard shadow for icons and small elements
  */
 fun Modifier.iconShadow(): Modifier = this.graphicsLayer {
-    shadowElevation = ShadowElevation.small
-    shadowColor = Color.Black.copy(alpha = getShadowAlpha(ShadowElevation.small))
+    shadowElevation = ShadowElevation.small.value
     shape = RectangleShape
     clip = false
 }
+
+/**
+ * Subtle outline for surface-colored floating controls (search bar, map buttons, favorite chips)
+ * so they stay legible against dark backgrounds. Draws a faint white border in dark mode; a no-op
+ * in light mode, where the drop shadow already separates the control from the map.
+ */
+@Composable
+fun Modifier.floatingControlBorder(shape: Shape): Modifier =
+    if (isAppInDarkTheme()) {
+        this.border(1.dp, Color.White.copy(alpha = 0.16f), shape)
+    } else {
+        this
+    }
 
 /**
  * Extension to add elevation to any modifier
@@ -113,8 +111,7 @@ fun Modifier.iconShadow(): Modifier = this.graphicsLayer {
 fun Modifier.withElevation(
     elevation: Dp
 ): Modifier = this.graphicsLayer {
-    shadowElevation = elevation
-    shadowColor = Color.Black.copy(alpha = getShadowAlpha(elevation))
+    shadowElevation = elevation.value
     shape = RectangleShape
     clip = false
 }

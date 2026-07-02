@@ -45,6 +45,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -70,6 +71,7 @@ import eu.dotshell.pelo.generic.ui.components.search.bar.stops.StopSearchPickerL
 import eu.dotshell.pelo.generic.ui.components.search.bar.stops.StopSearchResultItem
 import androidx.compose.material3.MaterialTheme
 import eu.dotshell.pelo.generic.ui.theme.AccentColor
+import eu.dotshell.pelo.generic.ui.theme.floatingControlBorder
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -244,7 +246,7 @@ fun SimpleSearchBar(
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = { submitFirstResult() }),
-                        placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurface) },
+                        placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium) },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Search,
@@ -268,13 +270,19 @@ fun SimpleSearchBar(
                     )
                 } else {
                     SearchBarDefaults.InputField(
-                        modifier = if (showDarkOutline) {
-                            Modifier
-                                .clip(RoundedCornerShape(28.dp))
-                                .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(28.dp))
-                        } else {
-                            Modifier
-                        },
+                        // Light border in dark mode so the dark search bar stays legible on the
+                        // dark map; the dark outline handles a dark map under the light theme.
+                        modifier = Modifier
+                            .floatingControlBorder(RoundedCornerShape(28.dp))
+                            .then(
+                                if (showDarkOutline) {
+                                    Modifier
+                                        .clip(RoundedCornerShape(28.dp))
+                                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(28.dp))
+                                } else {
+                                    Modifier
+                                }
+                            ),
                         query = queryText,
                         onQueryChange = { q -> setQueryText(q) },
                         onSearch = { submitFirstResult() },
@@ -284,7 +292,7 @@ fun SimpleSearchBar(
                                 setExpandedState(shouldExpand)
                             }
                         },
-                        placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurface) },
+                        placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium) },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Search,
@@ -316,7 +324,9 @@ fun SimpleSearchBar(
             colors = SearchBarDefaults.colors(
                 containerColor = MaterialTheme.colorScheme.surface,
                 dividerColor = Color.Transparent
-            )
+            ),
+            // Small drop shadow on the collapsed bar; none when expanded (it fills the screen).
+            shadowElevation = if (expanded) 0.dp else 2.dp
         ) {
             val lazyListState = rememberLazyListState()
 

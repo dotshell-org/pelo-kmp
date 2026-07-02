@@ -18,6 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material3.IconButtonColors
 
 /**
  * Unified button styles for the Pelo app
@@ -25,30 +27,33 @@ import androidx.compose.ui.unit.dp
  */
 
 // Standard button elevation
-val ButtonElevations = ButtonDefaults.buttonElevation(
-    defaultElevation = ShadowElevation.small.value,
-    pressedElevation = ShadowElevation.none.value,
-    focusedElevation = ShadowElevation.medium.value,
-    hoveredElevation = ShadowElevation.medium.value,
-    disabledElevation = ShadowElevation.none.value
+@Composable
+fun ButtonElevations() = ButtonDefaults.buttonElevation(
+    defaultElevation = ShadowElevation.small,
+    pressedElevation = ShadowElevation.none,
+    focusedElevation = ShadowElevation.medium,
+    hoveredElevation = ShadowElevation.medium,
+    disabledElevation = ShadowElevation.none
 )
 
 // Elevated button elevation (for primary actions)
-val ElevatedButtonElevations = ButtonDefaults.buttonElevation(
-    defaultElevation = ShadowElevation.medium.value,
-    pressedElevation = ShadowElevation.small.value,
-    focusedElevation = ShadowElevation.large.value,
-    hoveredElevation = ShadowElevation.large.value,
-    disabledElevation = ShadowElevation.none.value
+@Composable
+fun ElevatedButtonElevations() = ButtonDefaults.buttonElevation(
+    defaultElevation = ShadowElevation.medium,
+    pressedElevation = ShadowElevation.small,
+    focusedElevation = ShadowElevation.large,
+    hoveredElevation = ShadowElevation.large,
+    disabledElevation = ShadowElevation.none
 )
 
 // FAB elevation
-val FabElevations = ButtonDefaults.buttonElevation(
-    defaultElevation = ShadowElevation.xlarge.value,
-    pressedElevation = ShadowElevation.large.value,
-    focusedElevation = ShadowElevation.xlarge.value,
-    hoveredElevation = ShadowElevation.xlarge.value,
-    disabledElevation = ShadowElevation.none.value
+@Composable
+fun FabElevations() = ButtonDefaults.buttonElevation(
+    defaultElevation = ShadowElevation.xlarge,
+    pressedElevation = ShadowElevation.large,
+    focusedElevation = ShadowElevation.xlarge,
+    hoveredElevation = ShadowElevation.xlarge,
+    disabledElevation = ShadowElevation.none
 )
 
 /**
@@ -61,7 +66,7 @@ fun PeloFilledButton(
     enabled: Boolean = true,
     shape: Shape = MaterialTheme.shapes.medium,
     colors: ButtonColors = ButtonDefaults.buttonColors(),
-    elevation: ButtonElevation? = ButtonElevations,
+    elevation: ButtonElevation? = ButtonElevations(),
     border: BorderStroke? = null,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit
@@ -92,7 +97,7 @@ fun PeloElevatedButton(
         containerColor = MaterialTheme.colorScheme.primaryContainer,
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer
     ),
-    elevation: ButtonElevation? = ElevatedButtonElevations,
+    elevation: ButtonElevation? = ElevatedButtonElevations(),
     border: BorderStroke? = null,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit
@@ -120,7 +125,7 @@ fun PeloOutlinedButton(
     enabled: Boolean = true,
     shape: Shape = MaterialTheme.shapes.medium,
     colors: ButtonColors = ButtonDefaults.outlinedButtonColors(),
-    elevation: ButtonElevation? = ButtonElevations,
+    elevation: ButtonElevation? = ButtonElevations(),
     border: BorderStroke? = null,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit
@@ -192,7 +197,7 @@ fun PeloFilledTonalButton(
     enabled: Boolean = true,
     shape: Shape = MaterialTheme.shapes.medium,
     colors: ButtonColors = ButtonDefaults.filledTonalButtonColors(),
-    elevation: ButtonElevation? = ButtonElevations,
+    elevation: ButtonElevation? = ButtonElevations(),
     border: BorderStroke? = null,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     content: @Composable RowScope.() -> Unit

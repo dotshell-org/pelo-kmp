@@ -16,7 +16,7 @@ import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.RaptorReposi
 import eu.dotshell.pelo.generic.data.repository.offline.SchedulesRepository
 import eu.dotshell.pelo.generic.service.NavigationModeForegroundService
 import eu.dotshell.pelo.generic.service.NavigationModeStateStore
-import eu.dotshell.pelo.generic.ui.screens.onboarding.NotificationPermissionGate
+import eu.dotshell.pelo.generic.utils.location.LocationPermissionSignal
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -53,39 +53,27 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             CompositionLocalProvider(eu.dotshell.pelo.platform.LocalPlatformContext provides this@MainActivity) {
-                NotificationPermissionGate {
-                    App(
-                        onNavigationModeChanged = { active ->
-                            if (!hasAppliedFirstNavigationCallback) {
-                                hasAppliedFirstNavigationCallback = true
-                                // Ignore initial Compose state restoration mismatch when service is still active.
-                                if (isNavigationModeEnabled && !active) return@App
-                            }
-                            if (active == isNavigationModeEnabled) return@App
-                            isNavigationModeEnabled = active
-                            if (active) {
-                                startNavigationForegroundService()
-                            } else {
-                                stopNavigationForegroundService()
-                            }
-                            setNavigationLockScreenBehavior(active)
+                App(
+                    onNavigationModeChanged = { active ->
+                        if (!hasAppliedFirstNavigationCallback) {
+                            hasAppliedFirstNavigationCallback = true
+                            // Ignore initial Compose state restoration mismatch when service is still active.
+                            if (isNavigationModeEnabled && !active) return@App
                         }
-                    )
-                }
+                        if (active == isNavigationModeEnabled) return@App
+                        isNavigationModeEnabled = active
+                        if (active) {
+                            startNavigationForegroundService()
+                        } else {
+                            stopNavigationForegroundService()
+                        }
+                        setNavigationLockScreenBehavior(active)
+                    },
+                    // Ask for location only once the user has accepted the terms/privacy policy
+                    // (fires immediately on launch for a user who already accepted).
+                    onConsentAccepted = { requestLocationPermissionsIfNeeded() }
+                )
             }
-        }
-
-        // Request location permissions if they are not already granted
-        // Moved AFTER setContent to avoid blocking first frame
-        val locationPermissions = arrayOf(
-            android.Manifest.permission.ACCESS_FINE_LOCATION,
-            android.Manifest.permission.ACCESS_COARSE_LOCATION
-        )
-        val missingPermissions = locationPermissions.filter {
-            ContextCompat.checkSelfPermission(this, it) != android.content.pm.PackageManager.PERMISSION_GRANTED
-        }
-        if (missingPermissions.isNotEmpty()) {
-            requestPermissions(missingPermissions.toTypedArray(), 1001)
         }
 
         // Start all background preloading AFTER setContent to ensure UI displays immediately
@@ -126,6 +114,32 @@ class MainActivity : ComponentActivity() {
         // Keep navigation service running when activity/task is closed.
         if (!isNavigationModeEnabled) {
             setNavigationLockScreenBehavior(false)
+        }
+    }
+
+    private fun requestLocationPermissionsIfNeeded() {
+        val missingPermissions = LOCATION_PERMISSIONS.filter {
+            ContextCompat.checkSelfPermission(this, it) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        }
+        if (missingPermissions.isEmpty()) {
+            LocationPermissionSignal.setGranted(true)
+        } else {
+            requestPermissions(missingPermissions.toTypedArray(), LOCATION_PERMISSION_REQUEST_CODE)
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            // Push the fresh grant state so location collection restarts immediately.
+            val hasLocation = LOCATION_PERMISSIONS.any {
+                ContextCompat.checkSelfPermission(this, it) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            }
+            LocationPermissionSignal.setGranted(hasLocation)
         }
     }
 
@@ -172,6 +186,14 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    companion object {
+        private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
+        private val LOCATION_PERMISSIONS = arrayOf(
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+        )
     }
 }
 

@@ -4,6 +4,9 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import eu.dotshell.pelo.generic.ui.theme.isAppInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -115,9 +118,25 @@ fun SettingsScreen(
                 label = "logo_rotation"
             )
 
+            // In light mode the logo is shown in negative so it reads on the light background.
+            val invertColorFilter = remember {
+                ColorFilter.colorMatrix(
+                    ColorMatrix(
+                        floatArrayOf(
+                            -1f, 0f, 0f, 0f, 255f,
+                            0f, -1f, 0f, 0f, 255f,
+                            0f, 0f, -1f, 0f, 255f,
+                            0f, 0f, 0f, 1f, 0f,
+                        )
+                    )
+                )
+            }
+            val logoColorFilter = if (isAppInDarkTheme()) null else invertColorFilter
+
             Image(
                 painter = drawableProvider.getPainter("ic_launcher_foreground"),
                 contentDescription = strings["logo_pelo"],
+                colorFilter = logoColorFilter,
                 modifier = Modifier
                     .size(200.dp)
                     .padding(bottom = 48.dp)
