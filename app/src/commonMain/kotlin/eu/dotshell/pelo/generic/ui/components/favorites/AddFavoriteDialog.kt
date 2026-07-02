@@ -50,9 +50,6 @@ import androidx.compose.ui.window.DialogProperties
 import eu.dotshell.pelo.generic.data.models.search.StationSearchResult
 import eu.dotshell.pelo.generic.ui.components.search.TransportSearchBar
 import eu.dotshell.pelo.generic.data.models.search.TransportSearchContent
-import eu.dotshell.pelo.generic.ui.theme.Gray700
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModelInterface
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
@@ -123,7 +120,7 @@ fun AddFavoriteDialog(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = SecondaryColor
+        containerColor = MaterialTheme.colorScheme.surface
     ) {
         Column(
             modifier = Modifier
@@ -140,13 +137,13 @@ fun AddFavoriteDialog(
                     text = strings["favorite_new"],
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
-                    color = PrimaryColor
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 IconButton(onClick = onDismiss) {
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = strings["close"],
-                        tint = Gray700
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -158,7 +155,7 @@ fun AddFavoriteDialog(
                 text = strings["favorite_type"],
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
-                color = PrimaryColor
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(8.dp))
             FlowRow(
@@ -187,7 +184,7 @@ fun AddFavoriteDialog(
                     text = strings["favorite_title"],
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
-                    color = PrimaryColor
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 BasicTextField(
@@ -196,9 +193,9 @@ fun AddFavoriteDialog(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(28.dp))
-                        .background(Color(0xFFF5F5F5))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(horizontal = 16.dp, vertical = 12.dp),
-                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = PrimaryColor),
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(
                         keyboardType = KeyboardType.Text,
@@ -209,7 +206,7 @@ fun AddFavoriteDialog(
                             Text(
                                 text = strings["favorite_title_placeholder"],
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = Color.Gray
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                         innerTextField()
@@ -224,7 +221,7 @@ fun AddFavoriteDialog(
                 text = strings["favorite_associated_stop"],
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium,
-                color = PrimaryColor
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -232,7 +229,7 @@ fun AddFavoriteDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(28.dp))
-                    .background(PrimaryColor)
+                    .background(MaterialTheme.colorScheme.primary)
                     .clickable { showStopSearchFullscreen = true }
                     .padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -240,14 +237,14 @@ fun AddFavoriteDialog(
                 Icon(
                     imageVector = Icons.Default.Search,
                     contentDescription = null,
-                    tint = SecondaryColor,
+                    tint = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = selectedStop?.stopName ?: strings["search_stop_placeholder"],
                     style = MaterialTheme.typography.bodyMedium,
-                    color = SecondaryColor
+                    color = MaterialTheme.colorScheme.onPrimary
                 )
             }
 
@@ -267,10 +264,10 @@ fun AddFavoriteDialog(
                     .fillMaxWidth()
                     .height(56.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = PrimaryColor,
-                    contentColor = SecondaryColor,
-                    disabledContainerColor = Color.Gray,
-                    disabledContentColor = SecondaryColor
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    disabledContainerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                    disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
                 ),
                 shape = RoundedCornerShape(28.dp),
                 enabled = selectedPreset != null && selectedStop != null && finalFavoriteTitle.isNotBlank()
@@ -294,7 +291,7 @@ fun AddFavoriteDialog(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(PrimaryColor)
+                    .background(MaterialTheme.colorScheme.background)
             ) {
                 TransportSearchBar(
                     onSearchStops = { query -> viewModel.searchStops(query) },

@@ -35,15 +35,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.datetime.Clock
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.data.models.stops.StationInfo
 import eu.dotshell.pelo.generic.data.telemetry.TelemetryEvent
-import eu.dotshell.pelo.generic.ui.theme.Gray200
-import eu.dotshell.pelo.generic.ui.theme.Gray700
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModelInterface
 import eu.dotshell.pelo.generic.utils.schedule.DepartureManager
 import eu.dotshell.pelo.platform.DrawableProvider
@@ -142,7 +137,7 @@ fun StationBottomSheet(
                         text = stationInfo.nom,
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
-                        color = PrimaryColor,
+                        color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -161,8 +156,8 @@ fun StationBottomSheet(
                     Button(
                         onClick = onItineraryClick,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = PrimaryColor,
-                            contentColor = SecondaryColor
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
                         )
                     ) {
                         Icon(
@@ -179,10 +174,8 @@ fun StationBottomSheet(
                             onReportAlertClick(stationInfo.nom, stationInfo.lignes)
                         },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isFavoriteStop) Color(0xFFD1D5DB) else Color(
-                                0xFFE5E7EB
-                            ),
-                            contentColor = Color(0xFF374151)
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                     ) {
                         Icon(
@@ -200,10 +193,8 @@ fun StationBottomSheet(
                     Button(
                         onClick = { onAddFavoriteClick(stationInfo.nom) },
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isFavoriteStop) Color(0xFFD1D5DB) else Color(
-                                0xFFE5E7EB
-                            ),
-                            contentColor = Color(0xFF374151)
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                         )
                     ) {
                         Icon(
@@ -254,7 +245,7 @@ fun StationBottomSheet(
                                         .padding(vertical = 24.dp),
                                     horizontalArrangement = Arrangement.Center
                                 ) {
-                                    CircularProgressIndicator(color = PrimaryColor)
+                                    CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
@@ -263,7 +254,7 @@ fun StationBottomSheet(
                                 Text(
                                     text = strings["no_schedule_for_stop"],
                                     style = MaterialTheme.typography.bodyMedium,
-                                    color = Gray700,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(vertical = 12.dp)
                                 )
                             }
@@ -290,7 +281,7 @@ fun StationBottomSheet(
                                 if (index < deps.size - 1) {
                                     HorizontalDivider(
                                         modifier = Modifier.padding(vertical = 4.dp),
-                                        color = Gray200
+                                        color = MaterialTheme.colorScheme.outlineVariant
                                     )
                                 }
                             }
@@ -309,7 +300,7 @@ fun StationBottomSheet(
             ModalBottomSheet(
                 onDismissRequest = onDismiss,
                 sheetState = sheetState,
-                containerColor = SecondaryColor
+                containerColor = MaterialTheme.colorScheme.surface
             ) {
                 content()
             }

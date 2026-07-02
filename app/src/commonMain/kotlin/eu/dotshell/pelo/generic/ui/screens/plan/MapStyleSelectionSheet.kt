@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -27,8 +28,6 @@ import eu.dotshell.pelo.generic.data.network.mapstyle.MapStyleData
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
 import eu.dotshell.pelo.platform.provideMapStyleConfig
-import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
-import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import eu.dotshell.pelo.generic.utils.map.MapStyleUtils.mapStyleLabel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,7 +47,7 @@ fun MapStyleSelectionSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        containerColor = SecondaryColor,
+        containerColor = MaterialTheme.colorScheme.surface,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ) {
         Column(
@@ -58,7 +57,7 @@ fun MapStyleSelectionSheet(
         ) {
             Text(
                 text = strings["theme_title"],
-                color = PrimaryColor
+                color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(modifier = Modifier.size(16.dp))
 
@@ -80,7 +79,7 @@ fun MapStyleSelectionSheet(
                                 .clip(RoundedCornerShape(14.dp))
                                 .border(
                                     2.dp,
-                                    if (isSelected) Color(0xFF3B82F6) else Color.Transparent,
+                                    if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
                                     RoundedCornerShape(14.dp)
                                 )
                                 .padding(2.dp)
@@ -94,7 +93,7 @@ fun MapStyleSelectionSheet(
 
                         Text(
                             text = mapStyleLabel(style),
-                            color = if (enabled) PrimaryColor else Color(0xFF9CA3AF)
+                            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
