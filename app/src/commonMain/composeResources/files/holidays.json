@@ -1,40 +1,52 @@
 {
-  "school_year": "2025-2026",
+  "school_year": "2026-2027",
   "location": {
-    "department": "Rhône (69)",
-    "academy": "Lyon",
-    "zone": "A"
+    "department": "Bouches-du-Rhône (13)",
+    "academy": "Aix-Marseille",
+    "zone": "B"
   },
   "holidays": [
     {
+      "name": "Vacances d'Été 2026",
+      "start_date_inclusive": "2026-07-04",
+      "end_date_inclusive": "2026-09-02",
+      "school_resumes": "2026-09-03"
+    },
+    {
+      "name": "Vacances de la Toussaint",
+      "start_date_inclusive": "2026-10-17",
+      "end_date_inclusive": "2026-11-01",
+      "school_resumes": "2026-11-02"
+    },
+    {
       "name": "Vacances de Noël",
-      "start_date_inclusive": "2025-12-20",
-      "end_date_inclusive": "2026-01-04",
-      "school_resumes": "2026-01-05"
+      "start_date_inclusive": "2026-12-19",
+      "end_date_inclusive": "2027-01-03",
+      "school_resumes": "2027-01-04"
     },
     {
       "name": "Vacances d'Hiver",
-      "start_date_inclusive": "2026-02-07",
-      "end_date_inclusive": "2026-02-22",
-      "school_resumes": "2026-02-23"
+      "start_date_inclusive": "2027-02-20",
+      "end_date_inclusive": "2027-03-07",
+      "school_resumes": "2027-03-08"
     },
     {
       "name": "Vacances de Printemps",
-      "start_date_inclusive": "2026-04-04",
-      "end_date_inclusive": "2026-04-19",
-      "school_resumes": "2026-04-20"
+      "start_date_inclusive": "2027-04-17",
+      "end_date_inclusive": "2027-05-02",
+      "school_resumes": "2027-05-03"
     },
     {
       "name": "Pont de l'Ascension",
-      "start_date_inclusive": "2026-05-13",
-      "end_date_inclusive": "2026-05-17",
-      "school_resumes": "2026-05-18"
+      "start_date_inclusive": "2027-05-06",
+      "end_date_inclusive": "2027-05-09",
+      "school_resumes": "2027-05-10"
     },
     {
-      "name": "Vacances d'Été",
-      "start_date_inclusive": "2026-07-04",
+      "name": "Vacances d'Été 2027",
+      "start_date_inclusive": "2027-07-03",
       "end_date_inclusive": null,
-      "school_resumes": "Rentrée 2026"
+      "school_resumes": "Rentrée 2027"
     }
   ]
 }
