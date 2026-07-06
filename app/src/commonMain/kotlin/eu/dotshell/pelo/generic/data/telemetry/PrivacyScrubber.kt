@@ -10,7 +10,7 @@ package eu.dotshell.pelo.generic.data.telemetry
  * distinct addresses collide into the same cell.
  *
  * Bucket sizes for the precisions we expose:
- *  - precision 6 → ~1.2 km × ~0.6 km (≈ 460 m on average at Lyon's latitude) ← default
+ *  - precision 6 → ~1.2 km × ~0.6 km (≈ 460 m on average at Marseille's latitude) ← default
  *  - precision 7 → ~150 m × ~150 m (precise, not used for telemetry — kept for future)
  *
  * The bucket label uses the standard base-32 alphabet (excludes ambiguous chars: a/i/l/o).

@@ -153,21 +153,27 @@ class AppTransportLineRules(private val data: RulesData) : TransportLineRules {
         fun keyFor(lineRaw: String): Key {
             val up = lineRaw.trim().uppercase()
 
-            when (up) {
-                "A" -> return Key(1000, number = 0, raw = up)
-                "B" -> return Key(1001, number = 0, raw = up)
-                "C" -> return Key(1002, number = 0, raw = up)
-                "D" -> return Key(1003, number = 0, raw = up)
-            }
-
-            if (up.startsWith("F")) {
+            // RTM display order: metro (M1, M2), then tram (T1-T3), then BHNS
+            // (B1-B5), then navettes maritimes, then everything else.
+            if (up.startsWith("M")) {
                 val num = up.drop(1).toIntOrNull()
-                if (num != null) return Key(2000, number = num, raw = up)
+                if (num != null) return Key(1000, number = num, raw = up)
             }
 
             if (up.startsWith("T")) {
                 val num = up.drop(1).toIntOrNull()
+                if (num != null) return Key(2000, number = num, raw = up)
+            }
+
+            if (up.startsWith("B")) {
+                val num = up.drop(1).toIntOrNull()
                 if (num != null) return Key(3000, number = num, raw = up)
+            }
+
+            if (up == "FERRY") return Key(3500, number = 0, raw = up)
+            if (up.startsWith("NAV")) {
+                val num = up.drop(3).toIntOrNull()
+                if (num != null) return Key(3500, number = num, raw = up)
             }
 
             val match = SORT_PREFIX_NUMBER_SUFFIX.matchEntire(up)

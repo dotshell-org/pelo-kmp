@@ -95,15 +95,15 @@ fun CreditsScreen(
 
             Column(modifier = Modifier.padding(bottom = 16.dp)) {
                 ClickableLink(
-                    label = "data.grandlyon.com",
-                    url = "https://data.grandlyon.com",
+                    label = "transport.data.gouv.fr",
+                    url = "https://transport.data.gouv.fr",
                     uriHandler = uriHandler,
                     strings = strings
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 ClickableLink(
-                    label = "api.dotshell.eu/pelo/v1/",
-                    url = "https://api.dotshell.eu/pelo/v1/",
+                    label = "commons.wikimedia.org",
+                    url = "https://commons.wikimedia.org/wiki/Category:Public_transport_symbols_of_Marseille",
                     uriHandler = uriHandler,
                     strings = strings
                 )

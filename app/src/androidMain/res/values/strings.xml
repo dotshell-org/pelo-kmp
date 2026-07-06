@@ -1,5 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <string name="app_name">Pelo</string>
+    <string name="app_name">Pelo Marseille</string>
     <string name="map_style_preview">Aperçu du style de carte</string>
     <string name="offline_available">Données hors ligne disponibles</string>
     <string name="offline_unavailable">Données hors ligne non disponibles</string>
@@ -13,17 +13,6 @@
     <string name="bus_mode_icon">Icône de mode bus</string>
     <string name="todo">TODO</string>
     <string name="chargement">Chargement…</string>
-    <string name="bellecour">Bellecour</string>
-    <string name="_14_35">14:35</string>
-    <string name="perrache">Perrache</string>
-    <string name="_14_52">14:52</string>
-    <string name="iut_feyssine">IUT-Feyssine</string>
-    <string name="_15_10">15:10</string>
-    <string name="gare_de_venissieux">Gare de Vénissieux</string>
-    <string name="gare_de_v_nissieux">Gare de Vénissieux</string>
-    <string name="_3_min">3 min</string>
-    <string name="_8_min">8 min</string>
-    <string name="_15_min">15 min</string>
     <string name="navigation_mode_notification_channel_name">Navigation active</string>
     <string name="navigation_mode_notification_channel_description">Maintient le mode navigation actif et les positions a jour</string>
     <string name="navigation_mode_notification_title">Mode navigation en cours</string>

@@ -64,7 +64,7 @@ object TelemetryService {
 
         // Register Background Task for Telemetry Upload
         BGTaskScheduler.sharedScheduler.registerForTaskWithIdentifier(
-            "eu.dotshell.pelo.telemetryUpload",
+            "eu.dotshell.pelo.marseille.telemetryUpload",
             usingQueue = null
         ) { task ->
             if (task == null) return@registerForTaskWithIdentifier
@@ -82,7 +82,7 @@ object TelemetryService {
 
         // Register Background Task for Traffic Alerts
         BGTaskScheduler.sharedScheduler.registerForTaskWithIdentifier(
-            "eu.dotshell.pelo.trafficAlerts",
+            "eu.dotshell.pelo.marseille.trafficAlerts",
             usingQueue = null
         ) { task ->
             if (task == null) return@registerForTaskWithIdentifier

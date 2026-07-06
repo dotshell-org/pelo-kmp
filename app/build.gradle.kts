@@ -123,7 +123,7 @@ compose.resources {
 android {
     signingConfigs {
         create("release") {
-            storeFile = rootProject.file("pelotcl.jks")
+            storeFile = rootProject.file("pelo_marseille.jks")
             storePassword = localProperties.getProperty("RELEASE_STORE_PASSWORD") ?: ""
             keyAlias = "key0"
             keyPassword = localProperties.getProperty("RELEASE_KEY_PASSWORD") ?: ""
@@ -133,7 +133,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "eu.dotshell.pelo"
+        applicationId = "eu.dotshell.pelo.marseille"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

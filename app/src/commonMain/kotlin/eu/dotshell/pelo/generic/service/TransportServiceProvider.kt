@@ -44,7 +44,7 @@ object TransportServiceProvider {
     private lateinit var realtimeConfig: RealtimeConfigData
 
     /**
-     * Initializes the provider with Lyon TCL configuration
+     * Initializes the provider with the Marseille RTM configuration
      */
     fun initialize(context: PlatformContext) {
         // Load configuration from config.json

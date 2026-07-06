@@ -209,18 +209,13 @@ fun LinesBottomSheet(
                             Spacer(modifier = Modifier.height(8.dp))
                             val categoryText = when (item.category) {
                                 "Métro" -> strings["category_metro"]
-                                "Funiculaire" -> strings["category_funicular"]
                                 "Tramway" -> strings["category_tramway"]
-                                "Navigone" -> strings["category_navigone"]
-                                "Chrono" -> strings["category_chrono"]
-                                "Pleine Lune" -> strings["category_pleine_lune"]
-                                "Gare Express" -> strings["category_gare_express"]
-                                "Navette" -> strings["category_navette"]
-                                "Soyeuse" -> strings["category_soyeuse"]
-                                "Zone Industrielle" -> strings["category_zone_industrielle"]
+                                "BHNS" -> strings["category_bhns"]
+                                "Navette maritime" -> strings["category_navette_maritime"]
                                 "Bus" -> strings["category_bus"]
-                                "Cars du Rhône TCL unifié" -> strings["category_cars_du_rhone"]
-                                "Junior Direct" -> strings["category_junior_direct"]
+                                "Bus de nuit" -> strings["category_nuit"]
+                                "Scolaire" -> strings["category_scolaire"]
+                                "Bus de remplacement" -> strings["category_remplacement"]
                                 else -> item.category
                             }
                             Text(
@@ -318,7 +313,7 @@ fun LinesBottomSheet(
 }
 
 /**
- * Chip to show a line with the official TCL icon
+ * Chip to show a line with the official RTM icon
  */
 @Composable
 private fun LineChip(
@@ -348,7 +343,7 @@ private fun LineChip(
             contentAlignment = Alignment.Center
         ) {
             if (hasIcon) {
-                // Use official TCL icon
+                // Use official RTM icon
                 Icon(
                     painter = drawableProvider.getPainter(drawableName),
                     contentDescription = strings["line_label"].replace("%s", lineName),
@@ -439,51 +434,32 @@ private fun categorizeLines(
     lines: List<String>,
     hasLineIcon: (String) -> Boolean
 ): Map<String, List<String>> {
-    // Keep lines with icons, and keep NAVI* even without a dedicated icon file.
+    // Keep lines with icons, and keep the BM metro-replacement lines even
+    // without a dedicated icon file (they fall back to the colored badge).
     val linesWithIcon = lines.filter { line ->
         val upperLine = line.uppercase()
-        hasLineIcon(line) || upperLine.startsWith("NAVI")
+        hasLineIcon(line) || upperLine.startsWith("BM")
     }
 
     val metros = mutableListOf<String>()
     val trams = mutableListOf<String>()
-    val funiculaires = mutableListOf<String>()
-    val chrono = mutableListOf<String>()
-    val pleineLune = mutableListOf<String>()
-    val jd = mutableListOf<String>()
-    val navigone = mutableListOf<String>()
-    val gareExpress = mutableListOf<String>()
-    val soyeuses = mutableListOf<String>()
-    val navettes = mutableListOf<String>()
-    val zi = mutableListOf<String>()
-    val carsDuRhone = mutableListOf<String>()
+    val bhns = mutableListOf<String>()
+    val navettesMaritimes = mutableListOf<String>()
+    val nuit = mutableListOf<String>()
+    val scolaires = mutableListOf<String>()
+    val remplacement = mutableListOf<String>()
     val bus = mutableListOf<String>()
 
     linesWithIcon.forEach { line ->
         val upperLine = line.uppercase()
         when {
-            upperLine in setOf("A", "B", "C", "D") -> metros.add(line)
-            upperLine.startsWith("F") && (upperLine == "F1" || upperLine == "F2") -> funiculaires.add(
-                line
-            )
-
-            upperLine.startsWith("TB") || upperLine == "RX" || upperLine.contains("RHON") -> trams.add(
-                line
-            )
-
-            upperLine.startsWith("T") && upperLine.length == 2 -> trams.add(line)
-            upperLine.startsWith("C") && upperLine.length >= 2 -> chrono.add(line)
-            upperLine.startsWith("PL") -> pleineLune.add(line)
-            upperLine.startsWith("JD") -> jd.add(line)
-            upperLine.startsWith("NAVI") -> navigone.add(line)
-            upperLine.startsWith("GE") -> gareExpress.add(line)
-            upperLine.startsWith("S") -> soyeuses.add(line)
-            upperLine.startsWith("ZI") -> zi.add(line)
-            upperLine.startsWith("N") -> navettes.add(line)
-            upperLine.length >= 3 && upperLine != "128" && upperLine.all { it.isDigit() } -> carsDuRhone.add(
-                line
-            )
-
+            upperLine.matches(Regex("^M[12]$")) -> metros.add(line)
+            upperLine.matches(Regex("^T[1-3]$")) -> trams.add(line)
+            upperLine.matches(Regex("^B[1-5]$")) -> bhns.add(line)
+            upperLine.startsWith("NAV") || upperLine == "FERRY" -> navettesMaritimes.add(line)
+            upperLine.matches(Regex("^N[12]$")) -> nuit.add(line)
+            upperLine.matches(Regex("^S\\d{1,2}$")) -> scolaires.add(line)
+            upperLine.startsWith("BM") -> remplacement.add(line)
             else -> bus.add(line)
         }
     }
@@ -522,18 +498,13 @@ private fun categorizeLines(
     val result = mutableMapOf<String, List<String>>()
 
     if (metros.isNotEmpty()) result["Métro"] = naturalSort(metros)
-    if (funiculaires.isNotEmpty()) result["Funiculaire"] = naturalSort(funiculaires)
     if (trams.isNotEmpty()) result["Tramway"] = naturalSort(trams)
-    if (navigone.isNotEmpty()) result["Navigone"] = naturalSort(navigone)
-    if (chrono.isNotEmpty()) result["Chrono"] = naturalSort(chrono)
-    if (pleineLune.isNotEmpty()) result["Pleine Lune"] = naturalSort(pleineLune)
-    if (gareExpress.isNotEmpty()) result["Gare Express"] = naturalSort(gareExpress)
-    if (navettes.isNotEmpty()) result["Navette"] = naturalSort(navettes)
-    if (soyeuses.isNotEmpty()) result["Soyeuse"] = naturalSort(soyeuses)
-    if (zi.isNotEmpty()) result["Zone Industrielle"] = naturalSort(zi)
+    if (bhns.isNotEmpty()) result["BHNS"] = naturalSort(bhns)
+    if (navettesMaritimes.isNotEmpty()) result["Navette maritime"] = naturalSort(navettesMaritimes)
     if (bus.isNotEmpty()) result["Bus"] = naturalSort(bus)
-    if (carsDuRhone.isNotEmpty()) result["Cars du Rhône TCL unifié"] = naturalSort(carsDuRhone)
-    if (jd.isNotEmpty()) result["Junior Direct"] = naturalSort(jd)
+    if (nuit.isNotEmpty()) result["Bus de nuit"] = naturalSort(nuit)
+    if (remplacement.isNotEmpty()) result["Bus de remplacement"] = naturalSort(remplacement)
+    if (scolaires.isNotEmpty()) result["Scolaire"] = naturalSort(scolaires)
 
     return result
 }

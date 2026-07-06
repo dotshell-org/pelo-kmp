@@ -19,7 +19,7 @@ import eu.dotshell.pelo.generic.data.telemetry.TelemetryUploader
 actual class BackgroundScheduler actual constructor(context: PlatformContext) {
 
     actual fun scheduleTelemetryUpload(delaySeconds: Long) {
-        val request = BGAppRefreshTaskRequest("eu.dotshell.pelo.telemetryUpload")
+        val request = BGAppRefreshTaskRequest("eu.dotshell.pelo.marseille.telemetryUpload")
         request.earliestBeginDate = NSDate.dateWithTimeIntervalSinceNow(delaySeconds.toDouble())
         
         val success = BGTaskScheduler.sharedScheduler.submitTaskRequest(request, null)
@@ -55,12 +55,12 @@ actual class BackgroundScheduler actual constructor(context: PlatformContext) {
     }
 
     actual fun cancelTelemetryUpload() {
-        BGTaskScheduler.sharedScheduler.cancelTaskRequestWithIdentifier("eu.dotshell.pelo.telemetryUpload")
+        BGTaskScheduler.sharedScheduler.cancelTaskRequestWithIdentifier("eu.dotshell.pelo.marseille.telemetryUpload")
         Log.i(TAG, "cancelTelemetryUpload() called")
     }
 
     actual fun ensureTrafficAlertsScheduled() {
-        val request = BGAppRefreshTaskRequest("eu.dotshell.pelo.trafficAlerts")
+        val request = BGAppRefreshTaskRequest("eu.dotshell.pelo.marseille.trafficAlerts")
         
         val success = BGTaskScheduler.sharedScheduler.submitTaskRequest(request, null)
         if (success) {

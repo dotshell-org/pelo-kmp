@@ -88,6 +88,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
+import eu.dotshell.pelo.generic.service.TransportServiceProvider
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
@@ -948,14 +949,11 @@ private fun StopItemWithLine(
             )
         }
 
+        // Only show structuring connections (metro, tram, BHNS, navettes maritimes) —
+        // config-driven via the strong-lines rules instead of hardcoded names.
+        val connectionRules = remember { TransportServiceProvider.getTransportLineRules() }
         val filteredConnections = stop.connections.filter { connection ->
-            val upperCaseConnection = connection.uppercase()
-
-            upperCaseConnection in listOf("A", "B", "C", "D") || // Metro
-                    (upperCaseConnection.startsWith("T") && !upperCaseConnection.endsWith("36")) || // Tram & Trambus
-                    upperCaseConnection in listOf("F1", "F2") || // Funicular
-                    upperCaseConnection.startsWith("NAVI") || // Navigone
-                    upperCaseConnection == "RX" // Rhone Express
+            connectionRules.isStrongLine(connection)
         }
 
         Row(
@@ -995,7 +993,7 @@ private fun StopItemWithLine(
 
 /**
  * Badge displaying a transfer line (metro or funicular)
- * Uses TCL images like on the map
+ * Uses RTM pictograms like on the map
  */
 @Composable
 private fun ConnectionBadge(
@@ -1021,7 +1019,7 @@ private fun ConnectionBadge(
     }
 
     if (hasIcon) {
-        // Display TCL image via Compose Resources (cross-platform)
+        // Display RTM pictogram via Compose Resources (cross-platform)
         Image(
             painter = drawableProvider.getPainter(drawableName),
             contentDescription = strings["line_label"].replace("%s", lineName),

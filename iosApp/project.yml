@@ -25,13 +25,13 @@ targets:
     info:
       path: Info.plist
       properties:
-        CFBundleDisplayName: Pelo
+        CFBundleDisplayName: Pelo Marseille
         CFBundleShortVersionString: "1.0.0"
         CFBundleVersion: "1"
         CADisableMinimumFrameDurationOnPhone: true
         UILaunchScreen: {}
         UIRequiresFullScreen: false
-        NSLocationWhenInUseUsageDescription: "Pelo utilise votre position pour centrer la carte et calculer des itinéraires."
+        NSLocationWhenInUseUsageDescription: "Pelo Marseille utilise votre position pour centrer la carte et calculer des itinéraires."
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         UISupportedInterfaceOrientations~ipad:
@@ -43,11 +43,11 @@ targets:
           - fetch
           - processing
         BGTaskSchedulerPermittedIdentifiers:
-          - eu.dotshell.pelo.telemetryUpload
-          - eu.dotshell.pelo.trafficAlerts
+          - eu.dotshell.pelo.marseille.telemetryUpload
+          - eu.dotshell.pelo.marseille.trafficAlerts
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: eu.dotshell.pelo
+        PRODUCT_BUNDLE_IDENTIFIER: eu.dotshell.pelo.marseille
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "1,2"
         ENABLE_USER_SCRIPT_SANDBOXING: "NO"

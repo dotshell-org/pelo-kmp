@@ -14,19 +14,25 @@ import org.maplibre.android.offline.OfflineRegionStatus
 import org.maplibre.android.offline.OfflineTilePyramidRegionDefinition
 
 /**
- * Manages offline map tile downloads for the Lyon TCL region using MapLibre OfflineManager.
+ * Manages offline map tile downloads for the network region using MapLibre OfflineManager.
+ * The bounding box comes from config.json (transport.regionBounds).
  */
 class OfflineMapManager(private val context: Context) {
 
     companion object {
         private const val TAG = "OfflineMapManager"
-        private const val REGION_NAME_PREFIX = "pelo_lyon_tcl_"
+        private const val REGION_NAME_PREFIX = "pelo_marseille_rtm_"
 
-        // Lyon metropolitan area bounding box (covers the full TCL network)
-        private val LYON_BOUNDS = LatLngBounds.Builder()
-            .include(LatLng(45.55, 4.65))  // Southwest
-            .include(LatLng(45.95, 5.10))  // Northeast
-            .build()
+        // Network bounding box from config.json: [minLat, minLon, maxLat, maxLon]
+        private val NETWORK_BOUNDS: LatLngBounds
+            get() {
+                val bounds = eu.dotshell.pelo.generic.data.config.AppConfigLoader
+                    .getConfig().transport.regionBounds
+                return LatLngBounds.Builder()
+                    .include(LatLng(bounds[0], bounds[1]))  // Southwest
+                    .include(LatLng(bounds[2], bounds[3]))  // Northeast
+                    .build()
+            }
 
         // Zoom range: 8 (regional overview) to 16 (street-level detail)
         private const val MIN_ZOOM = 8.0
@@ -52,7 +58,7 @@ class OfflineMapManager(private val context: Context) {
 
         val definition = OfflineTilePyramidRegionDefinition(
             styleUrl,
-            LYON_BOUNDS,
+            NETWORK_BOUNDS,
             MIN_ZOOM,
             MAX_ZOOM,
             PIXEL_RATIO

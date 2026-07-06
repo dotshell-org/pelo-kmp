@@ -561,7 +561,7 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                 .map { stop ->
                     val latDiff = stop.lat - latitude
                     // Scale longitude by cos(lat) so a degree of longitude isn't over-weighted
-                    // relative to a degree of latitude (~0.7 at Lyon's latitude).
+                    // relative to a degree of latitude (~0.73 at Marseille's latitude).
                     val lonDiff = (stop.lon - longitude) * cos(latitude * PI / 180.0)
                     val distance = sqrt(latDiff.pow(2) + lonDiff.pow(2))
                     stop to distance

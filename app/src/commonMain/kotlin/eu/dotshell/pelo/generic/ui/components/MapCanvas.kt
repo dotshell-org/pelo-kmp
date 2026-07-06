@@ -87,8 +87,8 @@ private const val BUS_RENDER_MIN_ZOOM = 16.0
 fun MapCanvas(
     modifier: Modifier = Modifier,
     styleUrl: String,
-    initialLatitude: Double = 45.75,
-    initialLongitude: Double = 4.85,
+    initialLatitude: Double = 43.2965,
+    initialLongitude: Double = 5.3698,
     initialZoom: Double = 10.0,
     initialBearing: Double? = null,
     cameraState: CameraState = rememberCameraState(
@@ -264,9 +264,9 @@ fun MapCanvas(
     // Pre-load all key/strong-line icons to avoid asynchronous pop-in/loading delay when zooming in.
     val preloadedIconNames = remember {
         listOf(
-            "a", "b", "c", "d", "f1", "f2",
-            "t1", "t2", "t3", "t4", "t5", "t6", "t7",
-            "tb11", "tb12", "navi1", "rx", "brtrx", "mode_bus"
+            "m1", "m2", "t1", "t2", "t3",
+            "b1", "b2", "b3", "b4", "b5",
+            "nav1", "nav2", "nav3", "ferry", "mode_bus"
         ).filter { drawableProvider.hasDrawable(it) }
     }
     val allIconNamesToLoad = remember(iconNames, preloadedIconNames) {
@@ -436,7 +436,7 @@ fun MapCanvas(
                     fallback = fallback,
                 )
 
-                // Loop over slots to stack multiple icons vertically at multi-line stations (like Bellecour).
+                // Loop over slots to stack multiple icons vertically at multi-line stations (like Castellane).
                 // Priority gates the zoom (metro/funicular from 12.5f, tram from 14f, bus from 17f).
                 // String-based priority comparison to avoid numerical conversion mismatches.
                 val tiers = listOf(
