@@ -103,8 +103,8 @@ kotlin {
         }
 
         androidMain {
-            kotlin.exclude("eu/dotshell/pelo/generic/data/models/**")
-            kotlin.exclude("eu/dotshell/pelo/specific/data/model/**")
+            kotlin.exclude("eu/dotshell/massilia/generic/data/models/**")
+            kotlin.exclude("eu/dotshell/massilia/specific/data/model/**")
         }
 
         iosMain.dependencies {
@@ -120,24 +120,24 @@ kotlin {
 
 compose.resources {
     publicResClass = true
-    packageOfResClass = "eu.dotshell.pelo.resources"
+    packageOfResClass = "eu.dotshell.massilia.resources"
     generateResClass = always
 }
 
 android {
     signingConfigs {
         create("release") {
-            storeFile = rootProject.file("pelo_marseille.jks")
+            storeFile = rootProject.file("massilia.jks")
             storePassword = localProperties.getProperty("RELEASE_STORE_PASSWORD") ?: ""
             keyAlias = "key0"
             keyPassword = localProperties.getProperty("RELEASE_KEY_PASSWORD") ?: ""
         }
     }
-    namespace = "eu.dotshell.pelo"
+    namespace = "eu.dotshell.massilia"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "eu.dotshell.pelo.marseille"
+        applicationId = "eu.dotshell.massilia"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

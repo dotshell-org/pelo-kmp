@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Generate every Pelo Marseille app icon asset from one vector definition.
+"""Generate every Massilia app icon asset from one vector definition.
 
 Design (approved): white silhouette of Notre-Dame de la Garde on a black
 square — dome and lantern on the left, bell tower with its dark window,
 tapered crown, pedestal and statue on the right, all sitting on the hill.
 
 Outputs:
-- pelo-icon.png (1024, repo root, README)
+- massilia-icon.png (1024, repo root, README)
 - app/src/commonMain/composeResources/drawable/ic_launcher_foreground.png (1536)
 - app/src/androidMain/res/drawable-{mdpi,hdpi,xhdpi,xxhdpi}/ic_launcher_foreground.png
 - app/src/androidMain/res/mipmap-*/ic_launcher.png (rounded square) and
@@ -187,7 +187,7 @@ def main() -> None:
     res = ROOT / "app/src/androidMain/res"
 
     # README / repo icon
-    render_square(1024).convert("RGB").save(ROOT / "pelo-icon.png")
+    render_square(1024).convert("RGB").save(ROOT / "massilia-icon.png")
 
     # Compose resources foreground (used in-app: settings & consent screens)
     render_square(1536).save(

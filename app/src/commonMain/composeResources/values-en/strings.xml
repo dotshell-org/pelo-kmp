@@ -55,7 +55,7 @@
     <string name="previous_month">Previous month</string>
     <string name="next_month">Next month</string>
     <string name="intermediate_stops">%1$s stop%2$s</string>
-    <string name="logo_pelo">Pelo logo</string>
+    <string name="logo_massilia">Massilia logo</string>
     <string name="app_version_title">App version</string>
     <string name="legal_title">Legal notice / Terms</string>
     <string name="credits_title">Credits</string>
@@ -176,15 +176,15 @@
     <string name="telemetry_alert_incident">Incident/Disruption</string>
     <string name="telemetry_alert_elevator">Elevator out of service</string>
     <string name="legal_editor_title">Publisher</string>
-    <string name="legal_editor_content">The Pelo Marseille Application is published by Dotshell. Dotshell is not affiliated with RTM or the Aix-Marseille-Provence Metropolis. For any questions, please refer to the contact details provided in the Application.\n</string>
+    <string name="legal_editor_content">The Massilia Application is published by Dotshell. Dotshell is not affiliated with RTM or the Aix-Marseille-Provence Metropolis. For any questions, please refer to the contact details provided in the Application.\n</string>
     <string name="legal_object_title">Purpose</string>
-    <string name="legal_object_content">These Terms of Use define the conditions of access and use of the Pelo Application (hereinafter "the Application"). Using the Application implies acceptance of these terms.\n</string>
+    <string name="legal_object_content">These Terms of Use define the conditions of access and use of the Massilia Application (hereinafter "the Application"). Using the Application implies acceptance of these terms.\n</string>
     <string name="legal_desc_title">Application Description</string>
     <string name="legal_desc_content">The Application helps the user navigate the RTM network (Marseille and surrounding area) through search and planning tools. Third-party sources are listed in the "Credits" page.\n</string>
     <string name="legal_permissions_title">Permissions</string>
     <string name="legal_permissions_content">The Application may request the following permissions based on technical needs:\n• Location: To display nearby stops and center the map (processed locally).\n• Network/Internet: To display map tiles.\n</string>
     <string name="legal_privacy_title">Data Processing and Privacy</string>
-    <string name="legal_privacy_content">Pelo Marseille is designed according to the principle of data protection by design.\n\n5.1. Exclusive local storage\nYour favorite stops, your preferences and your trip history are stored exclusively locally on your device. Dotshell has no access to this information. You can delete this history at any time from the "Privacy" screen.\n\n5.2. Offline operation\nJourney search and schedule lookup run entirely on your device, from data bundled with the application. No search, itinerary or position is ever transmitted to a server.\n\n5.3. Network access\nThe only network exchanges of the Application concern map tiles (provided by OpenFreeMap and ESRI). These requests contain no personal identifier.\n\n5.4. No collection, no resale\nDotshell does not collect your data and does not sell any data to advertisers or data brokers.\n</string>
+    <string name="legal_privacy_content">Massilia is designed according to the principle of data protection by design.\n\n5.1. Exclusive local storage\nYour favorite stops, your preferences and your trip history are stored exclusively locally on your device. Dotshell has no access to this information. You can delete this history at any time from the "Privacy" screen.\n\n5.2. Offline operation\nJourney search and schedule lookup run entirely on your device, from data bundled with the application. No search, itinerary or position is ever transmitted to a server.\n\n5.3. Network access\nThe only network exchanges of the Application concern map tiles (provided by OpenFreeMap and ESRI). These requests contain no personal identifier.\n\n5.4. No collection, no resale\nDotshell does not collect your data and does not sell any data to advertisers or data brokers.\n</string>
     <string name="legal_liability_title">Liability</string>
     <string name="legal_liability_content">Information (schedules, disruptions) is provided for guidance only. Dotshell declines all responsibility in the event of inaccuracies in data from third parties or unavailability of the transport network.\n</string>
     <string name="legal_ip_title">Intellectual Property</string>
@@ -196,7 +196,7 @@
     <string name="credits_cartography_title">Mapping</string>
     <string name="credits_cartography_content">Map data is provided by MapLibre and OpenStreetMaps.\n\nMap styles (namely Positron, Dark Matter, OSM Bright, and Liberty) are provided by OpenMapTiles. The application uses the Map Tiler Positron (Light) theme by default.\n\nSatellite view tiles come from ESRI World Imagery.</string>
     <string name="credits_development_title">Development</string>
-    <string name="credits_development_content">The application is developed independently by Dotshell under the GPL-3.0 license. Pelo Marseille is not affiliated with RTM or the Aix-Marseille-Provence Metropolis.\n\nThe source code is available on Dotshell's GitHub page at the following repositories: pelo-kmp for the application source code (Android and iOS), plus raptor-gtfs-pipeline and raptor-kt for the RAPTOR routing system.\n\nAny contribution is open to the community.\n\nFor more information, go to dotshell.eu.</string>
+    <string name="credits_development_content">The application is developed independently by Dotshell under the GPL-3.0 license. Massilia is not affiliated with RTM or the Aix-Marseille-Provence Metropolis.\n\nThe source code is available on Dotshell's GitHub page at the following repositories: massilia-kmp for the application source code (Android and iOS), plus raptor-gtfs-pipeline and raptor-kt for the RAPTOR routing system.\n\nAny contribution is open to the community.\n\nFor more information, go to dotshell.eu.</string>
     <string name="credits_open_link">Open</string>
     <string name="contact_header">A question? A problem?</string>
     <string name="contact_subtitle">Feel free to contact us with any questions, suggestions, or to report a bug.</string>

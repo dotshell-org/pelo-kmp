@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="pelo-icon.png" alt="Pelo Marseille Logo" width="256" height="256" />
+  <img src="massilia-icon.png" alt="Massilia Logo" width="256" height="256" />
 </p>
 
-<h1 style="text-align: center;">Pelo Marseille</h1>
+<h1 style="text-align: center;">Massilia</h1>
 
 <p style="text-align: center;">
 <strong>Public transport app for Marseille and its surroundings</strong>
@@ -12,7 +12,7 @@
 
 ## About
 
-**Pelo Marseille** is a modern, open-source Kotlin Multiplatform application (Android and iOS) designed to easily navigate the Marseille public transport network (RTM): metro, tramway, bus, BHNS and sea shuttles. Journey planning and schedules work fully offline from bundled GTFS data.
+**Massilia** is a modern, open-source Kotlin Multiplatform application (Android and iOS) designed to easily navigate the Marseille public transport network (RTM): metro, tramway, bus, BHNS and sea shuttles. Journey planning and schedules work fully offline from bundled GTFS data.
 
 ### Prerequisites
 

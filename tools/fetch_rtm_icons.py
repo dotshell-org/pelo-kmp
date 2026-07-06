@@ -29,7 +29,7 @@ import urllib.request
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-USER_AGENT = "PeloMarseille-IconFetcher/1.0 (contact@pelo.app)"
+USER_AGENT = "Massilia-IconFetcher/1.0 (contact@dotshell.eu)"
 COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 FILEPATH_URL = "https://commons.wikimedia.org/wiki/Special:FilePath/"
 

@@ -83,14 +83,14 @@
 # Application classes that will be serialized/deserialized over Gson
 # Keep ALL data model classes (generic + specific) — R8 strips field names otherwise,
 # breaking Gson deserialization (fields without @SerializedName get renamed)
--keep class eu.dotshell.pelo.generic.data.models.** { *; }
--keep class eu.dotshell.pelo.specific.data.model.** { *; }
+-keep class eu.dotshell.massilia.generic.data.models.** { *; }
+-keep class eu.dotshell.massilia.specific.data.model.** { *; }
 
 # config.yml is parsed via SnakeYAML → Gson reflection on AppConfig + nested *Data classes.
 # Without these rules R8 full-mode strips the no-arg constructor or class-merges them, causing
 # "Abstract classes can't be instantiated" at runtime.
--keep class eu.dotshell.pelo.generic.data.config.AppConfig { *; }
--keep class eu.dotshell.pelo.generic.data.config.**Data { *; }
+-keep class eu.dotshell.massilia.generic.data.config.AppConfig { *; }
+-keep class eu.dotshell.massilia.generic.data.config.**Data { *; }
 
 # Prevent proguard from stripping interface information from TypeAdapter, TypeAdapterFactory,
 # JsonSerializer, JsonDeserializer instances (so they can be used in @JsonAdapter)
@@ -111,7 +111,7 @@
 -keepclasseswithmembers class kotlinx.serialization.json.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
--keepclassmembers @kotlinx.serialization.Serializable class eu.dotshell.pelo.** {
+-keepclassmembers @kotlinx.serialization.Serializable class eu.dotshell.massilia.** {
     *** Companion;
     *** INSTANCE;
     kotlinx.serialization.KSerializer serializer(...);
@@ -119,8 +119,8 @@
 
 # Telemetry sealed class hierarchy and DTOs — kept whole because polymorphic
 # kotlinx.serialization needs the subclass list at runtime.
--keep class eu.dotshell.pelo.generic.data.telemetry.** { *; }
--keep class eu.dotshell.pelo.generic.data.local_history.** { *; }
+-keep class eu.dotshell.massilia.generic.data.telemetry.** { *; }
+-keep class eu.dotshell.massilia.generic.data.local_history.** { *; }
 
 # ==================== OkHttp ====================
 -dontwarn okhttp3.internal.platform.**

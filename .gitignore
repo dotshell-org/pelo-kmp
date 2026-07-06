@@ -35,3 +35,5 @@ iosApp/Info.plist
 .swiftpm/
 
 .claude
+# Kotlin toolchain working dir
+.kotlin/

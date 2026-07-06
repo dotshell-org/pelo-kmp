@@ -1,5 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <string name="app_name">Pelo Marseille</string>
+    <string name="app_name">Massilia</string>
     <string name="map_style_preview">Aperçu du style de carte</string>
     <string name="offline_available">Données hors ligne disponibles</string>
     <string name="offline_unavailable">Données hors ligne non disponibles</string>
@@ -16,9 +16,9 @@
     <string name="navigation_mode_notification_channel_name">Navigation active</string>
     <string name="navigation_mode_notification_channel_description">Maintient le mode navigation actif et les positions a jour</string>
     <string name="navigation_mode_notification_title">Mode navigation en cours</string>
-    <string name="navigation_mode_notification_text">Pelo reste visible sur ecran verrouille et met a jour votre position.</string>
+    <string name="navigation_mode_notification_text">Massilia reste visible sur ecran verrouille et met a jour votre position.</string>
     <string name="navigation_mode_wakeup_channel_name">Reveil navigation</string>
-    <string name="navigation_mode_wakeup_channel_description">Affiche Pelo au reveil de l ecran pendant la navigation</string>
+    <string name="navigation_mode_wakeup_channel_description">Affiche Massilia au reveil de l ecran pendant la navigation</string>
     <string name="navigation_mode_wakeup_title">Navigation active</string>
     <string name="navigation_mode_wakeup_text">Retour a la navigation</string>
 </resources>

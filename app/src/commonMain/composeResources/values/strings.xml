@@ -55,7 +55,7 @@
     <string name="previous_month">Mois précédent</string>
     <string name="next_month">Mois suivant</string>
     <string name="intermediate_stops">%1$s arrêt%2$s</string>
-    <string name="logo_pelo">Logo Pelo</string>
+    <string name="logo_massilia">Logo Massilia</string>
     <string name="app_version_title">Version de l\'application</string>
     <string name="legal_title">Mentions légales / CGU</string>
     <string name="credits_title">Crédits</string>
@@ -176,15 +176,15 @@
     <string name="telemetry_alert_incident">Incident/Perturbation</string>
     <string name="telemetry_alert_elevator">Ascenseur en panne</string>
     <string name="legal_editor_title">Éditeur</string>
-    <string name="legal_editor_content">L’Application Pelo Marseille est éditée par Dotshell. Dotshell n’est pas affiliée à la RTM ni à la Métropole Aix-Marseille-Provence. Pour toute question, se référer aux moyens de contact indiqués dans l’Application.\n</string>
+    <string name="legal_editor_content">L’Application Massilia est éditée par Dotshell. Dotshell n’est pas affiliée à la RTM ni à la Métropole Aix-Marseille-Provence. Pour toute question, se référer aux moyens de contact indiqués dans l’Application.\n</string>
     <string name="legal_object_title">Objet</string>
-    <string name="legal_object_content">Les présentes CGU définissent les conditions d’accès et d’utilisation de l’Application Pelo (ci‑après « l’Application »). L’utilisation de l’Application vaut acceptation de ces conditions.\n</string>
+    <string name="legal_object_content">Les présentes CGU définissent les conditions d’accès et d’utilisation de l’Application Massilia (ci‑après « l’Application »). L’utilisation de l’Application vaut acceptation de ces conditions.\n</string>
     <string name="legal_desc_title">Description de l\'application</string>
     <string name="legal_desc_content">L’Application aide l’utilisateur à se déplacer sur le réseau RTM (Marseille et agglomération) via des outils de recherche et de planification. Les sources tierces sont listées dans la page « Crédits ».\n</string>
     <string name="legal_permissions_title">Permissions</string>
     <string name="legal_permissions_content">L’Application peut solliciter les permissions suivantes selon les besoins techniques :\n• Localisation : Pour afficher les arrêts proches et centrer la carte (traitée localement).\n• Réseau/Internet : Pour afficher les fonds de carte.\n</string>
     <string name="legal_privacy_title">Traitement des données et confidentialité</string>
-    <string name="legal_privacy_content">Pelo Marseille est conçue selon le principe de la protection des données dès la conception.\n\n5.1. Stockage local exclusif\nVos arrêts favoris, vos préférences et l\'historique de vos trajets sont stockés exclusivement en local sur votre appareil. Dotshell ne dispose d\'aucun accès à ces informations. Vous pouvez supprimer cet historique à tout moment depuis l\'écran « Confidentialité ».\n\n5.2. Fonctionnement hors connexion\nLa recherche d\'itinéraires et la consultation des horaires s\'effectuent entièrement sur votre appareil, à partir de données embarquées dans l\'application. Aucune recherche, aucun itinéraire et aucune position ne sont transmis à un serveur.\n\n5.3. Accès réseau\nLes seuls échanges réseau de l\'Application concernent l\'affichage des fonds de carte (tuiles fournies par OpenFreeMap et ESRI). Ces requêtes ne contiennent aucun identifiant personnel.\n\n5.4. Absence de collecte et de revente\nDotshell ne collecte pas vos données et ne vend aucune donnée à des annonceurs ou à des courtiers en données.\n</string>
+    <string name="legal_privacy_content">Massilia est conçue selon le principe de la protection des données dès la conception.\n\n5.1. Stockage local exclusif\nVos arrêts favoris, vos préférences et l\'historique de vos trajets sont stockés exclusivement en local sur votre appareil. Dotshell ne dispose d\'aucun accès à ces informations. Vous pouvez supprimer cet historique à tout moment depuis l\'écran « Confidentialité ».\n\n5.2. Fonctionnement hors connexion\nLa recherche d\'itinéraires et la consultation des horaires s\'effectuent entièrement sur votre appareil, à partir de données embarquées dans l\'application. Aucune recherche, aucun itinéraire et aucune position ne sont transmis à un serveur.\n\n5.3. Accès réseau\nLes seuls échanges réseau de l\'Application concernent l\'affichage des fonds de carte (tuiles fournies par OpenFreeMap et ESRI). Ces requêtes ne contiennent aucun identifiant personnel.\n\n5.4. Absence de collecte et de revente\nDotshell ne collecte pas vos données et ne vend aucune donnée à des annonceurs ou à des courtiers en données.\n</string>
     <string name="legal_liability_title">Responsabilité</string>
     <string name="legal_liability_content">Les informations (horaires, perturbations) sont fournies à titre indicatif. Dotshell décline toute responsabilité en cas d’inexactitude des données provenant de tiers ou d’indisponibilité du réseau de transport.\n</string>
     <string name="legal_ip_title">Propriété intellectuelle</string>
@@ -196,7 +196,7 @@
     <string name="credits_cartography_title">Cartographie</string>
     <string name="credits_cartography_content">Les données de cartographie sont fournies par MapLibre et OpenStreetMaps.\n\nLes fonds de carte (dénommés Positron, Dark Matter, OSM Bright et Liberty) sont fournis par OpenMapTiles. L’application utilise par défaut le thème Positron (Light) de Map Tiler.\n\nLes tuiles de la vue satellite proviennent de la ESRI World Imagery.</string>
     <string name="credits_development_title">Développement</string>
-    <string name="credits_development_content">L’application est développée de manière indépendante par Dotshell sous licence GPL-3.0. Pelo Marseille n’est pas affilié à la RTM ni à la Métropole Aix-Marseille-Provence.\n\nLe code source est disponible sur la page GitHub de Dotshell aux dépôts suivants : pelo-kmp pour le code source de l’application (Android et iOS), ainsi que raptor-gtfs-pipeline et raptor-kt pour le système d’itinéraire RAPTOR.\n\nToute contribution est ouverte à la communauté.\n\nPour plus d’information, rendez-vous sur dotshell.eu.</string>
+    <string name="credits_development_content">L’application est développée de manière indépendante par Dotshell sous licence GPL-3.0. Massilia n’est pas affilié à la RTM ni à la Métropole Aix-Marseille-Provence.\n\nLe code source est disponible sur la page GitHub de Dotshell aux dépôts suivants : massilia-kmp pour le code source de l’application (Android et iOS), ainsi que raptor-gtfs-pipeline et raptor-kt pour le système d’itinéraire RAPTOR.\n\nToute contribution est ouverte à la communauté.\n\nPour plus d’information, rendez-vous sur dotshell.eu.</string>
     <string name="credits_open_link">Ouvrir</string>
     <string name="contact_header">Une question ? Un problème ?</string>
     <string name="contact_subtitle">N\'hésitez pas à nous contacter pour toute question, suggestion ou pour signaler un bug.</string>
