@@ -1341,11 +1341,11 @@ private fun PlanContent(
                             )
 
                             val buttonColor = when {
-                                hasVehicles -> Color(0xFFEF4444)
+                                hasVehicles -> Color(0xFF009FE3)
                                 isActiveNoVehicles -> Color(0xFF9CA3AF)
                                 else -> MaterialTheme.colorScheme.surface
                             }
-                            // White reads on the red/grey active states; onSurface on the themed idle state.
+                            // White reads on the blue/grey active states; onSurface on the themed idle state.
                             val buttonContentColor = if (hasVehicles || isActiveNoVehicles) Color.White else MaterialTheme.colorScheme.onSurface
 
                             Row(

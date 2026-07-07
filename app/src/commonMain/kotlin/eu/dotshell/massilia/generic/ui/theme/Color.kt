@@ -291,7 +291,7 @@ val Rose950 = Color(0xFF4C0519)
 // Theme Colors
 val PrimaryColor = Color.Black
 val SecondaryColor = Color.White
-val AccentColor = Red500
+val AccentColor = Color(0xFF009FE3) // Bleu M1 RTM
 
 // Neutral (non-bluish) dark gray used for bottom sheets in dark mode, so they read as a
 // distinct surface above the pure-black navbar and map rather than blending into them.

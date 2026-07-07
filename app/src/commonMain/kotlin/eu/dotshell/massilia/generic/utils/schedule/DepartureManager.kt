@@ -2,9 +2,9 @@ package eu.dotshell.massilia.generic.utils.schedule
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import eu.dotshell.massilia.generic.ui.theme.AccentColor
 import eu.dotshell.massilia.generic.ui.theme.Green500
 import eu.dotshell.massilia.generic.ui.theme.Orange500
+import eu.dotshell.massilia.generic.ui.theme.Red500
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -50,7 +50,7 @@ object DepartureManager {
         if (diff < 0) return Green500
 
         return when (diff) {
-            in 0..1 -> AccentColor
+            in 0..1 -> Red500
             in 2..14 -> Orange500
             else -> Green500
         }

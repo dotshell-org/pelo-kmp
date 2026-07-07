@@ -77,7 +77,7 @@ import eu.dotshell.massilia.generic.data.telemetry.TelemetryEvent
 import eu.dotshell.massilia.generic.data.telemetry.emitTelemetryEvent
 import eu.dotshell.massilia.generic.ui.theme.Green500
 import eu.dotshell.massilia.generic.ui.theme.Orange500
-import eu.dotshell.massilia.generic.ui.theme.AccentColor
+import eu.dotshell.massilia.generic.ui.theme.Red500
 import eu.dotshell.massilia.generic.ui.viewmodel.TransportLinesUiState
 import eu.dotshell.massilia.generic.ui.viewmodel.TransportViewModelInterface
 import eu.dotshell.massilia.generic.utils.LineColorHelper
@@ -123,7 +123,7 @@ private fun getScheduleColorBasedOnTime(scheduleTime: String): Color {
         }
 
         return when (diffMinutes) {
-            in 0..<2 -> AccentColor
+            in 0..<2 -> Red500
             in 2..<15 -> Orange500
             else -> Green500
         }

@@ -41,7 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import eu.dotshell.massilia.generic.data.models.ui.AllSchedulesInfo
 import eu.dotshell.massilia.generic.ui.theme.Orange500
-import eu.dotshell.massilia.generic.ui.theme.AccentColor
+import eu.dotshell.massilia.generic.ui.theme.Red500
 import eu.dotshell.massilia.generic.utils.LineColorHelper
 import eu.dotshell.massilia.generic.utils.graphics.LineIconResolver
 import eu.dotshell.massilia.platform.DrawableProvider
@@ -67,7 +67,7 @@ private fun getAllDayScheduleColor(hour: String, minute: String, defaultColor: C
 
     return when {
         diffMinutes < 0 -> Color.Gray
-        diffMinutes < 2 -> AccentColor
+        diffMinutes < 2 -> Red500
         diffMinutes < 15 -> Orange500
         else -> defaultColor
     }
