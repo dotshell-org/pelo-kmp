@@ -555,10 +555,16 @@ private fun RootScaffold(
         itineraryActive = true
     }
 
-    LaunchedEffect(selectedStation?.nom, stops) {
-        val stName = selectedStation?.nom
+    LaunchedEffect(selectedStation?.nom, selectedLine?.currentStationName, stops) {
+        val stName = selectedStation?.nom ?: selectedLine?.currentStationName
         if (!stName.isNullOrBlank() && stops != null) {
-            val stop = stops.firstOrNull { it.properties.nom.equals(stName, ignoreCase = true) }
+            val stop = if (selectedLine?.lineName != null) {
+                viewModel.getStopsFeaturesForLine(selectedLine!!.lineName)
+                    .firstOrNull { it.properties.nom.equals(stName, ignoreCase = true) }
+                    ?: stops.firstOrNull { it.properties.nom.equals(stName, ignoreCase = true) }
+            } else {
+                stops.firstOrNull { it.properties.nom.equals(stName, ignoreCase = true) }
+            }
             if (stop != null && stop.geometry.coordinates.size >= 2) {
                 manualFocusCenter = Position(latitude = stop.geometry.coordinates[1], longitude = stop.geometry.coordinates[0])
                 manualFocusZoom = 18.0
@@ -568,7 +574,7 @@ private fun RootScaffold(
 
     LaunchedEffect(selectedLine?.lineName, linesUiState) {
         val ln = selectedLine?.lineName
-        if (!ln.isNullOrBlank()) {
+        if (!ln.isNullOrBlank() && selectedLine?.currentStationName.isNullOrBlank()) {
             val allLines = when (val s = linesUiState) {
                 is TransportLinesUiState.Success -> s.lines
                 is TransportLinesUiState.PartialSuccess -> s.lines
