@@ -173,7 +173,25 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         // Load favorites first (synchronous SharedPrefs read, instant)
         loadFavorites()
         viewModelScope.launch(ioDispatcher) {
-            offlineDataManager.refreshOfflineDataInfo()
+            while (true) {
+                offlineDataManager.refreshOfflineDataInfo()
+                val info = offlineDataManager.offlineDataInfo.value
+                if (!info.isAvailable) {
+                    try {
+                        offlineDataManager.downloadAllOfflineData()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Auto-download failed: ${e.message}")
+                    }
+                }
+                
+                offlineDataManager.refreshOfflineDataInfo()
+                if (offlineDataManager.offlineDataInfo.value.isAvailable) {
+                    break // Download succeeded or was already available
+                }
+                
+                // Retry every 5 minutes if it failed
+                kotlinx.coroutines.delay(5 * 60 * 1000L)
+            }
         }
         // Fire all async loads in parallel — each launches its own coroutine
         loadTransportLines()

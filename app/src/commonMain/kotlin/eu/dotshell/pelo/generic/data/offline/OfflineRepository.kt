@@ -196,30 +196,21 @@ class OfflineRepository(context: PlatformContext) : ApiOfflineRepository {
     fun getOfflineDataInfo(): OfflineDataInfo {
         val lastDownload = settings.getLong(KEY_LAST_DOWNLOAD, 0L)
         val downloadedStyles = getDownloadedMapStyles()
-        val hasData = lastDownload > 0L && GzipFileStore.list(offlineDir).isNotEmpty()
-        val busFiles = GzipFileStore.list(busDir)
-        val busCount = busFiles.count { it.name.endsWith(".json.gz") }
+        val hasData = downloadedStyles.isNotEmpty()
 
         return OfflineDataInfo(
             isAvailable = hasData,
             lastDownloadTimestamp = lastDownload,
             totalSizeBytes = if (hasData) calculateTotalSize() else 0L,
             mapTilesDownloaded = downloadedStyles.isNotEmpty(),
-            downloadedMapStyles = downloadedStyles,
-            busLinesCount = busCount
+            downloadedMapStyles = downloadedStyles
         )
     }
 
     // ===== INTERNAL =====
 
     private fun calculateTotalSize(): Long {
-        val mainSize = GzipFileStore.list(offlineDir).sumOf { p ->
-            if (p.name == "bus") 0L else GzipFileStore.size(p.toString())
-        }
-        val busSize = GzipFileStore.list(busDir).sumOf { GzipFileStore.size(it.toString()) }
-        // Include MapLibre offline tiles database (stored by MapLibre in filesDir)
-        val mapTilesSize = GzipFileStore.size("${fileSystem.filesDir()}/mbgl-offline.db")
-        return mainSize + busSize + mapTilesSize
+        return GzipFileStore.size("${fileSystem.filesDir()}/mbgl-offline.db")
     }
 
     private suspend inline fun <reified T> writeCompressed(fileName: String, data: T) {

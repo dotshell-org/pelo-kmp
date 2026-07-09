@@ -6,18 +6,11 @@ import eu.dotshell.pelo.platform.Log
 import eu.dotshell.pelo.platform.PlatformContext
 import eu.dotshell.pelo.platform.createOfflineTileDownloader
 import eu.dotshell.pelo.generic.data.network.transport.TransportApi
-import eu.dotshell.pelo.generic.data.network.transport.TransportLinesQuery
-import eu.dotshell.pelo.generic.data.models.geojson.Feature
-import eu.dotshell.pelo.generic.data.models.geojson.StopFeature
-import eu.dotshell.pelo.generic.data.models.realtime.alerts.official.TrafficAlertsResponse
 import eu.dotshell.pelo.generic.service.TransportServiceProvider
-import eu.dotshell.pelo.generic.utils.network.withRetry
 import eu.dotshell.pelo.generic.data.repository.api.OfflineDataManager as ApiOfflineDataManager
 import eu.dotshell.pelo.generic.data.repository.offline.SchedulesRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -85,320 +78,21 @@ class OfflineDataManager(
 
         withContext(ioDispatcher) {
             try {
-                var cumulativeProgress: Float
-                val dataWeight =
-                    WEIGHT_METRO_TRAM + WEIGHT_NAVIGONE_TRAMBUS + WEIGHT_RX + WEIGHT_STOPS + WEIGHT_ALERTS
+                _downloadState.value = OfflineDownloadState.Downloading(0f, "Préparation...")
 
-                // ============================================================
-                // BATCH 1: Parallel API calls for all non-bus data
-                // All calls are independent (different API endpoints, different files).
-                // ============================================================
-                _downloadState.value =
-                    OfflineDownloadState.Downloading(0f, "Téléchargement des données...")
-
-                // Launch all API calls in parallel. Non-critical calls have try/catch
-                // inside async so they return null on failure instead of cancelling others.
-                data class BatchResults(
-                    val metroFeatures: List<Feature>?,
-                    val tramFeatures: List<Feature>?,
-                    val navigoneFeatures: List<Feature>?,
-                    val trambusFeatures: List<Feature>?,
-                    val rxFeatures: List<Feature>?,
-                    val stopsFeatures: List<StopFeature>?,
-                    val alertsResponse: TrafficAlertsResponse?
-                )
-
-                val batchResults: BatchResults
-                try {
-                    batchResults = coroutineScope {
-                        // Strong lines are provided in a single call.
-                        val strongLines = withRetry(
-                            maxRetries = 2,
-                            initialDelayMs = 1000
-                        ) { transportApi.getLines(TransportLinesQuery.StrongLines) }
-
-                        val stops = withRetry(
-                            maxRetries = 2,
-                            initialDelayMs = 1000
-                        ) { transportApi.getTransportStops() }
-
-                        // Traffic alerts are non-critical.
-                        val alerts = runCatching {
-                            withRetry(
-                                maxRetries = 2,
-                                initialDelayMs = 500
-                            ) { transportApi.getTrafficAlerts() }
-                        }.getOrNull()
-
-                        fun isMetroFunicular(upper: String): Boolean =
-                            upper in setOf("A", "B", "C", "D", "F1", "F2")
-
-                        fun isTram(upper: String): Boolean =
-                            upper.startsWith("T") && !upper.startsWith("TB")
-
-                        fun isTrambus(upper: String): Boolean = upper.startsWith("TB")
-                        fun isNavigone(upper: String): Boolean = upper.startsWith("NAV")
-                        fun isRx(upper: String): Boolean = upper == "RX"
-
-                        val metroFeatures = strongLines.features.filter { isMetroFunicular(it.properties.lineName.uppercase()) }
-                        val tramFeatures = strongLines.features.filter { isTram(it.properties.lineName.uppercase()) }
-                        val navigoneFeatures = strongLines.features.filter { isNavigone(it.properties.lineName.uppercase()) }
-                        val trambusFeatures = strongLines.features.filter { isTrambus(it.properties.lineName.uppercase()) }
-                        val rxFeatures = strongLines.features.filter { isRx(it.properties.lineName.uppercase()) }
-
-                        BatchResults(
-                            metroFeatures = metroFeatures,
-                            tramFeatures = tramFeatures,
-                            navigoneFeatures = navigoneFeatures,
-                            trambusFeatures = trambusFeatures,
-                            rxFeatures = rxFeatures,
-                            stopsFeatures = stops.features,
-                            alertsResponse = alerts
-                        )
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to download critical data (metro/tram/stops)", e)
-                    _downloadState.value =
-                        OfflineDownloadState.Error("Échec du téléchargement: ${e.message}")
-                    return@withContext
-                }
-
-                // Save all results — each writes a different file, no conflicts
-                _downloadState.value =
-                    OfflineDownloadState.Downloading(0.02f, "Sauvegarde des données...")
-
-                offlineRepository.saveMetroLines(batchResults.metroFeatures ?: emptyList())
-                offlineRepository.saveTramLines(batchResults.tramFeatures ?: emptyList())
-
-                batchResults.navigoneFeatures?.let { features ->
-                    offlineRepository.saveNavigoneLines(features)
-                    Log.i(TAG, "Navigone: saved ${features.size} features")
-                }
-
-                batchResults.trambusFeatures?.let { features ->
-                    Log.i(
-                        TAG,
-                        "Trambus API returned ${features.size} features: ${
-                            features.map { it.properties.lineName }.distinct()
-                        }"
-                    )
-                    if (features.isNotEmpty()) {
-                        offlineRepository.saveTrambusLines(features)
-                        val verifyLoad = offlineRepository.loadTrambusLines()
-                        Log.i(
-                            TAG,
-                            "Trambus: verify after save = ${verifyLoad?.size ?: "NULL (write failed!)"} features"
-                        )
-                    }
-                }
-
-                batchResults.rxFeatures?.let { features ->
-                    if (features.isNotEmpty()) offlineRepository.saveRxLines(features)
-                }
-
-                offlineRepository.saveStops(batchResults.stopsFeatures ?: emptyList())
-
-                batchResults.alertsResponse?.let { response ->
-                    if (response.success && response.alerts.isNotEmpty()) {
-                        offlineRepository.saveTrafficAlerts(response.alerts)
-                    }
-                }
-
-                cumulativeProgress = dataWeight
-                Log.i(TAG, "Batch 1 complete: all non-bus data downloaded and saved")
-
-                // ============================================================
-                // BATCH 2: Bus lines — sequential pages (OOM protection)
-                // ============================================================
-                _downloadState.value =
-                    OfflineDownloadState.Downloading(cumulativeProgress, "Lignes de bus...")
-                try {
-                    offlineRepository.clearBusLines()
-                    val busLikeNames = schedulesRepository.getAllBusLikeRouteNames()
-                    val busNameBySafe = busLikeNames.associateBy {
-                        it.uppercase().replace(Regex("[^A-Za-z0-9_-]"), "_")
-                    }
-                    val pageSize = 500
-                    var startIndex = 0
-                    var totalDownloaded = 0
-                    var hasMore = true
-                    val rescuedTrambus = mutableListOf<Feature>()
-
-                    Log.i(TAG, "Starting paginated bus download (pageSize=$pageSize)")
-
-                    while (hasMore) {
-                        Log.i(TAG, "Fetching bus page: startIndex=$startIndex, count=$pageSize")
-                        val page = withRetry(maxRetries = 2, initialDelayMs = 1000) {
-                            transportApi.getLines(
-                                TransportLinesQuery.BusPage(
-                                    startIndex = startIndex,
-                                    count = pageSize
-                                )
-                            )
-                        }
-                        val features = page.features
-                        Log.i(
-                            TAG,
-                            "Bus page response: ${features.size} features, totalFeatures=${page.totalFeatures}, numberMatched=${page.numberMatched}, numberReturned=${page.numberReturned}"
-                        )
-
-                        if (features.isNotEmpty()) {
-                            val trambusInPage =
-                                features.filter { it.properties.lineName.uppercase().startsWith("TB") }
-                            val busFeatures = features.filter {
-                                !it.properties.lineName.uppercase().startsWith("TB")
-                            }
-
-                            if (trambusInPage.isNotEmpty()) {
-                                rescuedTrambus.addAll(trambusInPage)
-                                Log.i(
-                                    TAG,
-                                    "Rescued ${trambusInPage.size} trambus features from bus page"
-                                )
-                            }
-
-                            if (busFeatures.isNotEmpty()) {
-                                offlineRepository.saveBusLinesPage(busFeatures)
-                                totalDownloaded += busFeatures.size
-                            }
-
-                            startIndex += features.size
-                            Log.i(
-                                TAG,
-                                "Bus page saved: ${busFeatures.size} bus features (total: $totalDownloaded), trambus rescued: ${rescuedTrambus.size}"
-                            )
-                            _downloadState.value = OfflineDownloadState.Downloading(
-                                cumulativeProgress + WEIGHT_BUS * (totalDownloaded.toFloat() / 10000f).coerceAtMost(
-                                    0.95f
-                                ),
-                                "Lignes de bus ($totalDownloaded)..."
-                            )
-                        } else {
-                            startIndex += pageSize
-                        }
-                        hasMore = features.size >= pageSize
-                        Log.i(
-                            TAG,
-                            "hasMore=$hasMore (features.size=${features.size} >= pageSize=$pageSize)"
-                        )
-                    }
-
-                    // Save rescued trambus if batch 1 failed to download them
-                    if (rescuedTrambus.isNotEmpty()) {
-                        val existingTrambus = offlineRepository.loadTrambusLines()
-                        if (existingTrambus.isNullOrEmpty()) {
-                            offlineRepository.saveTrambusLines(rescuedTrambus)
-                            Log.i(
-                                TAG,
-                                "Saved ${rescuedTrambus.size} rescued trambus features (batch 1 had failed)"
-                            )
-                        } else {
-                            Log.i(
-                                TAG,
-                                "Trambus already saved from batch 1 (${existingTrambus.size} features), skipping rescued ones"
-                            )
-                        }
-                    }
-
-                    var busFiles = offlineRepository.getAvailableBusLineNames()
-                    Log.i(
-                        TAG,
-                        "Bus download complete: $totalDownloaded features total, ${busFiles.size} line files on disk: ${
-                            busFiles.take(10)
-                        }"
-                    )
-
-                    // Fallback: fetch missing lines in parallel batches of 5
-                    if (busNameBySafe.isNotEmpty()) {
-                        val busFilesSafe = busFiles.map { it.uppercase() }.toSet()
-                        val missingSafe = busNameBySafe.keys - busFilesSafe
-                        if (missingSafe.isNotEmpty()) {
-                            Log.w(
-                                TAG,
-                                "Bulk bus download missing ${missingSafe.size} lines, starting per-line fallback (batched)"
-                            )
-                            var done = 0
-                            val total = missingSafe.size
-                            val missingList = missingSafe.toList()
-
-                            for (batch in missingList.chunked(5)) {
-                                coroutineScope {
-                                    batch.map { safeName ->
-                                        async {
-                                            val lineName = busNameBySafe[safeName] ?: return@async
-                                            try {
-                                                val pageFeatures = withRetry(
-                                                    maxRetries = 2,
-                                                    initialDelayMs = 1000
-                                                ) {
-                                                    transportApi
-                                                        .getLines(
-                                                            TransportLinesQuery.LineByName(lineName)
-                                                        )
-                                                        .features
-                                                }
-                                                if (pageFeatures.isNotEmpty()) {
-                                                    offlineRepository.saveBusLinesPage(pageFeatures)
-                                                }
-                                            } catch (e: Exception) {
-                                                Log.w(
-                                                    TAG,
-                                                    "Fallback bus fetch failed for $lineName: ${e.message}"
-                                                )
-                                            }
-                                        }
-                                    }.awaitAll()
-                                }
-                                done += batch.size
-                                _downloadState.value = OfflineDownloadState.Downloading(
-                                    cumulativeProgress + WEIGHT_BUS * (done.toFloat() / total).coerceAtMost(
-                                        0.95f
-                                    ),
-                                    "Lignes de bus ($done/$total)..."
-                                )
-                            }
-                            busFiles = offlineRepository.getAvailableBusLineNames()
-                            Log.i(TAG, "Bus fallback complete: ${busFiles.size} line files on disk")
-                        }
-                    }
-                } catch (e: OutOfMemoryError) {
-                    Log.e(TAG, "OutOfMemoryError downloading bus lines", e)
-                    _downloadState.value =
-                        OfflineDownloadState.Error("Mémoire insuffisante pour télécharger les lignes de bus")
-                    return@withContext
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to download bus lines", e)
-                    _downloadState.value =
-                        OfflineDownloadState.Error("Échec du téléchargement des lignes de bus: ${e.message}")
-                    return@withContext
-                }
-                cumulativeProgress += WEIGHT_BUS
-
-                // Mark data download as complete
-                offlineRepository.markDownloadComplete()
-                // Log offline info right after marking complete (before map tiles)
-                val infoAfterData = offlineRepository.getOfflineDataInfo()
-                Log.i(
-                    TAG,
-                    "After data download: busLinesCount=${infoAfterData.busLinesCount}, totalSize=${infoAfterData.totalSizeBytes}, isAvailable=${infoAfterData.isAvailable}"
-                )
-                _offlineDataInfo.value = infoAfterData
-
-                // Step 7: Map tiles for each selected style
-                val selectedStyleKeys = offlineRepository.getSelectedMapStyles()
+                // Step: Map tiles for ALL standard styles
                 val mapStyleConfig = TransportServiceProvider.getMapStyleConfig()
-                val stylesToDownload = selectedStyleKeys.mapNotNull { key ->
-                    mapStyleConfig.getMapStyleByKey(key)
-                }
-                    .filter { it.styleUrl.startsWith("http") } // Exclude asset:// styles (e.g. Satellite)
+                val stylesToDownload = eu.dotshell.pelo.generic.data.repository.offline.mapstyle.MapStyleCompat.getByCategory(
+                    eu.dotshell.pelo.generic.data.network.mapstyle.MapStyleCategory.STANDARD, 
+                    mapStyleConfig
+                ).filter { it.styleUrl.startsWith("http") } // Exclude asset:// styles (e.g. Satellite)
 
                 val completedStyles = mutableSetOf<String>()
-                val weightPerStyle =
-                    if (stylesToDownload.isNotEmpty()) WEIGHT_MAP_TILES / stylesToDownload.size else WEIGHT_MAP_TILES
+                val weightPerStyle = if (stylesToDownload.isNotEmpty()) 1.0f / stylesToDownload.size else 1.0f
 
                 for ((styleIndex, style) in stylesToDownload.withIndex()) {
                     val regionName = offlineMapManager.regionNameForStyle(style.key)
-                    val styleBaseProgress = cumulativeProgress + (styleIndex * weightPerStyle)
+                    val styleBaseProgress = styleIndex * weightPerStyle
                     _downloadState.value = OfflineDownloadState.Downloading(
                         styleBaseProgress,
                         "Tuiles ${style.displayName} (${styleIndex + 1}/${stylesToDownload.size})..."
@@ -413,8 +107,7 @@ class OfflineDataManager(
                         val progressJob = launch {
                             offlineMapManager.downloadState.collect { mapState ->
                                 if (mapState is MapTilesDownloadState.Downloading) {
-                                    val totalProgress =
-                                        styleBaseProgress + (mapState.progress * weightPerStyle)
+                                    val totalProgress = styleBaseProgress + (mapState.progress * weightPerStyle)
                                     _downloadState.value = OfflineDownloadState.Downloading(
                                         totalProgress.coerceIn(0f, 1f),
                                         "Tuiles ${style.displayName} (${(mapState.progress * 100).toInt()}%)..."
@@ -434,24 +127,20 @@ class OfflineDataManager(
                                 completedStyles.add(style.key)
                                 Log.i(TAG, "Map tiles for ${style.key} complete")
                             }
-
                             is MapTilesDownloadState.Error -> {
-                                Log.e(
-                                    TAG,
-                                    "Map tiles for ${style.key} failed: ${terminalState.message}"
-                                )
+                                Log.e(TAG, "Map tiles for ${style.key} failed: ${terminalState.message}")
                             }
-
                             else -> {}
                         }
                     }
                 }
 
-                // Also keep any previously downloaded styles that are still selected
-                val previouslyDownloaded = offlineRepository.getDownloadedMapStyles()
-                val allDownloaded =
-                    completedStyles + previouslyDownloaded.filter { it in selectedStyleKeys }
-                offlineRepository.setDownloadedMapStyles(allDownloaded)
+                // Mark all successfully downloaded styles
+                offlineRepository.setDownloadedMapStyles(completedStyles)
+                
+                // Mark data download as complete
+                offlineRepository.markDownloadComplete()
+                
                 _downloadState.value = OfflineDownloadState.Complete
                 _offlineDataInfo.value = offlineRepository.getOfflineDataInfo()
 
@@ -467,5 +156,4 @@ class OfflineDataManager(
             }
         }
     }
-
 }

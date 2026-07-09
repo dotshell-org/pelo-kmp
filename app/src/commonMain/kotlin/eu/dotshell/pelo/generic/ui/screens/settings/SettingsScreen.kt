@@ -66,7 +66,6 @@ fun SettingsScreen(
     onCreditsClick: () -> Unit,
     onContactClick: () -> Unit,
     modifier: Modifier = Modifier,
-    onOfflineClick: () -> Unit = {},
     onApiHealthClick: () -> Unit = {},
     onTelemetryClick: () -> Unit = {},
     onAboutClick: () -> Unit = {},
@@ -177,11 +176,6 @@ fun SettingsScreen(
                 SettingsMenuRow(
                     title = strings["itinerary"],
                     onClick = onItineraryClick
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                SettingsMenuRow(
-                    title = strings["offline_mode"],
-                    onClick = onOfflineClick
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 SettingsMenuRow(

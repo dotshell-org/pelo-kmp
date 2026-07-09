@@ -127,7 +127,6 @@ import eu.dotshell.pelo.generic.data.local_history.LocalHistoryStorage
 import eu.dotshell.pelo.generic.data.telemetry.TelemetryEmitter
 import eu.dotshell.pelo.platform.Settings
 import eu.dotshell.pelo.generic.ui.screens.settings.ItinerarySettingsScreen
-import eu.dotshell.pelo.generic.ui.screens.settings.OfflineSettingsScreen
 import eu.dotshell.pelo.generic.ui.screens.settings.SettingsScreen
 import eu.dotshell.pelo.generic.ui.screens.settings.TelemetrySettingsScreen
 import eu.dotshell.pelo.generic.ui.screens.settings.ThemeSettingsScreen
@@ -1460,7 +1459,6 @@ private fun SettingsTab(viewModel: TransportViewModel, modifier: Modifier = Modi
             )
             "credits" -> CreditsScreen(onBackClick = navigateBack)
             "contact" -> ContactScreen(onBackClick = navigateBack)
-            "offline" -> OfflineSettingsScreen(viewModel = viewModel, onBackClick = navigateBack)
 
             "itinerary" -> {
                 val cfg = remember { AppConfigLoader.getConfig().itinerarySettings }
@@ -1503,7 +1501,6 @@ private fun SettingsTab(viewModel: TransportViewModel, modifier: Modifier = Modi
                 onLegalClick = { navigateTo("legal") },
                 onCreditsClick = { navigateTo("credits") },
                 onContactClick = { navigateTo("contact") },
-                onOfflineClick = {},
                 onTelemetryClick = {},
                 onThemeClick = {},
 
@@ -1516,7 +1513,6 @@ private fun SettingsTab(viewModel: TransportViewModel, modifier: Modifier = Modi
                 onLegalClick = {},
                 onCreditsClick = {},
                 onContactClick = {},
-                onOfflineClick = { navigateTo("offline") },
                 onTelemetryClick = { navigateTo("telemetry") },
                 onAboutClick = { navigateTo("about") },
                 onThemeClick = { navigateTo("theme") },
