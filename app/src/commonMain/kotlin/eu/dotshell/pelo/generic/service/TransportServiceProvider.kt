@@ -56,7 +56,8 @@ object TransportServiceProvider {
         transportLineService = TransportLineServiceImpl()
 
         // Create the API using the KMP-compatible Ktor client (commonMain)
-        transportApi = LyonKtorClient(transportConfig.baseUrl)
+        val fileSystem = FileSystem(context)
+        transportApi = LyonKtorClient(transportConfig.baseUrl, fileSystem)
 
         // Rules for matching/normalizing line names
         transportLineRules = AppTransportLineRules(appConfig.rules)
