@@ -1,8 +1,5 @@
 package eu.dotshell.pelo.generic.ui.components
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,6 +28,7 @@ import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.Log
 import eu.dotshell.pelo.platform.FileSystem
 import kotlinx.coroutines.Dispatchers
+import kotlin.time.TimeSource
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -70,6 +68,7 @@ private const val EMPTY_FEATURE_COLLECTION = """{"type":"FeatureCollection","fea
 private const val STOP_RENDER_MIN_ZOOM = 12.0
 private const val BUS_RENDER_MIN_ZOOM = 16.0
 private const val REVEAL_PARSE_GRACE_MS = 500L
+private const val REVEAL_STEPS = 60
 
 /**
  * Cross-platform map canvas built on maplibre-compose (declarative).
@@ -239,16 +238,29 @@ fun MapCanvas(
     // heavy GeoJSON was still being prepared). Once the string is ready, hide
     // everything (progress < 0) through a short grace so MapLibre finishes
     // parsing the new source natively, then sweep 0->1: every line carries a
-    // revealRank in [0,1) and pops in when the sweep passes it. The sweep is a
-    // filter on the already-loaded source — no re-serialization.
-    val revealProgress = remember { Animatable(1f) }
+    // revealRank in [0,1) and pops in when the sweep passes it.
+    //
+    // The sweep is QUANTIZED into a few dozen wall-clock waves rather than one
+    // filter update per animation frame: re-filtering a huge source every frame
+    // stalls the renderer, and a stalled renderer turns the cascade into "a
+    // whole batch at once" when it catches up. Wall-clock pacing also keeps the
+    // rhythm even if some waves render late.
+    val revealProgress = remember { mutableStateOf(1f) }
     LaunchedEffect(linesGeoJson) {
         if (revealAnimated && linesGeoJson != EMPTY_FEATURE_COLLECTION) {
-            revealProgress.snapTo(-0.001f)
+            revealProgress.value = -0.001f
             delay(REVEAL_PARSE_GRACE_MS)
-            revealProgress.animateTo(1f, tween(durationMillis = revealDurationMs, easing = LinearEasing))
+            val stepMs = (revealDurationMs / REVEAL_STEPS).coerceAtLeast(50).toLong()
+            val start = TimeSource.Monotonic.markNow()
+            while (true) {
+                val elapsedMs = start.elapsedNow().inWholeMilliseconds
+                val progress = (elapsedMs.toFloat() / revealDurationMs).coerceAtMost(1f)
+                revealProgress.value = progress
+                if (progress >= 1f) break
+                delay(stepMs)
+            }
         } else {
-            revealProgress.snapTo(1f)
+            revealProgress.value = 1f
         }
     }
 
