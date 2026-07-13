@@ -125,8 +125,9 @@ class PeloSmokeTest {
         val missingCore = structuring.filterNot(::hasIcon)
         assertTrue("structuring lines without pictogram: $missingCore", missingCore.isEmpty())
 
-        val allNames = LyonLinesParser.parse(asset("lyon/lines.bin").readBytes())
-            .features.map { it.properties.lineName }.distinct().filter { it.isNotBlank() }
+        val parsed = LyonLinesParser.parse(asset("lyon/lines.bin").readBytes())
+        assertTrue("the RLN2 file carries the full network (got ${parsed.size} lines)", parsed.size > 900)
+        val allNames = parsed.map { it.name }.distinct().filter { it.isNotBlank() }
         val covered = allNames.count(::hasIcon)
         assertTrue(
             "most lines keep a pictogram ($covered/${allNames.size} covered)",

@@ -71,9 +71,63 @@ class LyonKtorClient(
         Log.d(TAG, "Loading lines.bin from composeResources...")
         val bytes = fileSystem.readAssetBytes("lyon/lines.bin")
         Log.d(TAG, "lines.bin size: ${bytes.size} bytes")
-        val parsed = eu.dotshell.pelo.specific.data.local.LyonLinesParser.parse(bytes)
-        Log.d(TAG, "Parsed ${parsed.features.size} features from lines.bin")
-        parsed
+        val lines = eu.dotshell.pelo.specific.data.local.LyonLinesParser.parse(bytes)
+        val features = lines.flatMap { line ->
+            line.paths.mapIndexed { index, path -> line.toFeature(index, path) }
+        }
+        Log.d(TAG, "Parsed ${lines.size} lines (${features.size} trace variants) from lines.bin")
+        FeatureCollection(
+            type = "FeatureCollection",
+            features = features,
+            totalFeatures = features.size,
+            numberMatched = features.size,
+            numberReturned = features.size
+        )
+    }
+
+    private fun eu.dotshell.pelo.specific.data.local.LyonLine.toFeature(
+        pathIndex: Int,
+        path: eu.dotshell.pelo.specific.data.local.LyonLinePath
+    ): Feature {
+        // Historical WFS type codes, preserved because every filter below
+        // (and the strong/bus splits) matches on them.
+        val typeCode = when {
+            name.equals("RX", ignoreCase = true) -> "TRAM"
+            gtfsRouteType == 1 -> "MET"
+            gtfsRouteType == 0 -> "TRA"
+            gtfsRouteType == 7 -> "FUN"
+            gtfsRouteType == 4 -> "BAT"
+            else -> "BUS"
+        }
+        return Feature(
+            type = "Feature",
+            id = "lyon_${name}_$pathIndex",
+            multiLineStringGeometry = MultiLineStringGeometry(
+                type = "MultiLineString",
+                coordinates = listOf(path.points)
+            ),
+            geometryName = null,
+            properties = TransportLineProperties(
+                lineName = name,
+                traceCode = "$name-$pathIndex",
+                lineId = name,
+                traceType = typeCode,
+                traceName = name,
+                direction = if (path.directionId == 0) "Aller" else "Retour",
+                transportType = typeCode,
+                lineTypeCode = typeCode,
+                lineTypeName = when (typeCode) {
+                    "MET" -> "Métro"
+                    "TRA", "TRAM" -> "Tramway"
+                    "FUN" -> "Funiculaire"
+                    "BAT" -> "Navette fluviale"
+                    else -> "Bus"
+                },
+                gid = idInternal,
+                color = colorHex.takeIf { it.isNotBlank() }?.let { "#$it" }
+            ),
+            bbox = null
+        )
     }
 
     private val json = Json {
