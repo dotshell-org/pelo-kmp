@@ -373,11 +373,11 @@ fun MapCanvas(
                     filter = feature["isStrong"].convertToString() eq const("yes"),
                     color = feature["color"].convertToColor(),
                     opacity = const(0.25f),
-                    blur = const(8.dp),
+                    blur = const(7.dp),
                     width = switch(
                         feature["isMetroOrFunicular"].convertToString(),
-                        case("yes", const(18.dp)),
-                        fallback = const(14.dp)
+                        case("yes", const(16.dp)),
+                        fallback = const(12.dp)
                     ),
                 )
                 LineLayer(
