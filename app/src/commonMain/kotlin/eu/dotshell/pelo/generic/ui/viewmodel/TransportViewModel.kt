@@ -1103,7 +1103,9 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         _vehiclePositions.value = emptyList()
 
         vehiclePositionsJob = viewModelScope.launch {
-            vehiclePositionsRepository.streamAllVehiclePositions().collect { result ->
+            // Focused per-line stream (one request per poll); the filter stays
+            // as a safety net in case the backend returns more than the asked line.
+            vehiclePositionsRepository.streamVehiclePositionsByLine(lineName.trim()).collect { result ->
                 result.onSuccess { allPositions ->
                     val requested = lineName.trim()
                     val requestedNormalized = lineRules.normalizeForComparison(requested)

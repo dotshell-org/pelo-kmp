@@ -77,17 +77,19 @@ import eu.dotshell.pelo.generic.data.telemetry.TelemetryEvent
 import eu.dotshell.pelo.generic.data.telemetry.emitTelemetryEvent
 import eu.dotshell.pelo.generic.ui.theme.Green500
 import eu.dotshell.pelo.generic.ui.theme.Orange500
-import eu.dotshell.pelo.generic.ui.theme.AccentColor
+import eu.dotshell.pelo.generic.ui.theme.Red500
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportLinesUiState
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModelInterface
 import eu.dotshell.pelo.generic.utils.LineColorHelper
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
+import eu.dotshell.pelo.generic.utils.schedule.DepartureManager
 import eu.dotshell.pelo.platform.randomId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
+import eu.dotshell.pelo.generic.service.TransportServiceProvider
 import kotlinx.datetime.Instant
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.LocalTime
@@ -114,7 +116,9 @@ private fun getScheduleColorBasedOnTime(scheduleTime: String): Color {
 
         val hour = parts[0].toInt()
         val minute = parts[1].toInt()
-        val schedule = LocalTime(hour, minute)
+        // GTFS night-run hours ("25:30" = 01:30) would make LocalTime throw;
+        // the day-wrap correction below makes the modulo equivalent anyway.
+        val schedule = LocalTime(hour % 24, minute)
 
         var diffMinutes = (schedule.toSecondOfDay() - now.toSecondOfDay()) / 60
         if (diffMinutes < 0) {
@@ -122,7 +126,7 @@ private fun getScheduleColorBasedOnTime(scheduleTime: String): Color {
         }
 
         return when (diffMinutes) {
-            in 0..<2 -> AccentColor
+            in 0..<2 -> Red500
             in 2..<15 -> Orange500
             else -> Green500
         }
@@ -144,7 +148,7 @@ private fun getMinutesUntil(scheduleTime: String): Long? {
         if (parts.size < 2) return null
         val hour = parts[0].toInt()
         val minute = parts[1].toInt()
-        val schedule = LocalTime(hour, minute)
+        val schedule = LocalTime(hour % 24, minute)
         var diff = (schedule.toSecondOfDay() - now.toSecondOfDay()) / 60
         if (diff < 0) {
             diff += 24 * 60
@@ -867,7 +871,7 @@ private fun NextSchedulesSection(
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
-                            text = schedule,
+                            text = DepartureManager.formatDisplayTime(schedule),
                             style = timeStyle,
                             color = getScheduleColorBasedOnTime(schedule)
                         )
@@ -948,14 +952,11 @@ private fun StopItemWithLine(
             )
         }
 
+        // Only show structuring connections (metro, tram, BHNS, navettes maritimes) —
+        // config-driven via the strong-lines rules instead of hardcoded names.
+        val connectionRules = remember { TransportServiceProvider.getTransportLineRules() }
         val filteredConnections = stop.connections.filter { connection ->
-            val upperCaseConnection = connection.uppercase()
-
-            upperCaseConnection in listOf("A", "B", "C", "D") || // Metro
-                    (upperCaseConnection.startsWith("T") && !upperCaseConnection.endsWith("36")) || // Tram & Trambus
-                    upperCaseConnection in listOf("F1", "F2") || // Funicular
-                    upperCaseConnection.startsWith("NAVI") || // Navigone
-                    upperCaseConnection == "RX" // Rhone Express
+            connectionRules.isStrongLine(connection)
         }
 
         Row(
@@ -995,7 +996,7 @@ private fun StopItemWithLine(
 
 /**
  * Badge displaying a transfer line (metro or funicular)
- * Uses TCL images like on the map
+ * Uses the line badges like on the map
  */
 @Composable
 private fun ConnectionBadge(
@@ -1021,7 +1022,7 @@ private fun ConnectionBadge(
     }
 
     if (hasIcon) {
-        // Display TCL image via Compose Resources (cross-platform)
+        // Display the line badge via Compose Resources (cross-platform)
         Image(
             painter = drawableProvider.getPainter(drawableName),
             contentDescription = strings["line_label"].replace("%s", lineName),
