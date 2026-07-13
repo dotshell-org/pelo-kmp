@@ -1160,6 +1160,10 @@ private fun PlanContent(
                     vehicleIconName = vehicleIconName,
                     selectedLineName = selectedLineName,
                     revealAnimated = showAllLines && selectedLineName.isNullOrBlank(),
+                    revealDurationMs = remember(mapLines) {
+                        val lineCount = mapLines?.asSequence()?.map { it.properties.lineName }?.distinct()?.count() ?: 0
+                        (lineCount * 12).coerceAtLeast(1200)
+                    },
                     itineraryGeoJson = itineraryGeoJson,
                     interactive = !navigationState.isActive,
                     tilt = if (navigationState.isActive) 55.0 else (if (isCenteredOnUser) 0.0 else null),

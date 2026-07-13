@@ -31,6 +31,7 @@ import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.Log
 import eu.dotshell.pelo.platform.FileSystem
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
@@ -68,6 +69,7 @@ import org.maplibre.spatialk.geojson.Position
 private const val EMPTY_FEATURE_COLLECTION = """{"type":"FeatureCollection","features":[]}"""
 private const val STOP_RENDER_MIN_ZOOM = 12.0
 private const val BUS_RENDER_MIN_ZOOM = 16.0
+private const val REVEAL_PARSE_GRACE_MS = 500L
 
 /**
  * Cross-platform map canvas built on maplibre-compose (declarative).
@@ -110,6 +112,7 @@ fun MapCanvas(
     vehicleIconName: String? = null,
     selectedLineName: String? = null,
     revealAnimated: Boolean = false,
+    revealDurationMs: Int = 2000,
     interactive: Boolean = true,
     onStopClick: (stopName: String) -> Unit = {},
     onLineClick: (lineName: String) -> Unit = {},
@@ -230,16 +233,20 @@ fun MapCanvas(
         value = result
     }
 
-    // Staggered reveal of the all-lines mode: once the (heavy) GeoJSON string
-    // is ready — preparation time deliberately NOT counted — the sweep runs
-    // 0->1 in exactly 2 s. Every feature carries a revealRank in [0,1), so at
-    // T=0 nothing is drawn and at T=2s the whole network is; the filter sweep
-    // costs nothing on the source (no re-serialization).
+    // Staggered reveal of the all-lines mode. Keyed on the DATA only: toggling
+    // the flag alone must not replay the sweep on the still-displayed previous
+    // collection (that made the strong lines cascade on button press while the
+    // heavy GeoJSON was still being prepared). Once the string is ready, hide
+    // everything (progress < 0) through a short grace so MapLibre finishes
+    // parsing the new source natively, then sweep 0->1: every line carries a
+    // revealRank in [0,1) and pops in when the sweep passes it. The sweep is a
+    // filter on the already-loaded source — no re-serialization.
     val revealProgress = remember { Animatable(1f) }
-    LaunchedEffect(linesGeoJson, revealAnimated) {
+    LaunchedEffect(linesGeoJson) {
         if (revealAnimated && linesGeoJson != EMPTY_FEATURE_COLLECTION) {
-            revealProgress.snapTo(0f)
-            revealProgress.animateTo(1f, tween(durationMillis = 2000, easing = LinearEasing))
+            revealProgress.snapTo(-0.001f)
+            delay(REVEAL_PARSE_GRACE_MS)
+            revealProgress.animateTo(1f, tween(durationMillis = revealDurationMs, easing = LinearEasing))
         } else {
             revealProgress.snapTo(1f)
         }

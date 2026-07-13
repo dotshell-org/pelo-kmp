@@ -44,8 +44,13 @@ fun FeatureCollection.toLinesGeoJson(): String {
     val sb = StringBuilder((estimatedPoints * 24 + features.size * 160 + 64).coerceAtLeast(1024))
 
     sb.append("{\"type\":\"FeatureCollection\",\"features\":[")
-    val totalFeatures = features.size
-    var featureIndex = 0
+    // Reveal ranks are assigned per DISTINCT line (first-seen order), so every
+    // variant of a line pops in at the same instant of the staggered reveal.
+    val lineRankByName = LinkedHashMap<String, Int>()
+    for (feature in features) {
+        lineRankByName.getOrPut(feature.properties.lineName) { lineRankByName.size }
+    }
+    val lineCount = lineRankByName.size.coerceAtLeast(1)
     var firstFeature = true
     for (feature in features) {
         if (!firstFeature) sb.append(',')
@@ -86,10 +91,9 @@ fun FeatureCollection.toLinesGeoJson(): String {
         sb.append("\",\"isStrong\":\"")
         sb.append(if (lineRules.isStrongLine(lineName)) "yes" else "no")
         // Rank in [0,1): drives the staggered all-lines reveal (a MapLibre
-        // filter sweeps 0->1 and features pop in one after the other).
+        // filter sweeps 0->1 and lines pop in one after the other).
         sb.append("\",\"revealRank\":")
-        appendCoordinate(sb, featureIndex.toDouble() / totalFeatures)
-        featureIndex++
+        appendCoordinate(sb, (lineRankByName[lineName] ?: 0).toDouble() / lineCount)
         sb.append("}}")
     }
     sb.append("]}")
