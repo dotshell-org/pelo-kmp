@@ -78,7 +78,7 @@ fun DepartureListItem(
                     maxLines = 1
                 )
                 Text(
-                    text = departureTime,
+                    text = DepartureManager.formatDisplayTime(departureTime),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = DepartureManager.getDepartureColor(departureTime)

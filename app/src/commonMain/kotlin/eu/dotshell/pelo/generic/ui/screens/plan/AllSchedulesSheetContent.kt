@@ -41,7 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.data.models.ui.AllSchedulesInfo
 import eu.dotshell.pelo.generic.ui.theme.Orange500
-import eu.dotshell.pelo.generic.ui.theme.AccentColor
+import eu.dotshell.pelo.generic.ui.theme.Red500
 import eu.dotshell.pelo.generic.utils.LineColorHelper
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.platform.DrawableProvider
@@ -58,7 +58,8 @@ private fun getLineColor(lineName: String): Color {
 private fun getAllDayScheduleColor(hour: String, minute: String, defaultColor: Color): Color {
     val hourInt = hour.toIntOrNull() ?: return defaultColor
     val minuteInt = minute.toIntOrNull() ?: return defaultColor
-    if (hourInt !in 0..23 || minuteInt !in 0..59) return defaultColor
+    // Hours 24+ are GTFS service-day times of after-midnight runs (night lines)
+    if (hourInt !in 0..47 || minuteInt !in 0..59) return defaultColor
 
     val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
     val nowMinutes = now.hour * 60 + now.minute
@@ -67,7 +68,7 @@ private fun getAllDayScheduleColor(hour: String, minute: String, defaultColor: C
 
     return when {
         diffMinutes < 0 -> Color.Gray
-        diffMinutes < 2 -> AccentColor
+        diffMinutes < 2 -> Red500
         diffMinutes < 15 -> Orange500
         else -> defaultColor
     }
@@ -196,6 +197,9 @@ fun AllSchedulesSheetContent(
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             itemsIndexed(list, key = { _, (hour, _) -> hour }) { index, (hour, minutesList) ->
+                // Night runs carry GTFS service-day hours ("25" = 01) — the raw key keeps
+                // the chronological ordering, only the label is wrapped to clock time.
+                val displayHour = hour.toIntOrNull()?.let { (it % 24).toString().padStart(2, '0') } ?: hour
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -203,7 +207,7 @@ fun AllSchedulesSheetContent(
                     verticalAlignment = Alignment.Top
                 ) {
                     Text(
-                        text = "${hour}h",
+                        text = "${displayHour}h",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = getLineColor(allSchedulesInfo.lineName),

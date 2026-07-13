@@ -111,6 +111,10 @@ kotlin {
             // Ktor engine for iOS
             implementation(libs.ktor.client.darwin)
         }
+
+        androidUnitTest.dependencies {
+            implementation(libs.junit)
+        }
     }
 }
 

@@ -59,8 +59,7 @@ fun HistoryListItem(
                     Spacer(modifier = Modifier.size(12.dp))
                 }
                 Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy((-6).dp)
+                    modifier = Modifier.weight(1f)
                 ) {
                     val lineRules = provideTransportLineRules()
                     val displayText = if (historyItem.type == SearchType.LINE) {
@@ -77,25 +76,27 @@ fun HistoryListItem(
                     )
                     // For stops, show ALL line icons below the name
                     if (historyItem.type == SearchType.STOP && historyItem.lines.isNotEmpty()) {
-                        Spacer(modifier = Modifier.size(10.dp))
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            historyItem.lines.forEach { lineName ->
-                                if (lineRules.isStrongLine(lineName)) {
+                        Spacer(modifier = Modifier.size(6.dp))
+                        val (strongLines, weakLines) = historyItem.lines.partition { lineRules.isStrongLine(it) }
+                        if (strongLines.isNotEmpty()) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                strongLines.forEach { lineName ->
                                     SearchConnectionBadge(lineName = lineName, sizeDp = 24)
                                 }
+                            }
+                            if (weakLines.isNotEmpty()) {
+                                Spacer(modifier = Modifier.size(4.dp))
                             }
                         }
                         FlowRow(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalArrangement = Arrangement.spacedBy((-8).dp)
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            historyItem.lines.forEach { lineName ->
-                                if (!lineRules.isStrongLine(lineName)) {
-                                    SearchConnectionBadge(lineName = lineName, sizeDp = 24)
-                                }
+                            weakLines.forEach { lineName ->
+                                SearchConnectionBadge(lineName = lineName, sizeDp = 24)
                             }
                         }
                     }

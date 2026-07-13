@@ -19,4 +19,12 @@ class VehiclePositionsRepository(
         return vehiclePositionsService.streamAllVehiclePositions()
     }
 
+    /**
+     * Streams vehicle positions for a single line. With the SIRI backend this
+     * is a focused poll of that line only — much cheaper than the full sweep.
+     */
+    fun streamVehiclePositionsByLine(lineName: String): Flow<Result<List<SimpleVehiclePosition>>> {
+        return vehiclePositionsService.streamVehiclePositionsByLine(lineName)
+    }
+
 }

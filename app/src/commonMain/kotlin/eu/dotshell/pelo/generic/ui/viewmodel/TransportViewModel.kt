@@ -73,7 +73,7 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
     )
     val userStopAlertsRepository by lazy {
         UserStopAlertsRepository(
-            transportApi as eu.dotshell.pelo.specific.data.network.LyonKtorClient
+            transportApi as? eu.dotshell.pelo.generic.data.network.UserStopAlertsApi
         )
     }
     private val vehiclePositionsRepository = VehiclePositionsRepository(vehiclePositionsService)

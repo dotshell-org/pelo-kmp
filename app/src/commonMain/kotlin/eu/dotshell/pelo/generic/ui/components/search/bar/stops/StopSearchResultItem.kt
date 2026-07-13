@@ -53,24 +53,26 @@ fun StopSearchResultItem(
                 val lineRules = provideTransportLineRules()
                 if (result.lines.isNotEmpty()) {
                     Spacer(modifier = Modifier.size(4.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        result.lines.forEach { lineName ->
-                            if (lineRules.isStrongLine(lineName)) {
+                    val (strongLines, weakLines) = result.lines.partition { lineRules.isStrongLine(it) }
+                    if (strongLines.isNotEmpty()) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            strongLines.forEach { lineName ->
                                 SearchConnectionBadge(lineName = lineName, sizeDp = 24)
                             }
+                        }
+                        if (weakLines.isNotEmpty()) {
+                            Spacer(modifier = Modifier.size(4.dp))
                         }
                     }
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalArrangement = Arrangement.spacedBy((-8).dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        result.lines.forEach { lineName ->
-                            if (!lineRules.isStrongLine(lineName)) {
-                                SearchConnectionBadge(lineName = lineName, sizeDp = 24)
-                            }
+                        weakLines.forEach { lineName ->
+                            SearchConnectionBadge(lineName = lineName, sizeDp = 24)
                         }
                     }
                 }

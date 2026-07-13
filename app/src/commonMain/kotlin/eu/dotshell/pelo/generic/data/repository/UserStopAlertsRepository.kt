@@ -5,19 +5,20 @@ import eu.dotshell.pelo.platform.ioDispatcher
 import eu.dotshell.pelo.generic.data.models.realtime.alerts.community.StopAlertsStatus
 import eu.dotshell.pelo.generic.data.models.realtime.alerts.community.UserStopAlert
 import eu.dotshell.pelo.generic.data.models.realtime.alerts.community.UserStopAlertsResponse
+import eu.dotshell.pelo.generic.data.network.UserStopAlertsApi
 import eu.dotshell.pelo.generic.utils.search.SearchUtils
 import eu.dotshell.pelo.platform.Log
-import eu.dotshell.pelo.specific.data.network.LyonKtorClient
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
  * Repository for managing user stop alerts (karma-based alerts).
  * Multiplatform: removed android.util.Log dependency; now uses platform.Log.
- * Depends on [LyonKtorClient] which is now in commonMain.
+ * When the transport client has no [UserStopAlertsApi] backend (null), every
+ * query resolves to "no alerts".
  */
 class UserStopAlertsRepository(
-    private val api: LyonKtorClient
+    private val api: UserStopAlertsApi?
 ) {
     companion object {
         private const val TAG = "UserStopAlertsRepository"
@@ -33,7 +34,7 @@ class UserStopAlertsRepository(
      */
     suspend fun getUserStopAlerts(stopIds: List<String>): UserStopAlertsResponse =
         withContext(ioDispatcher) {
-            if (stopIds.isEmpty()) return@withContext emptyMap()
+            if (api == null || stopIds.isEmpty()) return@withContext emptyMap()
 
             val requestedStops = stopIds.distinct()
             Log.i(TAG, "Fetching user stop alerts for ${requestedStops.size} stops")

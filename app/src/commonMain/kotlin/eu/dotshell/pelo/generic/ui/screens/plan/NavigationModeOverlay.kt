@@ -19,6 +19,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -177,20 +178,23 @@ fun NavigationModeOverlay(
                     .padding(8.dp)
             )
 
-            val drawableProvider = DrawableProvider(LocalPlatformContext.current)
-            Icon(
-                painter = drawableProvider.getPainter("add_triangle_24px"),
-                contentDescription = strings["alert_report_title"],
-                tint = Color(0xFFFACC15),
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 20.dp)
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .clickable { onReportAlert() }
-                    .padding(10.dp)
-            )
+            val realtimeConfig = remember { eu.dotshell.pelo.generic.service.TransportServiceProvider.getRealtimeConfig() }
+            if (realtimeConfig.userStopAlertsEnabled) {
+                val drawableProvider = DrawableProvider(LocalPlatformContext.current)
+                Icon(
+                    painter = drawableProvider.getPainter("add_triangle_24px"),
+                    contentDescription = strings["alert_report_title"],
+                    tint = Color(0xFFFACC15),
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .padding(end = 20.dp)
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                        .clickable { onReportAlert() }
+                        .padding(10.dp)
+                )
+            }
         }
     }
 }

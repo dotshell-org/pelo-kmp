@@ -72,6 +72,7 @@ fun StationBottomSheet(
 
     val drawableProvider = DrawableProvider(LocalPlatformContext.current)
     val strings = StringProvider(LocalPlatformContext.current)
+    val realtimeConfig = remember { eu.dotshell.pelo.generic.service.TransportServiceProvider.getRealtimeConfig() }
     val stationName = stationInfo?.nom
 
     androidx.compose.runtime.LaunchedEffect(stationName) {
@@ -170,25 +171,27 @@ fun StationBottomSheet(
                         Text(text = strings["itinerary"], fontWeight = FontWeight.Bold)
                     }
 
-                    Button(
-                        onClick = {
-                            onReportAlertClick(stationInfo.nom, stationInfo.lignes)
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-                        )
-                    ) {
-                        Icon(
-                            painter = drawableProvider.getPainter("add_triangle_24px"),
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.size(8.dp))
-                        Text(
-                            text = strings["alert_report_title"],
-                            fontWeight = FontWeight.SemiBold
-                        )
+                    if (realtimeConfig.userStopAlertsEnabled) {
+                        Button(
+                            onClick = {
+                                onReportAlertClick(stationInfo.nom, stationInfo.lignes)
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        ) {
+                            Icon(
+                                painter = drawableProvider.getPainter("add_triangle_24px"),
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.size(8.dp))
+                            Text(
+                                text = strings["alert_report_title"],
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
                     }
 
                     Button(

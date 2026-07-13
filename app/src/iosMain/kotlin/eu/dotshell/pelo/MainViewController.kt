@@ -34,7 +34,9 @@ fun MainViewController(): UIViewController {
         if (telemetryConfig != null) {
             TelemetryService.initialize(IosPlatformContext, telemetryConfig)
         }
-        BackgroundScheduler(IosPlatformContext).ensureTrafficAlertsScheduled()
+        if (TransportServiceProvider.getRealtimeConfig().trafficAlertsEnabled) {
+            BackgroundScheduler(IosPlatformContext).ensureTrafficAlertsScheduled()
+        }
     } catch (e: Exception) {
         Log.w("MainViewController", "Failed to initialize Telemetry: ${e.message}")
     }

@@ -14,7 +14,19 @@ data class AppConfig(
     @SerialName("cache") val cache: CacheConfigData,
     @SerialName("itinerarySettings") val itinerarySettings: ItinerarySettingsData,
     @SerialName("telemetry") val telemetry: TelemetryConfigData? = null,
-    @SerialName("consent") val consent: ConsentConfigData
+    @SerialName("consent") val consent: ConsentConfigData,
+    @SerialName("realtime") val realtime: RealtimeConfigData = RealtimeConfigData()
+)
+
+/**
+ * Feature flags for real-time capabilities. Networks without a real-time backend
+ * disable them: services become no-ops and the related UI is hidden.
+ */
+@Serializable
+data class RealtimeConfigData(
+    val trafficAlertsEnabled: Boolean = true,
+    val vehiclePositionsEnabled: Boolean = true,
+    val userStopAlertsEnabled: Boolean = true
 )
 
 @Serializable
@@ -32,7 +44,21 @@ data class TransportConfigData(
     val primaryColor: String,
     val secondaryColor: String,
     val trafficAlertsBaseUrl: String,
-    val vehiclePositionsStreamUrl: String
+    val vehiclePositionsStreamUrl: String,
+    // Commercial line name -> operator internal line id, used by real-time
+    // vehicle positions services that need to map feed ids back to line names.
+    val realtimeLineIds: Map<String, String> = emptyMap(),
+    // Measured per-line commercial speeds (lets a live mode dead-reckon
+    // vehicles from the very first feed tick). Empty = no dead reckoning.
+    val vehicleSpeedBaseline: Map<String, LineSpeedBaselineData> = emptyMap()
+)
+
+@Serializable
+data class LineSpeedBaselineData(
+    val speedMps: Double,
+    // Feed Direction ("1"/"2") -> trace path index (as string) -> abscissa
+    // progression sign (+1/-1) along that path.
+    val signs: Map<String, Map<String, Int>> = emptyMap()
 )
 
 @Serializable

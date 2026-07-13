@@ -45,7 +45,13 @@ actual class FileSystem actual constructor(private val context: PlatformContext)
 
     private val composeResourcesDir: String? by lazy {
         runCatching {
-            context.assets.list("composeResources")?.firstOrNull { it.isNotBlank() }
+            val entries = context.assets.list("composeResources").orEmpty().filter { it.isNotBlank() }
+            // Incremental builds can leave stale resource-package directories from
+            // the other city flavors of this codebase (massilia/telo) next to ours,
+            // and firstOrNull would pick them alphabetically — resolve OUR package
+            // (packageOfResClass = "<applicationId>.resources") explicitly.
+            val expected = "${context.packageName}.resources"
+            entries.firstOrNull { it == expected } ?: entries.firstOrNull()
         }.getOrNull()
     }
 

@@ -14,6 +14,10 @@ import eu.dotshell.pelo.generic.data.config.AppTransportConfig
 import eu.dotshell.pelo.generic.data.config.AppTransportLineRules
 import eu.dotshell.pelo.generic.data.config.AppTrafficAlertsService
 import eu.dotshell.pelo.generic.data.config.AppVehiclePositionsService
+import eu.dotshell.pelo.generic.data.config.LineSpeedBaselineData
+import eu.dotshell.pelo.generic.data.config.NoopTrafficAlertsService
+import eu.dotshell.pelo.generic.data.config.NoopVehiclePositionsService
+import eu.dotshell.pelo.generic.data.config.RealtimeConfigData
 import eu.dotshell.pelo.generic.ui.screens.about.GenericAboutScreen
 import eu.dotshell.pelo.generic.ui.theme.GenericTransportTheme
 import eu.dotshell.pelo.specific.data.network.LyonKtorClient
@@ -38,6 +42,8 @@ object TransportServiceProvider {
     private lateinit var transportLineService: TransportLineService
     private lateinit var trafficAlertsService: TrafficAlertsService
     private lateinit var transportLineRules: TransportLineRules
+    private lateinit var realtimeConfig: RealtimeConfigData
+    private var vehicleSpeedBaseline: Map<String, LineSpeedBaselineData> = emptyMap()
 
     /**
      * Initializes the provider with Lyon TCL configuration
@@ -62,11 +68,23 @@ object TransportServiceProvider {
         // Rules for matching/normalizing line names
         transportLineRules = AppTransportLineRules(appConfig.rules)
 
+        // Real-time feature flags (defaults keep everything enabled for TCL)
+        realtimeConfig = appConfig.realtime
+        vehicleSpeedBaseline = appConfig.transport.vehicleSpeedBaseline
+
         // Traffic alerts service
-        trafficAlertsService = AppTrafficAlertsService(appConfig.transport, transportApi)
+        trafficAlertsService = if (realtimeConfig.trafficAlertsEnabled) {
+            AppTrafficAlertsService(appConfig.transport, transportApi)
+        } else {
+            NoopTrafficAlertsService()
+        }
 
         // Vehicle positions service
-        vehiclePositionsService = AppVehiclePositionsService(appConfig.transport, appConfig.rules)
+        vehiclePositionsService = if (realtimeConfig.vehiclePositionsEnabled) {
+            AppVehiclePositionsService(appConfig.transport, appConfig.rules)
+        } else {
+            NoopVehiclePositionsService()
+        }
 
         // Theme
         transportTheme = GenericTransportTheme(appConfig.theme)
@@ -133,5 +151,20 @@ object TransportServiceProvider {
             error("TransportServiceProvider not initialized. Call initialize() first.")
         }
         return vehiclePositionsService
+    }
+
+    /**
+     * Measured per-line commercial speeds for live dead reckoning. May be empty.
+     */
+    fun getVehicleSpeedBaseline(): Map<String, LineSpeedBaselineData> = vehicleSpeedBaseline
+
+    /**
+     * Gets the real-time feature flags (used to hide Live/alert-report UI when disabled)
+     */
+    fun getRealtimeConfig(): RealtimeConfigData {
+        if (!::realtimeConfig.isInitialized) {
+            error("TransportServiceProvider not initialized. Call initialize() first.")
+        }
+        return realtimeConfig
     }
 }

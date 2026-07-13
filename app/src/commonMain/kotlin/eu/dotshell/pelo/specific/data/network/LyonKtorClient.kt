@@ -62,7 +62,10 @@ private const val TAG = "LyonKtorClient"
  * - Traffic alerts (Pelo API)
  * - User stop alerts (karma-based)
  */
-class LyonKtorClient(private val baseUrl: String, private val fileSystem: FileSystem) : TransportApi {
+class LyonKtorClient(
+    private val baseUrl: String,
+    private val fileSystem: FileSystem
+) : TransportApi, eu.dotshell.pelo.generic.data.network.UserStopAlertsApi {
 
     private val allLinesCache: FeatureCollection by lazy {
         Log.d(TAG, "Loading lines.bin from composeResources...")
@@ -160,9 +163,9 @@ class LyonKtorClient(private val baseUrl: String, private val fileSystem: FileSy
         return TrafficAlertMapper.mapResponseToGeneric(lyon)
     }
 
-    // ─── User stop alerts (not part of TransportApi, called directly) ─────────
+    // ─── User stop alerts (UserStopAlertsApi) ─────────────────────────────────
 
-    suspend fun getUserStopAlerts(stopIds: List<String>): UserStopAlertsResponse {
+    override suspend fun getUserStopAlerts(stopIds: List<String>): UserStopAlertsResponse {
         if (stopIds.isEmpty()) return emptyMap()
         val timestampMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
         return httpClient.get("${TRAFFIC_ALERTS_BASE_URL}pelo/v1/users-alerts/stops") {

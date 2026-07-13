@@ -27,7 +27,8 @@ data class JourneyLeg(
     fun formatArrivalTime(): String = formatTime(arrivalTime)
 
     private fun formatTime(seconds: Int): String {
-        val hours = seconds / 3600
+        // GTFS service-day hours can exceed 24 on night runs ("25:30" = 01:30)
+        val hours = (seconds / 3600) % 24
         val minutes = (seconds % 3600) / 60
         return "${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}"
     }

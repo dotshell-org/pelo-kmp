@@ -9,18 +9,17 @@ object LineIconResolver {
 
     /**
      * Converts a line name to a drawable name.
-     * Lines composed only of digits are prefixed with an underscore.
+     * Names starting with a digit are prefixed with an underscore, because a
+     * resource name cannot begin with a digit (covers pure numbers like "49"
+     * as well as letter variants like "35T" or "97JET").
      *
-     * @param lineName The line name (ex: "212", "C17", "A", "NAVI1")
-     * @return The corresponding drawable name (ex: "_212", "c17", "a", "navi1")
+     * @param lineName The line name (ex: "212", "35T", "M1", "NAV1")
+     * @return The corresponding drawable name (ex: "_212", "_35t", "m1", "nav1")
      */
     fun getDrawableNameForLineName(lineName: String): String {
         if (lineName.isBlank()) return ""
-        return if (lineName.all { it.isDigit() }) {
-            "_$lineName"
-        } else {
-            lineName.lowercase()
-        }
+        val lower = lineName.lowercase()
+        return if (lower.first().isDigit()) "_$lower" else lower
     }
 
     /**
