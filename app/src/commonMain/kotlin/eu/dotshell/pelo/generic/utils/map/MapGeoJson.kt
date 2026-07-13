@@ -44,6 +44,8 @@ fun FeatureCollection.toLinesGeoJson(): String {
     val sb = StringBuilder((estimatedPoints * 24 + features.size * 160 + 64).coerceAtLeast(1024))
 
     sb.append("{\"type\":\"FeatureCollection\",\"features\":[")
+    val totalFeatures = features.size
+    var featureIndex = 0
     var firstFeature = true
     for (feature in features) {
         if (!firstFeature) sb.append(',')
@@ -83,7 +85,12 @@ fun FeatureCollection.toLinesGeoJson(): String {
         sb.append(if (type == "Métro" || type == "Funiculaire") "yes" else "no")
         sb.append("\",\"isStrong\":\"")
         sb.append(if (lineRules.isStrongLine(lineName)) "yes" else "no")
-        sb.append("\"}}")
+        // Rank in [0,1): drives the staggered all-lines reveal (a MapLibre
+        // filter sweeps 0->1 and features pop in one after the other).
+        sb.append("\",\"revealRank\":")
+        appendCoordinate(sb, featureIndex.toDouble() / totalFeatures)
+        featureIndex++
+        sb.append("}}")
     }
     sb.append("]}")
     return sb.toString()

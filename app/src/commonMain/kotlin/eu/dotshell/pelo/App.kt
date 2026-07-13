@@ -1159,6 +1159,7 @@ private fun PlanContent(
                     vehiclesGeoJson = vehiclesGeoJson,
                     vehicleIconName = vehicleIconName,
                     selectedLineName = selectedLineName,
+                    revealAnimated = showAllLines && selectedLineName.isNullOrBlank(),
                     itineraryGeoJson = itineraryGeoJson,
                     interactive = !navigationState.isActive,
                     tilt = if (navigationState.isActive) 55.0 else (if (isCenteredOnUser) 0.0 else null),

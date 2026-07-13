@@ -1,5 +1,8 @@
 package eu.dotshell.pelo.generic.ui.components
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,6 +51,7 @@ import org.maplibre.compose.expressions.dsl.convertToString
 import org.maplibre.compose.expressions.dsl.eq
 import org.maplibre.compose.expressions.dsl.feature
 import org.maplibre.compose.expressions.dsl.image
+import org.maplibre.compose.expressions.dsl.lte
 import org.maplibre.compose.expressions.dsl.switch
 import org.maplibre.compose.expressions.value.ImageValue
 import org.maplibre.compose.expressions.value.StringValue
@@ -105,6 +109,7 @@ fun MapCanvas(
     vehiclesGeoJson: String? = null,
     vehicleIconName: String? = null,
     selectedLineName: String? = null,
+    revealAnimated: Boolean = false,
     interactive: Boolean = true,
     onStopClick: (stopName: String) -> Unit = {},
     onLineClick: (lineName: String) -> Unit = {},
@@ -223,6 +228,21 @@ fun MapCanvas(
             lines?.toLinesGeoJson() ?: EMPTY_FEATURE_COLLECTION
         }
         value = result
+    }
+
+    // Staggered reveal of the all-lines mode: once the (heavy) GeoJSON string
+    // is ready — preparation time deliberately NOT counted — the sweep runs
+    // 0->1 in exactly 2 s. Every feature carries a revealRank in [0,1), so at
+    // T=0 nothing is drawn and at T=2s the whole network is; the filter sweep
+    // costs nothing on the source (no re-serialization).
+    val revealProgress = remember { Animatable(1f) }
+    LaunchedEffect(linesGeoJson, revealAnimated) {
+        if (revealAnimated && linesGeoJson != EMPTY_FEATURE_COLLECTION) {
+            revealProgress.snapTo(0f)
+            revealProgress.animateTo(1f, tween(durationMillis = 2000, easing = LinearEasing))
+        } else {
+            revealProgress.snapTo(1f)
+        }
     }
 
     val stopsToRender = if (shouldRenderStops) stops else null
@@ -363,14 +383,19 @@ fun MapCanvas(
             // Transport lines
             // ------------------------------------------------------------------
             if (lines != null && itineraryGeoJson == null) {
-                // Soft line-colored glow + bold dark casing under the STRONG lines only —
-                // a deliberate, clean recreation of the halo the old tap layer
-                // produced by alpha-stacking. Ordinary lines stay thin and
-                // unoutlined so the all-lines mode remains readable.
+                // The staggered reveal: features whose rank the 2s sweep has not
+                // reached yet are filtered out (revealProgress rests at 1f outside
+                // the animation, which lets every rank through).
+                val revealFilter = feature["revealRank"].convertToNumber() lte const(revealProgress.value)
+
+                // Soft line-colored glow under the STRONG lines only — a deliberate,
+                // clean recreation of the halo the old tap layer produced by
+                // alpha-stacking. Ordinary lines stay thin and unoutlined so the
+                // all-lines mode remains readable.
                 LineLayer(
                     id = "transport-lines-glow",
                     source = lineSource,
-                    filter = feature["isStrong"].convertToString() eq const("yes"),
+                    filter = (feature["isStrong"].convertToString() eq const("yes")) and revealFilter,
                     color = feature["color"].convertToColor(),
                     opacity = const(0.25f),
                     blur = const(7.dp),
@@ -381,19 +406,9 @@ fun MapCanvas(
                     ),
                 )
                 LineLayer(
-                    id = "transport-lines-casing",
-                    source = lineSource,
-                    filter = feature["isStrong"].convertToString() eq const("yes"),
-                    color = const(Color(0xFF111827)),
-                    width = switch(
-                        feature["isMetroOrFunicular"].convertToString(),
-                        case("yes", const(6.dp)),
-                        fallback = const(4.dp)
-                    ),
-                )
-                LineLayer(
                     id = "transport-lines",
                     source = lineSource,
+                    filter = revealFilter,
                     color = feature["color"].convertToColor(),
                     width = switch(
                         feature["isMetroOrFunicular"].convertToString(),
@@ -408,6 +423,7 @@ fun MapCanvas(
                 LineLayer(
                     id = "transport-lines-tap",
                     source = lineSource,
+                    filter = revealFilter,
                     // Fully transparent: an almost-invisible black (0x01000000) stacks
                     // up where dozens of lines share a corridor and reads as a fat
                     // dark halo around every line in the all-lines mode.
