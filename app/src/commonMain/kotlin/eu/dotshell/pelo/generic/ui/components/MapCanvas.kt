@@ -363,6 +363,19 @@ fun MapCanvas(
             // Transport lines
             // ------------------------------------------------------------------
             if (lines != null && itineraryGeoJson == null) {
+                // Bold dark casing under the STRONG lines only — ordinary lines
+                // stay thin and unoutlined so the all-lines mode remains readable.
+                LineLayer(
+                    id = "transport-lines-casing",
+                    source = lineSource,
+                    filter = feature["isStrong"].convertToString() eq const("yes"),
+                    color = const(Color(0xFF111827)),
+                    width = switch(
+                        feature["isMetroOrFunicular"].convertToString(),
+                        case("yes", const(6.dp)),
+                        fallback = const(4.dp)
+                    ),
+                )
                 LineLayer(
                     id = "transport-lines",
                     source = lineSource,
@@ -380,7 +393,10 @@ fun MapCanvas(
                 LineLayer(
                     id = "transport-lines-tap",
                     source = lineSource,
-                    color = const(Color(0x01000000)),
+                    // Fully transparent: an almost-invisible black (0x01000000) stacks
+                    // up where dozens of lines share a corridor and reads as a fat
+                    // dark halo around every line in the all-lines mode.
+                    color = const(Color.Transparent),
                     width = const(24.dp),
                     onClick = { features ->
                         val lineName = features.firstOrNull()?.properties?.get("lineName")?.jsonPrimitive?.contentOrNull

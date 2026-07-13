@@ -26,42 +26,101 @@ import eu.dotshell.pelo.generic.utils.location.GeoPoint
  * coordinates and a non-standard `multiLineStringGeometry` field) into a standard
  * GeoJSON FeatureCollection string suitable for a maplibre-compose GeoJSON source.
  *
- * Each output feature carries `lineName` and a resolved `color` property so a
- * LineLayer can colour lines with a data-driven expression. Replaces the former
- * Gson-based GeoJSON construction.
+ * Each output feature carries `lineName`, a resolved `color` and the
+ * `isStrong`/`isMetroOrFunicular` flags so LineLayers can style lines with
+ * data-driven expressions.
+ *
+ * Serialized straight into a StringBuilder rather than a kotlinx JsonObject
+ * tree: the full-network collection (Lyon: ~1.2M shape points) allocated one
+ * JsonPrimitive per coordinate and blew the default Android heap when the
+ * "all lines" map mode serialized everything at once. Coordinates are emitted
+ * with 6 decimals — the exact precision of the delta-encoded binary sources.
  */
-fun FeatureCollection.toLinesGeoJson(): String = buildJsonObject {
-    put("type", "FeatureCollection")
-    putJsonArray("features") {
-        for (feature in features) {
-            addJsonObject {
-                put("type", "Feature")
-                put("id", feature.id)
-                putJsonObject("geometry") {
-                    put("type", "MultiLineString")
-                    putJsonArray("coordinates") {
-                        for (line in feature.multiLineStringGeometry.coordinates) {
-                            addJsonArray {
-                                for (point in line) {
-                                    addJsonArray {
-                                        for (coordinate in point) add(coordinate)
-                                    }
-                                }
-                            }
-                        }
-                    }
+fun FeatureCollection.toLinesGeoJson(): String {
+    val lineRules = TransportServiceProvider.getTransportLineRules()
+    val estimatedPoints = features.sumOf { feature ->
+        feature.multiLineStringGeometry.coordinates.sumOf { it.size }
+    }
+    val sb = StringBuilder((estimatedPoints * 24 + features.size * 160 + 64).coerceAtLeast(1024))
+
+    sb.append("{\"type\":\"FeatureCollection\",\"features\":[")
+    var firstFeature = true
+    for (feature in features) {
+        if (!firstFeature) sb.append(',')
+        firstFeature = false
+
+        sb.append("{\"type\":\"Feature\",\"id\":")
+        appendJsonString(sb, feature.id)
+        sb.append(",\"geometry\":{\"type\":\"MultiLineString\",\"coordinates\":[")
+        var firstLine = true
+        for (line in feature.multiLineStringGeometry.coordinates) {
+            if (!firstLine) sb.append(',')
+            firstLine = false
+            sb.append('[')
+            var firstPoint = true
+            for (point in line) {
+                if (!firstPoint) sb.append(',')
+                firstPoint = false
+                sb.append('[')
+                var firstCoordinate = true
+                for (coordinate in point) {
+                    if (!firstCoordinate) sb.append(',')
+                    firstCoordinate = false
+                    appendCoordinate(sb, coordinate)
                 }
-                putJsonObject("properties") {
-                    put("lineName", feature.properties.lineName)
-                    put("color", LineColorHelper.getColorForLine(feature))
-                    val lineRules = TransportServiceProvider.getTransportLineRules()
-                    val type = lineRules.getTransportType(feature.properties.lineName)
-                    put("isMetroOrFunicular", if (type == "Métro" || type == "Funiculaire") "yes" else "no")
-                }
+                sb.append(']')
+            }
+            sb.append(']')
+        }
+
+        val lineName = feature.properties.lineName
+        val type = lineRules.getTransportType(lineName)
+        sb.append("]},\"properties\":{\"lineName\":")
+        appendJsonString(sb, lineName)
+        sb.append(",\"color\":")
+        appendJsonString(sb, LineColorHelper.getColorForLine(feature))
+        sb.append(",\"isMetroOrFunicular\":\"")
+        sb.append(if (type == "Métro" || type == "Funiculaire") "yes" else "no")
+        sb.append("\",\"isStrong\":\"")
+        sb.append(if (lineRules.isStrongLine(lineName)) "yes" else "no")
+        sb.append("\"}}")
+    }
+    sb.append("]}")
+    return sb.toString()
+}
+
+private fun appendJsonString(sb: StringBuilder, value: String?) {
+    sb.append('"')
+    if (value != null) {
+        for (c in value) {
+            when {
+                c == '"' -> sb.append("\\\"")
+                c == '\\' -> sb.append("\\\\")
+                c == '\n' -> sb.append("\\n")
+                c == '\r' -> sb.append("\\r")
+                c == '\t' -> sb.append("\\t")
+                c < ' ' -> sb.append("\\u").append(c.code.toString(16).padStart(4, '0'))
+                else -> sb.append(c)
             }
         }
     }
-}.toString()
+    sb.append('"')
+}
+
+/** Fixed-point with 6 decimals: matches the sources' precision and never falls
+ *  into Double.toString's scientific notation. */
+private fun appendCoordinate(sb: StringBuilder, value: Double) {
+    var scaled = kotlin.math.round(value * 1_000_000.0).toLong()
+    if (scaled < 0) {
+        sb.append('-')
+        scaled = -scaled
+    }
+    sb.append(scaled / 1_000_000)
+    val fraction = (scaled % 1_000_000).toInt()
+    if (fraction != 0) {
+        sb.append('.').append(fraction.toString().padStart(6, '0').trimEnd('0'))
+    }
+}
 
 /**
  * Converts a [StopCollection] (transport stops, Point geometry) into a standard
