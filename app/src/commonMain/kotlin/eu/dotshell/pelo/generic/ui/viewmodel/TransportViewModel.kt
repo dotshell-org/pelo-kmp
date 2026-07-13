@@ -123,6 +123,15 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
     private val _isGlobalLiveEnabled = MutableStateFlow(false)
     override val isGlobalLiveEnabled: StateFlow<Boolean> = _isGlobalLiveEnabled.asStateFlow()
 
+    // Toggle to draw every line trace on the map (not only the strong ones),
+    // mirroring the global-live button behaviour: on until tapped again.
+    private val _showAllLinesOnMap = MutableStateFlow(false)
+    val showAllLinesOnMap: StateFlow<Boolean> = _showAllLinesOnMap.asStateFlow()
+
+    fun toggleShowAllLinesOnMap() {
+        _showAllLinesOnMap.value = !_showAllLinesOnMap.value
+    }
+
     private val _isOffline = MutableStateFlow(false)
     override val isOffline: StateFlow<Boolean> = _isOffline.asStateFlow()
 

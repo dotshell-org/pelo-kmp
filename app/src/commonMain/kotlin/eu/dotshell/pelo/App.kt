@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Route
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapVert
@@ -1113,18 +1114,19 @@ private fun PlanContent(
         is TransportLinesUiState.PartialSuccess -> s.lines
         else -> null
     }
+    val showAllLines by viewModel.showAllLinesOnMap.collectAsState(initial = false)
     val strongLines = allLines?.filter { lineRules.isStrongLine(it.properties.lineName) }
-    val mapLines = remember(strongLines, selectedLineName, allLines) {
+    val mapLines = remember(strongLines, selectedLineName, allLines, showAllLines) {
         if (allLines == null) return@remember null
         val strongs = strongLines ?: emptyList()
         val selected = if (!selectedLineName.isNullOrBlank()) {
             val normSelected = lineRules.normalizeForComparison(selectedLineName)
             allLines.firstOrNull { lineRules.normalizeForComparison(it.properties.lineName) == normSelected }
         } else null
-        if (selected != null) {
-            listOf(selected)
-        } else {
-            strongs
+        when {
+            selected != null -> listOf(selected)
+            showAllLines -> allLines
+            else -> strongs
         }
     }
 
@@ -1350,6 +1352,25 @@ private fun PlanContent(
                             }
                             // White reads on the red/grey active states; onSurface on the themed idle state.
                             val buttonContentColor = if (hasVehicles || isActiveNoVehicles) Color.White else MaterialTheme.colorScheme.onSurface
+
+                            Row(
+                                modifier = Modifier
+                                    .shadow(2.dp, RoundedCornerShape(20.dp))
+                                    .clip(RoundedCornerShape(20.dp))
+                                    .background(if (showAllLines) AccentColor else MaterialTheme.colorScheme.surface)
+                                    .floatingControlBorder(RoundedCornerShape(20.dp))
+                                    .clickable { viewModel.toggleShowAllLinesOnMap() }
+                                    .height(40.dp)
+                                    .padding(horizontal = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Filled.Route,
+                                    contentDescription = "Afficher toutes les lignes",
+                                    tint = if (showAllLines) Color.White else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
 
                             Row(
                                 modifier = Modifier
