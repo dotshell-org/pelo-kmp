@@ -46,7 +46,24 @@ object LineColorHelper {
     }
 
     fun getColorForLine(feature: Feature): String {
+        // Prefer the color carried by the line data itself (the operator's own
+        // palette bundled in lines.bin): "#RRGGBB" from the GTFS-based clients,
+        // or the legacy WFS "R G B" decimal triplet in the Lyon properties.
+        // The config lineColors rules remain the fallback for colorless data.
+        normalizeDataColor(feature.properties.color)?.let { return it }
         return resolveColorHex(feature.properties.lineName)
+    }
+
+    private fun normalizeDataColor(raw: String?): String? {
+        val value = raw?.trim().orEmpty()
+        if (value.isEmpty()) return null
+        if (value.startsWith("#")) {
+            return if (value.length == 7 || value.length == 9) value else null
+        }
+        val parts = value.split(' ', ',').filter { it.isNotBlank() }
+        if (parts.size != 3) return null
+        val channels = parts.map { it.toIntOrNull()?.takeIf { v -> v in 0..255 } ?: return null }
+        return "#" + channels.joinToString("") { it.toString(16).padStart(2, '0').uppercase() }
     }
 
     fun getColorForLineStringAux(lineName: String): String {
