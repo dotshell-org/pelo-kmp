@@ -89,6 +89,20 @@ class PeloSmokeTest {
         )
     }
 
+    @Test
+    fun jdFamilyMustBeExpandedIntoRealRouteNames() {
+        // The raptor RouteFilter matches route names EXACTLY — blocking the
+        // literal "JD*" is a no-op. The Junior Direct toggle therefore expands
+        // the family from the real network route names; this pins the premise.
+        val routeNames = io.raptor.data.NetworkLoader
+            .loadRoutes(asset("raptor/routes_school_on_weekdays.bin").readBytes())
+            .map { it.name }
+            .toSet()
+        val jdLines = routeNames.filter { it.startsWith("JD", ignoreCase = true) }
+        assertTrue("the weekday network carries JD school lines (got none)", jdLines.isNotEmpty())
+        assertTrue("\"JD*\" is not a real route name", "JD*" !in routeNames)
+    }
+
     // ─── Icons ───────────────────────────────────────────────────────────────
 
     @Test

@@ -104,11 +104,13 @@ fun InlineItinerarySheetContent(
     val jdLinesEnabled = remember { itineraryPrefsRepo.isJdLinesEnabled() }
     val rxLineEnabled = remember { itineraryPrefsRepo.isRxLineEnabled() }
 
-    // Build set of blocked route names based on user preferences
+    // Build set of blocked route names based on user preferences.
+    // raptorKt's RouteFilter matches route names EXACTLY (no wildcards), so
+    // the JD family must be expanded into the real line names of the network.
     val blockedRouteNames = remember(jdLinesEnabled, rxLineEnabled) {
         buildSet {
             if (!jdLinesEnabled) {
-                add("JD*")
+                addAll(raptorRepository.getAllRouteNames().filter { it.startsWith("JD", ignoreCase = true) })
             }
             if (!rxLineEnabled) add("RX")
         }

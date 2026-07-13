@@ -344,6 +344,15 @@ class RaptorRepository private constructor(private val context: PlatformContext)
         return loaded
     }
 
+    /**
+     * Distinct route names of the school-term weekday network (the superset
+     * period). The raptor RouteFilter matches route names EXACTLY (no
+     * wildcards), so family-based blocking (e.g. every "JD…" school line)
+     * must be expanded into the real names with this list.
+     */
+    fun getAllRouteNames(): Set<String> =
+        getRoutesForPeriod("school_on_weekdays").map { it.name }.toSet()
+
     private data class RouteVariant(
         val route: Route,
         val stopNames: List<String>
