@@ -150,39 +150,30 @@ class AppTransportLineRules(private val data: RulesData) : TransportLineRules {
         fun keyFor(lineRaw: String): Key {
             val up = lineRaw.trim().uppercase()
 
-            // RTM display order: metro (M1, M2), then tram (T1-T3), then BHNS
-            // (B1-B5), then navettes maritimes, then everything else.
-            if (up.startsWith("M")) {
-                val num = up.drop(1).toIntOrNull()
-                if (num != null) return Key(1000, number = num, raw = up)
-            }
+            // Mistral display order: U (the structuring line), then the Mont
+            // Faron cable car, then the bateaux-bus (8M/18M/28M), then the
+            // numbered bus lines (a letter suffix sorts right after its
+            // number: 11, 11B, 12), then letter-prefixed navettes (BN1, BN3),
+            // then everything else.
+            if (up == "U") return Key(1000, raw = up)
+            if (up == "T") return Key(2000, raw = up)
 
-            if (up.startsWith("T")) {
-                val num = up.drop(1).toIntOrNull()
-                if (num != null) return Key(2000, number = num, raw = up)
-            }
-
-            if (up.startsWith("B")) {
-                val num = up.drop(1).toIntOrNull()
+            if (up.endsWith("M")) {
+                val num = up.dropLast(1).toIntOrNull()
                 if (num != null) return Key(3000, number = num, raw = up)
             }
 
-            if (up == "FERRY") return Key(3500, number = 0, raw = up)
-            if (up.startsWith("NAV")) {
-                val num = up.drop(3).toIntOrNull()
-                if (num != null) return Key(3500, number = num, raw = up)
+            val numbered = SORT_NUMBER_SUFFIX.matchEntire(up)
+            if (numbered != null) {
+                val num = numbered.groupValues[1].toIntOrNull() ?: Int.MAX_VALUE
+                return Key(4000, number = num, raw = up)
             }
 
             val match = SORT_PREFIX_NUMBER_SUFFIX.matchEntire(up)
             if (match != null) {
                 val prefix = match.groupValues[1]
                 val num = match.groupValues[2].toIntOrNull() ?: Int.MAX_VALUE
-                return Key(4000, subFamily = prefix, number = num, raw = up)
-            }
-
-            val pureNum = up.toIntOrNull()
-            if (pureNum != null) {
-                return Key(5000, number = pureNum, raw = up)
+                return Key(5000, subFamily = prefix, number = num, raw = up)
             }
 
             return Key(9000, subFamily = up, number = Int.MAX_VALUE, raw = up)
@@ -215,6 +206,7 @@ class AppTransportLineRules(private val data: RulesData) : TransportLineRules {
 
     companion object {
         private val SORT_PREFIX_NUMBER_SUFFIX = Regex("^([A-Z]+)(\\d+)([A-Z]*)$")
+        private val SORT_NUMBER_SUFFIX = Regex("^(\\d+)[A-Z]*$")
 
         /** transportType names that count as water/ferry lines (Lyon "Navigone", Toulon "Bateau-bus"). */
         private val WATER_TRANSPORT_TYPES = setOf("Navigone", "Navette maritime", "Bateau-bus")

@@ -132,7 +132,7 @@ private fun JustifiedFlowRow(
         content = content,
         modifier = modifier
     ) { measurables, constraints ->
-        val maxWidth = constraints.maxWidth
+        val maxWidth = if (constraints.hasBoundedWidth) constraints.maxWidth else Int.MAX_VALUE
         val placeables = measurables.map { it.measure(constraints.copy(minWidth = 0, minHeight = 0)) }
 
         val rows = mutableListOf<List<Placeable>>()
@@ -159,14 +159,22 @@ private fun JustifiedFlowRow(
         val verticalSpacingPx = verticalSpacing.roundToPx()
         val totalHeight = rowHeights.sum() + (rows.size - 1).coerceAtLeast(0) * verticalSpacingPx
 
-        layout(maxWidth, totalHeight) {
+        val actualLayoutWidth = if (constraints.hasBoundedWidth) {
+            maxWidth
+        } else {
+            rows.maxOfOrNull { row ->
+                row.sumOf { it.width } + (row.size - 1).coerceAtLeast(0) * defaultSpacingPx
+            } ?: 0
+        }
+
+        layout(actualLayoutWidth, totalHeight) {
             var y = 0
 
             var spacingForLastRow = defaultSpacingPx
-            if (rows.size > 1 && rows[0].size > 1) {
+            if (constraints.hasBoundedWidth && rows.size > 1 && rows[0].size > 1) {
                 val firstRow = rows[0]
                 val firstRowItemsWidth = firstRow.sumOf { it.width }
-                val remainingWidth = maxWidth - firstRowItemsWidth
+                val remainingWidth = actualLayoutWidth - firstRowItemsWidth
                 val numSpaces = firstRow.size - 1
                 spacingForLastRow = remainingWidth / numSpaces
             }
@@ -176,7 +184,7 @@ private fun JustifiedFlowRow(
                 val rowHeight = rowHeights[i]
                 val isLastRow = i == rows.lastIndex
 
-                if (isLastRow) {
+                if (isLastRow || !constraints.hasBoundedWidth) {
                     var x = 0
                     for (placeable in row) {
                         placeable.place(x, y + (rowHeight - placeable.height) / 2)
@@ -187,7 +195,7 @@ private fun JustifiedFlowRow(
                         row[0].place(0, y + (rowHeight - row[0].height) / 2)
                     } else {
                         val totalItemsWidth = row.sumOf { it.width }
-                        val remainingWidth = maxWidth - totalItemsWidth
+                        val remainingWidth = actualLayoutWidth - totalItemsWidth
                         val numSpaces = row.size - 1
                         var x = 0
                         for (j in row.indices) {

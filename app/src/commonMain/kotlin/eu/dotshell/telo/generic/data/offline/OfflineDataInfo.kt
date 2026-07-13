@@ -10,8 +10,7 @@ data class OfflineDataInfo(
     val lastDownloadTimestamp: Long = 0L,
     val totalSizeBytes: Long = 0L,
     val mapTilesDownloaded: Boolean = false,
-    val downloadedMapStyles: Set<String> = emptySet(),
-    val busLinesCount: Int = 0
+    val downloadedMapStyles: Set<String> = emptySet()
 ) {
     val STALE_THRESHOLD_MS = 7L * 24 * 60 * 60 * 1000
 
