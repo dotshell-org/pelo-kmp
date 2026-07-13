@@ -363,8 +363,23 @@ fun MapCanvas(
             // Transport lines
             // ------------------------------------------------------------------
             if (lines != null && itineraryGeoJson == null) {
-                // Bold dark casing under the STRONG lines only — ordinary lines
-                // stay thin and unoutlined so the all-lines mode remains readable.
+                // Soft dark glow + bold casing under the STRONG lines only —
+                // a deliberate, clean recreation of the halo the old tap layer
+                // produced by alpha-stacking. Ordinary lines stay thin and
+                // unoutlined so the all-lines mode remains readable.
+                LineLayer(
+                    id = "transport-lines-glow",
+                    source = lineSource,
+                    filter = feature["isStrong"].convertToString() eq const("yes"),
+                    color = const(Color.Black),
+                    opacity = const(0.35f),
+                    blur = const(8.dp),
+                    width = switch(
+                        feature["isMetroOrFunicular"].convertToString(),
+                        case("yes", const(18.dp)),
+                        fallback = const(14.dp)
+                    ),
+                )
                 LineLayer(
                     id = "transport-lines-casing",
                     source = lineSource,
