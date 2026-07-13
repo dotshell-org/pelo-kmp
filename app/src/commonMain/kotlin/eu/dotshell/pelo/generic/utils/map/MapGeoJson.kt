@@ -44,11 +44,16 @@ fun FeatureCollection.toLinesGeoJson(): String {
     val sb = StringBuilder((estimatedPoints * 24 + features.size * 160 + 64).coerceAtLeast(1024))
 
     sb.append("{\"type\":\"FeatureCollection\",\"features\":[")
-    // Reveal ranks are assigned per DISTINCT line (first-seen order), so every
-    // variant of a line pops in at the same instant of the staggered reveal.
+    // Reveal ranks are assigned per DISTINCT non-strong line (first-seen
+    // order), so every variant of a line pops in at the same instant of the
+    // staggered reveal. Strong lines are exempt (rank -1, always shown): they
+    // are on screen before the all-lines mode kicks in and must never blink.
     val lineRankByName = LinkedHashMap<String, Int>()
     for (feature in features) {
-        lineRankByName.getOrPut(feature.properties.lineName) { lineRankByName.size }
+        val name = feature.properties.lineName
+        if (!lineRules.isStrongLine(name)) {
+            lineRankByName.getOrPut(name) { lineRankByName.size }
+        }
     }
     val lineCount = lineRankByName.size.coerceAtLeast(1)
     var firstFeature = true
@@ -88,12 +93,18 @@ fun FeatureCollection.toLinesGeoJson(): String {
         appendJsonString(sb, LineColorHelper.getColorForLine(feature))
         sb.append(",\"isMetroOrFunicular\":\"")
         sb.append(if (type == "Métro" || type == "Funiculaire") "yes" else "no")
+        val isStrongLine = lineRules.isStrongLine(lineName)
         sb.append("\",\"isStrong\":\"")
-        sb.append(if (lineRules.isStrongLine(lineName)) "yes" else "no")
+        sb.append(if (isStrongLine) "yes" else "no")
         // Rank in [0,1): drives the staggered all-lines reveal (a MapLibre
-        // filter sweeps 0->1 and lines pop in one after the other).
+        // filter sweeps 0->1 and lines pop in one after the other). Strong
+        // lines carry -1 so they pass the filter even while it hides the rest.
         sb.append("\",\"revealRank\":")
-        appendCoordinate(sb, (lineRankByName[lineName] ?: 0).toDouble() / lineCount)
+        if (isStrongLine) {
+            sb.append("-1")
+        } else {
+            appendCoordinate(sb, (lineRankByName[lineName] ?: 0).toDouble() / lineCount)
+        }
         sb.append("}}")
     }
     sb.append("]}")

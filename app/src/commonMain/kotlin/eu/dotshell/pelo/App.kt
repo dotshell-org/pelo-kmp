@@ -1160,9 +1160,9 @@ private fun PlanContent(
                     vehicleIconName = vehicleIconName,
                     selectedLineName = selectedLineName,
                     revealAnimated = showAllLines && selectedLineName.isNullOrBlank(),
-                    revealDurationMs = remember(mapLines) {
-                        val lineCount = mapLines?.asSequence()?.map { it.properties.lineName }?.distinct()?.count() ?: 0
-                        (lineCount * 12).coerceAtLeast(1200)
+                    revealLineCount = remember(mapLines) {
+                        mapLines?.asSequence()?.map { it.properties.lineName }?.distinct()
+                            ?.count { !lineRules.isStrongLine(it) } ?: 0
                     },
                     itineraryGeoJson = itineraryGeoJson,
                     interactive = !navigationState.isActive,

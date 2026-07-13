@@ -68,7 +68,8 @@ private const val EMPTY_FEATURE_COLLECTION = """{"type":"FeatureCollection","fea
 private const val STOP_RENDER_MIN_ZOOM = 12.0
 private const val BUS_RENDER_MIN_ZOOM = 16.0
 private const val REVEAL_PARSE_GRACE_MS = 500L
-private const val REVEAL_STEPS = 60
+private const val REVEAL_MS_PER_LINE = 12
+private const val REVEAL_LINES_PER_WAVE = 4
 
 /**
  * Cross-platform map canvas built on maplibre-compose (declarative).
@@ -111,7 +112,7 @@ fun MapCanvas(
     vehicleIconName: String? = null,
     selectedLineName: String? = null,
     revealAnimated: Boolean = false,
-    revealDurationMs: Int = 2000,
+    revealLineCount: Int = 0,
     interactive: Boolean = true,
     onStopClick: (stopName: String) -> Unit = {},
     onLineClick: (lineName: String) -> Unit = {},
@@ -234,33 +235,40 @@ fun MapCanvas(
 
     // Staggered reveal of the all-lines mode. Keyed on the DATA only: toggling
     // the flag alone must not replay the sweep on the still-displayed previous
-    // collection (that made the strong lines cascade on button press while the
-    // heavy GeoJSON was still being prepared). Once the string is ready, hide
-    // everything (progress < 0) through a short grace so MapLibre finishes
-    // parsing the new source natively, then sweep 0->1: every line carries a
-    // revealRank in [0,1) and pops in when the sweep passes it.
+    // collection. Strong lines carry revealRank -1 and are never filtered out,
+    // so they stay rock solid across the source swap; the cascade only covers
+    // the other lines and starts once their data is ready.
+    //
+    // The hidden initial state is created SYNCHRONOUSLY with the new data
+    // (remember keyed on it): resetting it from the coroutine instead left a
+    // frame where the new source rendered under the previous progress=1 —
+    // the "every line flashes at once" glitch.
     //
     // The sweep is QUANTIZED into a few dozen wall-clock waves rather than one
     // filter update per animation frame: re-filtering a huge source every frame
     // stalls the renderer, and a stalled renderer turns the cascade into "a
     // whole batch at once" when it catches up. Wall-clock pacing also keeps the
     // rhythm even if some waves render late.
-    val revealProgress = remember { mutableStateOf(1f) }
+    val revealProgress = remember(linesGeoJson) {
+        mutableStateOf(
+            if (revealAnimated && linesGeoJson != EMPTY_FEATURE_COLLECTION) -0.001f else 1f
+        )
+    }
     LaunchedEffect(linesGeoJson) {
         if (revealAnimated && linesGeoJson != EMPTY_FEATURE_COLLECTION) {
-            revealProgress.value = -0.001f
             delay(REVEAL_PARSE_GRACE_MS)
-            val stepMs = (revealDurationMs / REVEAL_STEPS).coerceAtLeast(50).toLong()
+            // One wave per four (non-strong) lines, wall-clock paced.
+            val durationMs = (revealLineCount * REVEAL_MS_PER_LINE).coerceAtLeast(1200)
+            val waves = (revealLineCount / REVEAL_LINES_PER_WAVE).coerceAtLeast(1)
+            val stepMs = (durationMs / waves).coerceAtLeast(50).toLong()
             val start = TimeSource.Monotonic.markNow()
             while (true) {
                 val elapsedMs = start.elapsedNow().inWholeMilliseconds
-                val progress = (elapsedMs.toFloat() / revealDurationMs).coerceAtMost(1f)
+                val progress = (elapsedMs.toFloat() / durationMs).coerceAtMost(1f)
                 revealProgress.value = progress
                 if (progress >= 1f) break
                 delay(stepMs)
             }
-        } else {
-            revealProgress.value = 1f
         }
     }
 
@@ -414,7 +422,7 @@ fun MapCanvas(
                 LineLayer(
                     id = "transport-lines-glow",
                     source = lineSource,
-                    filter = (feature["isStrong"].convertToString() eq const("yes")) and revealFilter,
+                    filter = feature["isStrong"].convertToString() eq const("yes"),
                     color = feature["color"].convertToColor(),
                     opacity = const(0.25f),
                     blur = const(7.dp),
