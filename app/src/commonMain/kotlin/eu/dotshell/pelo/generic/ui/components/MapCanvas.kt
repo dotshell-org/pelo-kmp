@@ -67,9 +67,6 @@ import org.maplibre.spatialk.geojson.Position
 private const val EMPTY_FEATURE_COLLECTION = """{"type":"FeatureCollection","features":[]}"""
 private const val STOP_RENDER_MIN_ZOOM = 12.0
 private const val BUS_RENDER_MIN_ZOOM = 16.0
-private const val REVEAL_PARSE_GRACE_MS = 500L
-private const val REVEAL_MS_PER_LINE = 12
-private const val REVEAL_LINES_PER_WAVE = 4
 
 /**
  * Cross-platform map canvas built on maplibre-compose (declarative).
@@ -111,8 +108,6 @@ fun MapCanvas(
     vehiclesGeoJson: String? = null,
     vehicleIconName: String? = null,
     selectedLineName: String? = null,
-    revealAnimated: Boolean = false,
-    revealLineCount: Int = 0,
     interactive: Boolean = true,
     onStopClick: (stopName: String) -> Unit = {},
     onLineClick: (lineName: String) -> Unit = {},
@@ -231,45 +226,6 @@ fun MapCanvas(
             lines?.toLinesGeoJson() ?: EMPTY_FEATURE_COLLECTION
         }
         value = result
-    }
-
-    // Staggered reveal of the all-lines mode. Keyed on the DATA only: toggling
-    // the flag alone must not replay the sweep on the still-displayed previous
-    // collection. Strong lines carry revealRank -1 and are never filtered out,
-    // so they stay rock solid across the source swap; the cascade only covers
-    // the other lines and starts once their data is ready.
-    //
-    // The hidden initial state is created SYNCHRONOUSLY with the new data
-    // (remember keyed on it): resetting it from the coroutine instead left a
-    // frame where the new source rendered under the previous progress=1 —
-    // the "every line flashes at once" glitch.
-    //
-    // The sweep is QUANTIZED into a few dozen wall-clock waves rather than one
-    // filter update per animation frame: re-filtering a huge source every frame
-    // stalls the renderer, and a stalled renderer turns the cascade into "a
-    // whole batch at once" when it catches up. Wall-clock pacing also keeps the
-    // rhythm even if some waves render late.
-    val revealProgress = remember(linesGeoJson) {
-        mutableStateOf(
-            if (revealAnimated && linesGeoJson != EMPTY_FEATURE_COLLECTION) -0.001f else 1f
-        )
-    }
-    LaunchedEffect(linesGeoJson) {
-        if (revealAnimated && linesGeoJson != EMPTY_FEATURE_COLLECTION) {
-            delay(REVEAL_PARSE_GRACE_MS)
-            // One wave per four (non-strong) lines, wall-clock paced.
-            val durationMs = (revealLineCount * REVEAL_MS_PER_LINE).coerceAtLeast(1200)
-            val waves = (revealLineCount / REVEAL_LINES_PER_WAVE).coerceAtLeast(1)
-            val stepMs = (durationMs / waves).coerceAtLeast(50).toLong()
-            val start = TimeSource.Monotonic.markNow()
-            while (true) {
-                val elapsedMs = start.elapsedNow().inWholeMilliseconds
-                val progress = (elapsedMs.toFloat() / durationMs).coerceAtMost(1f)
-                revealProgress.value = progress
-                if (progress >= 1f) break
-                delay(stepMs)
-            }
-        }
     }
 
     val stopsToRender = if (shouldRenderStops) stops else null
@@ -410,32 +366,9 @@ fun MapCanvas(
             // Transport lines
             // ------------------------------------------------------------------
             if (lines != null && itineraryGeoJson == null) {
-                // The staggered reveal: features whose rank the 2s sweep has not
-                // reached yet are filtered out (revealProgress rests at 1f outside
-                // the animation, which lets every rank through).
-                val revealFilter = feature["revealRank"].convertToNumber() lte const(revealProgress.value)
-
-                // Soft line-colored glow under the STRONG lines only — a deliberate,
-                // clean recreation of the halo the old tap layer produced by
-                // alpha-stacking. Ordinary lines stay thin and unoutlined so the
-                // all-lines mode remains readable.
-                LineLayer(
-                    id = "transport-lines-glow",
-                    source = lineSource,
-                    filter = feature["isStrong"].convertToString() eq const("yes"),
-                    color = feature["color"].convertToColor(),
-                    opacity = const(0.25f),
-                    blur = const(7.dp),
-                    width = switch(
-                        feature["isMetroOrFunicular"].convertToString(),
-                        case("yes", const(16.dp)),
-                        fallback = const(12.dp)
-                    ),
-                )
                 LineLayer(
                     id = "transport-lines",
                     source = lineSource,
-                    filter = revealFilter,
                     color = feature["color"].convertToColor(),
                     width = switch(
                         feature["isMetroOrFunicular"].convertToString(),
@@ -450,7 +383,6 @@ fun MapCanvas(
                 LineLayer(
                     id = "transport-lines-tap",
                     source = lineSource,
-                    filter = revealFilter,
                     // Fully transparent: an almost-invisible black (0x01000000) stacks
                     // up where dozens of lines share a corridor and reads as a fat
                     // dark halo around every line in the all-lines mode.

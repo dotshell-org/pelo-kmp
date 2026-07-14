@@ -1159,11 +1159,6 @@ private fun PlanContent(
                     vehiclesGeoJson = vehiclesGeoJson,
                     vehicleIconName = vehicleIconName,
                     selectedLineName = selectedLineName,
-                    revealAnimated = showAllLines && selectedLineName.isNullOrBlank(),
-                    revealLineCount = remember(mapLines) {
-                        mapLines?.asSequence()?.map { it.properties.lineName }?.distinct()
-                            ?.count { !lineRules.isStrongLine(it) } ?: 0
-                    },
                     itineraryGeoJson = itineraryGeoJson,
                     interactive = !navigationState.isActive,
                     tilt = if (navigationState.isActive) 55.0 else (if (isCenteredOnUser) 0.0 else null),
@@ -1357,25 +1352,6 @@ private fun PlanContent(
                             }
                             // White reads on the red/grey active states; onSurface on the themed idle state.
                             val buttonContentColor = if (hasVehicles || isActiveNoVehicles) Color.White else MaterialTheme.colorScheme.onSurface
-
-                            Row(
-                                modifier = Modifier
-                                    .shadow(2.dp, RoundedCornerShape(20.dp))
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(if (showAllLines) AccentColor else MaterialTheme.colorScheme.surface)
-                                    .floatingControlBorder(RoundedCornerShape(20.dp))
-                                    .clickable { viewModel.toggleShowAllLinesOnMap() }
-                                    .height(40.dp)
-                                    .padding(horizontal = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    Icons.Filled.Route,
-                                    contentDescription = "Afficher toutes les lignes",
-                                    tint = if (showAllLines) Color.White else MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
 
                             Row(
                                 modifier = Modifier
