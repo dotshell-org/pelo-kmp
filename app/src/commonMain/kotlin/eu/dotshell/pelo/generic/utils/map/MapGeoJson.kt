@@ -328,11 +328,16 @@ suspend fun StopCollection.toStopsGeoJsonByPriority(
 /**
  * Converts a list of calculated itinerary journeys into a standard GeoJSON FeatureCollection string.
  * This reconstructs the actual cut line segments or draws straight fallback paths between stops/legs.
+ *
+ * @param fetchWalkingPaths true = fetch street-following walk paths from the pedestrian router
+ *        (may take a network round-trip); false = use only already-cached paths, never blocking —
+ *        callers paint instantly with false then refine with true.
  */
 suspend fun toItinerariesGeoJson(
     journeys: List<JourneyResult>,
     selectedJourney: JourneyResult?,
-    viewModel: TransportViewModel
+    viewModel: TransportViewModel,
+    fetchWalkingPaths: Boolean = true
 ): String {
     val journeysToDraw = selectedJourney?.let { listOf(it) } ?: journeys
     val lineNames = journeysToDraw.flatMap { journey ->
@@ -353,14 +358,18 @@ suspend fun toItinerariesGeoJson(
     // Street-following geometry for walk legs, fetched in parallel (memoized in the repository;
     // a null entry falls back to the straight segment below)
     val walkingPaths: Map<Pair<Int, Int>, List<DoubleArray>> = coroutineScope {
+        val router = WalkingRouteRepository.getInstance()
         journeysToDraw.withIndex().flatMap { (journeyIndex, journey) ->
             journey.legs.withIndex()
                 .filter { (_, leg) -> leg.isWalking }
                 .map { (legIndex, leg) ->
                     async {
-                        WalkingRouteRepository.getInstance()
-                            .getWalkingPath(leg.fromLat, leg.fromLon, leg.toLat, leg.toLon)
-                            ?.let { (journeyIndex to legIndex) to it }
+                        val path = if (fetchWalkingPaths) {
+                            router.getWalkingPath(leg.fromLat, leg.fromLon, leg.toLat, leg.toLon)
+                        } else {
+                            router.peekWalkingPath(leg.fromLat, leg.fromLon, leg.toLat, leg.toLon)
+                        }
+                        path?.let { (journeyIndex to legIndex) to it }
                     }
                 }
         }.awaitAll().filterNotNull().toMap()

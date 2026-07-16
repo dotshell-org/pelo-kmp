@@ -432,12 +432,20 @@ private fun RootScaffold(
         key1 = activeJourneys,
         key2 = selectedJourney
     ) {
-        value = if (activeJourneys.isNotEmpty()) {
-            withContext(Dispatchers.Default) {
-                toItinerariesGeoJson(activeJourneys, selectedJourney, viewModel)
-            }
-        } else {
-            null
+        if (activeJourneys.isEmpty()) {
+            value = null
+            return@produceState
+        }
+        // Instant first paint: cached street walk paths where available, straight lines otherwise
+        value = withContext(Dispatchers.Default) {
+            toItinerariesGeoJson(activeJourneys, selectedJourney, viewModel, fetchWalkingPaths = false)
+        }
+        // Background refinement: fetch the missing street paths, then update only on change
+        val refined = withContext(Dispatchers.Default) {
+            toItinerariesGeoJson(activeJourneys, selectedJourney, viewModel, fetchWalkingPaths = true)
+        }
+        if (refined != value) {
+            value = refined
         }
     }
     var itineraryDeparture by remember { mutableStateOf<SelectedStop?>(null) }

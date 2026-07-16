@@ -29,6 +29,18 @@ class WalkingRouteRepository private constructor() {
     private val cache = LinkedHashMap<String, List<DoubleArray>>()
 
     /**
+     * Cache-only lookup: the street path if a previous fetch already resolved it, else null
+     * immediately (no network). Lets the map paint instantly and refine once fetches complete.
+     */
+    suspend fun peekWalkingPath(
+        fromLat: Double,
+        fromLon: Double,
+        toLat: Double,
+        toLon: Double
+    ): List<DoubleArray>? =
+        cacheMutex.withLock { cache[cacheKey(fromLat, fromLon, toLat, toLon)] }
+
+    /**
      * @return the street path as [lon, lat] points including the exact endpoints,
      *         or null when unavailable (caller draws a straight line).
      */
