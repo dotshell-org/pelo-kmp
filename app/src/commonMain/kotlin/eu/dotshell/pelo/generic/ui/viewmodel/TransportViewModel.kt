@@ -1457,4 +1457,32 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         destinationStopIds: List<Int>,
         arrivalTimeSeconds: Int
     ): List<JourneyResult> = raptorRepository.getOptimizedPathsArriveBy(originStopIds, destinationStopIds, arrivalTimeSeconds)
+
+    override suspend fun getOptimizedPathsForLocations(
+        origin: io.raptor.Location,
+        destination: io.raptor.Location,
+        departureTimeSeconds: Int,
+        originLabel: String?,
+        destinationLabel: String?
+    ): List<JourneyResult> = raptorRepository.getOptimizedPaths(
+        origin = origin,
+        destination = destination,
+        departureTimeSeconds = departureTimeSeconds,
+        originLabel = originLabel,
+        destinationLabel = destinationLabel
+    )
+
+    override suspend fun getOptimizedPathsArriveByForLocations(
+        origin: io.raptor.Location,
+        destination: io.raptor.Location,
+        arrivalTimeSeconds: Int,
+        originLabel: String?,
+        destinationLabel: String?
+    ): List<JourneyResult> = raptorRepository.getOptimizedPathsArriveBy(
+        origin = origin,
+        destination = destination,
+        arrivalTimeSeconds = arrivalTimeSeconds,
+        originLabel = originLabel,
+        destinationLabel = destinationLabel
+    )
 }

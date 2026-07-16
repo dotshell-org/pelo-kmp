@@ -1,7 +1,24 @@
 package eu.dotshell.pelo.generic.data.repository.itinerary.itinerary
 
+import kotlinx.serialization.Serializable
+
 /**
- * Data class representing a leg of a journey
+ * Kind of journey leg. TRANSIT and TRANSFER cover classic stop-to-stop journeys; the WALK_*
+ * kinds come from coordinate-based queries (address/POI or GPS endpoints, raptor-kmp 1.8+).
+ */
+@Serializable
+enum class JourneyLegKind {
+    TRANSIT,
+    TRANSFER,
+    WALK_ACCESS,
+    WALK_EGRESS,
+    WALK_DIRECT
+}
+
+/**
+ * Data class representing a leg of a journey.
+ * A coordinate endpoint (walk leg from/to an address or GPS point) uses stopId "-1";
+ * its lat/lon then come from the query point rather than a network stop.
  */
 data class JourneyLeg(
     val fromStopId: String,
@@ -18,7 +35,8 @@ data class JourneyLeg(
     val routeColor: String?,
     val isWalking: Boolean,
     val direction: String? = null,
-    val intermediateStops: List<IntermediateStop> = emptyList()
+    val intermediateStops: List<IntermediateStop> = emptyList(),
+    val legKind: JourneyLegKind = if (isWalking) JourneyLegKind.TRANSFER else JourneyLegKind.TRANSIT
 ) {
     val durationMinutes: Int
         get() = (arrivalTime - departureTime) / 60

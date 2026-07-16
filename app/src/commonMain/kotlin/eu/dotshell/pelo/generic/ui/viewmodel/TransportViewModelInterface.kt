@@ -13,6 +13,7 @@ import eu.dotshell.pelo.generic.data.offline.OfflineDownloadState
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.RaptorStop
 import eu.dotshell.pelo.generic.ui.viewmodel.StopDeparturePreview
+import io.raptor.Location
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -85,6 +86,22 @@ interface TransportViewModelInterface {
         originStopIds: List<Int>,
         destinationStopIds: List<Int>,
         arrivalTimeSeconds: Int
+    ): List<JourneyResult>
+
+    suspend fun getOptimizedPathsForLocations(
+        origin: Location,
+        destination: Location,
+        departureTimeSeconds: Int,
+        originLabel: String? = null,
+        destinationLabel: String? = null
+    ): List<JourneyResult>
+
+    suspend fun getOptimizedPathsArriveByForLocations(
+        origin: Location,
+        destination: Location,
+        arrivalTimeSeconds: Int,
+        originLabel: String? = null,
+        destinationLabel: String? = null
     ): List<JourneyResult>
 
     fun startOfflineDownload()
