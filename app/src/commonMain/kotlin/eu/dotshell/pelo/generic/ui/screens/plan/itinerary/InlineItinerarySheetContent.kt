@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.dotshell.pelo.generic.data.models.realtime.alerts.community.UserStopAlert
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.ItineraryPreferencesRepository
+import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLegKind
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
 import eu.dotshell.pelo.generic.data.models.itinerary.SelectedStop
 import eu.dotshell.pelo.generic.data.telemetry.PlaceRef
@@ -570,6 +571,33 @@ fun InlineItinerarySheetContent(
                     val nonWalkingLegs = remember(selectedJourney?.legs) {
                         selectedJourney?.legs?.filterNot { it.isWalking }.orEmpty()
                     }
+                    // Start/end walks only — mid-journey transfer walks stay hidden
+                    val startWalk = remember(selectedJourney?.legs) {
+                        selectedJourney?.legs?.firstOrNull()?.takeIf {
+                            it.legKind == JourneyLegKind.WALK_ACCESS || it.legKind == JourneyLegKind.WALK_DIRECT
+                        }
+                    }
+                    val endWalk = remember(selectedJourney?.legs) {
+                        selectedJourney?.legs?.lastOrNull()?.takeIf { it.legKind == JourneyLegKind.WALK_EGRESS }
+                    }
+
+                    if (startWalk != null) {
+                        WalkDurationChip(
+                            minutes = startWalk.durationMinutes,
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            textColor = MaterialTheme.colorScheme.onSurface,
+                            iconSize = 24.dp,
+                            fontSize = 14.sp
+                        )
+                        if (nonWalkingLegs.isNotEmpty()) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
 
                     nonWalkingLegs.forEachIndexed { index, leg ->
                         val drawableName = LineIconResolver.getDrawableNameForLineName(leg.routeName ?: "")
@@ -609,6 +637,22 @@ fun InlineItinerarySheetContent(
                                 modifier = Modifier.size(24.dp)
                             )
                         }
+                    }
+
+                    if (endWalk != null) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        WalkDurationChip(
+                            minutes = endWalk.durationMinutes,
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            textColor = MaterialTheme.colorScheme.onSurface,
+                            iconSize = 24.dp,
+                            fontSize = 14.sp
+                        )
                     }
                 }
             }
