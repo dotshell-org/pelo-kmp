@@ -30,14 +30,32 @@ class OsrmWalkingClient {
     }
 
     suspend fun route(fromLat: Double, fromLon: Double, toLat: Double, toLon: Double): OsrmRouteResponse =
-        httpClient.get("$BASE_URL$fromLon,$fromLat;$toLon,$toLat") {
+        httpClient.get("$ROUTE_URL$fromLon,$fromLat;$toLon,$toLat") {
             parameter("overview", "full")
             parameter("geometries", "geojson")
             parameter("steps", "false")
         }.body()
 
+    /**
+     * One-to-many street distances (meters) from a source point to [targets] (lat/lon pairs),
+     * in a single request via the OSRM table service.
+     */
+    suspend fun table(fromLat: Double, fromLon: Double, targets: List<Pair<Double, Double>>): OsrmTableResponse {
+        val coords = buildString {
+            append(fromLon).append(',').append(fromLat)
+            for ((lat, lon) in targets) {
+                append(';').append(lon).append(',').append(lat)
+            }
+        }
+        return httpClient.get("$TABLE_URL$coords") {
+            parameter("sources", "0")
+            parameter("annotations", "distance")
+        }.body()
+    }
+
     companion object {
-        private const val BASE_URL = "https://routing.openstreetmap.de/routed-foot/route/v1/foot/"
+        private const val ROUTE_URL = "https://routing.openstreetmap.de/routed-foot/route/v1/foot/"
+        private const val TABLE_URL = "https://routing.openstreetmap.de/routed-foot/table/v1/foot/"
     }
 }
 
@@ -58,4 +76,12 @@ data class OsrmRoute(
 data class OsrmGeometry(
     // GeoJSON order: [lon, lat]
     val coordinates: List<List<Double>> = emptyList()
+)
+
+@Serializable
+data class OsrmTableResponse(
+    val code: String? = null,
+    // distances[0] = row for the single source: [0.0, dToTarget1, dToTarget2, ...];
+    // null entries mean the target is unreachable on foot
+    val distances: List<List<Double?>> = emptyList()
 )
