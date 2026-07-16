@@ -472,6 +472,31 @@ suspend fun toItinerariesGeoJson(
                     }
                 }
             }
+
+            // Coordinate endpoints (address / GPS point, stopId "-1"): a pin marker so the
+            // walk legs don't visually end nowhere. De-duplicated across journeys.
+            val endpointCoords = LinkedHashSet<Pair<Double, Double>>()
+            for (journey in journeysToDraw) {
+                for (leg in journey.legs) {
+                    if (leg.fromStopId == "-1") endpointCoords.add(leg.fromLon to leg.fromLat)
+                    if (leg.toStopId == "-1") endpointCoords.add(leg.toLon to leg.toLat)
+                }
+            }
+            for ((lon, lat) in endpointCoords) {
+                addJsonObject {
+                    put("type", "Feature")
+                    putJsonObject("geometry") {
+                        put("type", "Point")
+                        putJsonArray("coordinates") {
+                            add(lon)
+                            add(lat)
+                        }
+                    }
+                    putJsonObject("properties") {
+                        put("endpoint", "yes")
+                    }
+                }
+            }
         }
     }.toString()
 }
