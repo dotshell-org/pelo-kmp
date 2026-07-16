@@ -5,6 +5,7 @@ import eu.dotshell.pelo.generic.data.models.gtfs.LineStopInfo
 import eu.dotshell.pelo.generic.data.models.realtime.alerts.official.AlertSeverity
 import eu.dotshell.pelo.generic.data.models.realtime.alerts.official.TrafficAlert
 import eu.dotshell.pelo.generic.data.models.realtime.vehiclepositions.SimpleVehiclePosition
+import eu.dotshell.pelo.generic.data.models.search.AddressSearchResult
 import eu.dotshell.pelo.generic.data.models.search.LineSearchResult
 import eu.dotshell.pelo.generic.data.models.search.StationSearchResult
 import eu.dotshell.pelo.generic.data.models.stops.Favorite
@@ -38,6 +39,7 @@ interface TransportViewModelInterface {
     val offlineDownloadState: StateFlow<OfflineDownloadState>
 
     suspend fun searchStops(query: String): List<StationSearchResult>
+    suspend fun searchAddresses(query: String): List<AddressSearchResult>
     fun searchLines(query: String): List<LineSearchResult>
 
     fun loadAllLines()

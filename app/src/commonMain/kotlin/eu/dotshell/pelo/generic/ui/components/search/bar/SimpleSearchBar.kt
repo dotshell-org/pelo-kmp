@@ -23,6 +23,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -62,6 +63,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.data.repository.offline.search.SearchHistoryItem
 import eu.dotshell.pelo.generic.data.repository.offline.search.SearchType
+import eu.dotshell.pelo.generic.data.models.search.AddressSearchResult
 import eu.dotshell.pelo.generic.data.models.search.LineSearchResult
 import eu.dotshell.pelo.generic.data.models.search.StationSearchResult
 import eu.dotshell.pelo.generic.data.models.search.TransportSearchContent
@@ -79,9 +81,11 @@ fun SimpleSearchBar(
     modifier: Modifier = Modifier,
     searchResults: List<StationSearchResult>,
     lineSearchResults: List<LineSearchResult> = emptyList(),
+    addressResults: List<AddressSearchResult> = emptyList(),
     searchHistory: List<SearchHistoryItem> = emptyList(),
     onSearch: (StationSearchResult) -> Unit,
     onLineSearch: (LineSearchResult) -> Unit = {},
+    onAddressSearch: (AddressSearchResult) -> Unit = {},
     onHistoryItemClick: (SearchHistoryItem) -> Unit = {},
     onHistoryItemRemove: (SearchHistoryItem) -> Unit = {},
     onHistoryItemOptionsClick: (SearchHistoryItem) -> Unit = {},
@@ -160,6 +164,7 @@ fun SimpleSearchBar(
     val pickOnlyStopRows = content == TransportSearchContent.STOPS_ONLY && !showHistory
     val trimmedQuery = queryText.trim()
     val showNoResults = trimmedQuery.length >= minQueryLengthForResults && trimmedQuery.length > 1 &&
+            addressResults.isEmpty() &&
             when (content) {
                 TransportSearchContent.STOPS_ONLY -> searchResults.isEmpty()
                 TransportSearchContent.LINES_ONLY -> lineSearchResults.isEmpty()
@@ -426,6 +431,24 @@ fun SimpleSearchBar(
                                 )
                             }
                         }
+                    }
+                }
+
+                // Geocoded addresses/POIs: separate section below the stops, kept in Photon
+                // relevance order (not merged into the alphabetical sort above)
+                if (addressResults.isNotEmpty()) {
+                    item(key = "address_header") {
+                        SectionHeader(icon = Icons.Default.Place, text = strings["address_section"])
+                    }
+                    items(addressResults, key = { "addr_${it.lat}_${it.lon}" }) { address ->
+                        AddressSearchResultItem(
+                            result = address,
+                            onClick = {
+                                setQueryText("")
+                                setExpandedState(false)
+                                onAddressSearch(address)
+                            }
+                        )
                     }
                 }
 

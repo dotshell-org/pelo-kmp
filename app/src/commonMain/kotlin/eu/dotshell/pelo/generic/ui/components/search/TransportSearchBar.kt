@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import eu.dotshell.pelo.generic.data.models.search.AddressSearchResult
 import eu.dotshell.pelo.generic.data.models.search.LineSearchResult
 import eu.dotshell.pelo.generic.data.models.search.StationSearchResult
 import eu.dotshell.pelo.generic.data.models.search.TransportSearchContent
@@ -37,6 +38,10 @@ fun TransportSearchBar(
     onStopPrimary: (StationSearchResult) -> Unit,
     onStopSecondary: (StationSearchResult) -> Unit = {},
     onLineSelected: (LineSearchResult) -> Unit = {},
+    // Geocoded address/POI search: opt-in — call sites that don't provide a source never
+    // show the address section
+    onSearchAddresses: suspend (String) -> List<AddressSearchResult> = { emptyList() },
+    onAddressSelected: (AddressSearchResult) -> Unit = {},
     showDirections: Boolean = true,
     searchHistory: List<SearchHistoryItem> = emptyList(),
     onAddToHistory: (SearchHistoryItem) -> Unit = {},
@@ -68,6 +73,7 @@ fun TransportSearchBar(
 
     var stationSearchResults by remember { mutableStateOf<List<StationSearchResult>>(emptyList()) }
     var lineSearchResults by remember { mutableStateOf<List<LineSearchResult>>(emptyList()) }
+    var addressSearchResults by remember { mutableStateOf<List<AddressSearchResult>>(emptyList()) }
 
     LaunchedEffect(
         effectiveQuery,
@@ -80,6 +86,7 @@ fun TransportSearchBar(
         if (current.isEmpty()) {
             stationSearchResults = emptyList()
             lineSearchResults = emptyList()
+            addressSearchResults = emptyList()
             return@LaunchedEffect
         }
         delay(resolvedDebounce)
@@ -101,18 +108,28 @@ fun TransportSearchBar(
         } else {
             emptyList()
         }
+        addressSearchResults = if (
+            content != TransportSearchContent.LINES_ONLY &&
+            current.length >= ADDRESS_MIN_QUERY_LENGTH
+        ) {
+            onSearchAddresses(current)
+        } else {
+            emptyList()
+        }
     }
 
     fun clearQuery() {
         setEffectiveQuery("")
         stationSearchResults = emptyList()
         lineSearchResults = emptyList()
+        addressSearchResults = emptyList()
     }
 
     SimpleSearchBar(
         modifier = modifier,
         searchResults = stationSearchResults,
         lineSearchResults = lineSearchResults,
+        addressResults = addressSearchResults,
         searchHistory = if (showHistory) searchHistory else emptyList(),
         onQueryChange = { q -> setEffectiveQuery(q) },
         externalQuery = effectiveQuery,
@@ -125,6 +142,10 @@ fun TransportSearchBar(
         onLineSearch = { line ->
             if (showHistory) onAddToHistory(SearchHistoryItem(line.lineName, SearchType.LINE))
             onLineSelected(line)
+            clearQuery()
+        },
+        onAddressSearch = { address ->
+            onAddressSelected(address)
             clearQuery()
         },
         onHistoryItemClick = { historyItem ->
@@ -168,3 +189,6 @@ fun TransportSearchBar(
         showDirections = showDirections
     )
 }
+
+// Addresses need a slightly longer prefix than stops before hitting the remote geocoder
+private const val ADDRESS_MIN_QUERY_LENGTH = 3

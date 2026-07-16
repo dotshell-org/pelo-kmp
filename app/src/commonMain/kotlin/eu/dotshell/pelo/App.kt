@@ -930,6 +930,17 @@ private fun RootScaffold(
                         itinerarySearchTarget = null
                     }
                 },
+                onSearchAddresses = { q -> viewModel.searchAddresses(q) },
+                onAddressSelected = { address ->
+                    val sel = SelectedStop(
+                        name = address.label,
+                        stopIds = emptyList(),
+                        lat = address.lat,
+                        lon = address.lon
+                    )
+                    if (isDeparture) itineraryDeparture = sel else itineraryArrival = sel
+                    itinerarySearchTarget = null
+                },
             )
         }
 
