@@ -145,14 +145,37 @@ fun TransportSearchBar(
             clearQuery()
         },
         onAddressSearch = { address ->
+            if (showHistory) {
+                onAddToHistory(
+                    SearchHistoryItem(
+                        query = address.label,
+                        type = SearchType.ADDRESS,
+                        lat = address.lat,
+                        lon = address.lon,
+                        detail = address.detail
+                    )
+                )
+            }
             onAddressSelected(address)
             clearQuery()
         },
         onHistoryItemClick = { historyItem ->
-            if (historyItem.type == SearchType.LINE) {
-                onLineSelected(LineSearchResult(historyItem.query))
-            } else {
-                onStopPrimary(
+            when {
+                historyItem.type == SearchType.LINE ->
+                    onLineSelected(LineSearchResult(historyItem.query))
+                historyItem.type == SearchType.ADDRESS ->
+                    // Coordinates persisted with the entry: re-select without re-geocoding
+                    if (historyItem.lat != null && historyItem.lon != null) {
+                        onAddressSelected(
+                            AddressSearchResult(
+                                label = historyItem.query,
+                                detail = historyItem.detail,
+                                lat = historyItem.lat,
+                                lon = historyItem.lon
+                            )
+                        )
+                    } else Unit
+                else -> onStopPrimary(
                     StationSearchResult(
                         stopName = historyItem.query,
                         lines = historyItem.lines

@@ -379,7 +379,9 @@ fun SimpleSearchBar(
                                 setExpandedState(false)
                             },
                             onOptionsClick = {
-                                if (historyItem.type == SearchType.STOP) {
+                                if (historyItem.type == SearchType.STOP ||
+                                    historyItem.type == SearchType.ADDRESS
+                                ) {
                                     onHistoryItemClick(historyItem)
                                 }
                                 setQueryText("")
