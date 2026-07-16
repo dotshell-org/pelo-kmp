@@ -444,6 +444,8 @@ private fun RootScaffold(
     var itineraryNearby by remember { mutableStateOf<List<String>>(emptyList()) }
     var itinerarySearchTarget by remember { mutableStateOf<ItineraryFieldTarget?>(null) }
     var itineraryArrivalSeed by remember { mutableStateOf<String?>(null) }
+    // Captured at composable scope: string resources aren't readable inside LaunchedEffect
+    val myPositionLabel = StringProvider(context)["my_position"]
     LaunchedEffect(itineraryArrivalSeed) {
         val arrivalName = itineraryArrivalSeed ?: return@LaunchedEffect
         runCatching { viewModel.raptorRepository.resolveStopIdsByName(arrivalName) }
@@ -451,15 +453,17 @@ private fun RootScaffold(
             ?.let { itineraryArrival = SelectedStop(name = arrivalName, stopIds = it) }
         val loc = userLocation
         if (loc != null && itineraryDeparture == null) {
+            // Departure = the actual GPS point: raptor walks to every stop in range natively.
+            // Nearby stop names are still collected for the stop-departure fallback UI.
+            itineraryDeparture = SelectedStop(
+                name = myPositionLabel,
+                stopIds = emptyList(),
+                lat = loc.latitude,
+                lon = loc.longitude
+            )
             val nearest = runCatching { viewModel.raptorRepository.findNearestStops(loc.latitude, loc.longitude, 5) }
                 .getOrDefault(emptyList())
-            val names = nearest.map { it.name }.distinct()
-            itineraryNearby = names
-            names.firstOrNull()?.let { depName ->
-                runCatching { viewModel.raptorRepository.resolveStopIdsByName(depName) }
-                    .getOrDefault(emptyList()).takeIf { it.isNotEmpty() }
-                    ?.let { itineraryDeparture = SelectedStop(name = depName, stopIds = it) }
-            }
+            itineraryNearby = nearest.map { it.name }.distinct()
         }
     }
 
