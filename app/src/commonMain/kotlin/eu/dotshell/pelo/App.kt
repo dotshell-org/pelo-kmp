@@ -970,6 +970,19 @@ private fun RootScaffold(
                     if (isDeparture) itineraryDeparture = sel else itineraryArrival = sel
                     itinerarySearchTarget = null
                 },
+                showMyPosition = userLocation != null,
+                onMyPositionSelected = {
+                    userLocation?.let { loc ->
+                        val sel = SelectedStop(
+                            name = myPositionLabel,
+                            stopIds = emptyList(),
+                            lat = loc.latitude,
+                            lon = loc.longitude
+                        )
+                        if (isDeparture) itineraryDeparture = sel else itineraryArrival = sel
+                    }
+                    itinerarySearchTarget = null
+                },
             )
         }
 

@@ -42,6 +42,9 @@ fun TransportSearchBar(
     // show the address section
     onSearchAddresses: suspend (String) -> List<AddressSearchResult> = { emptyList() },
     onAddressSelected: (AddressSearchResult) -> Unit = {},
+    // Pinned "My location" row (itinerary pickers with a known GPS position)
+    showMyPosition: Boolean = false,
+    onMyPositionSelected: () -> Unit = {},
     showDirections: Boolean = true,
     searchHistory: List<SearchHistoryItem> = emptyList(),
     onAddToHistory: (SearchHistoryItem) -> Unit = {},
@@ -209,7 +212,12 @@ fun TransportSearchBar(
         searchPlaceholder = searchPlaceholder,
         focusNonce = focusNonce,
         minQueryLengthForResults = resolvedUiMinLen,
-        showDirections = showDirections
+        showDirections = showDirections,
+        showMyPositionRow = showMyPosition,
+        onMyPositionClick = {
+            onMyPositionSelected()
+            clearQuery()
+        }
     )
 }
 
