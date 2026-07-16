@@ -23,7 +23,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -434,22 +433,17 @@ fun SimpleSearchBar(
                     }
                 }
 
-                // Geocoded addresses/POIs: separate section below the stops, kept in Photon
-                // relevance order (not merged into the alphabetical sort above)
-                if (addressResults.isNotEmpty()) {
-                    item(key = "address_header") {
-                        SectionHeader(icon = Icons.Default.Place, text = strings["address_section"])
-                    }
-                    items(addressResults, key = { "addr_${it.lat}_${it.lon}" }) { address ->
-                        AddressSearchResultItem(
-                            result = address,
-                            onClick = {
-                                setQueryText("")
-                                setExpandedState(false)
-                                onAddressSearch(address)
-                            }
-                        )
-                    }
+                // Geocoded addresses/POIs: straight after the stops, kept in Photon relevance
+                // order (not merged into the alphabetical sort above)
+                items(addressResults, key = { "addr_${it.lat}_${it.lon}" }) { address ->
+                    AddressSearchResultItem(
+                        result = address,
+                        onClick = {
+                            setQueryText("")
+                            setExpandedState(false)
+                            onAddressSearch(address)
+                        }
+                    )
                 }
 
                 item(key = "bottom_spacer") {
