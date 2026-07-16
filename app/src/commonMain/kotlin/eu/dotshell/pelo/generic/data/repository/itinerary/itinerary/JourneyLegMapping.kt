@@ -9,7 +9,7 @@ import io.raptor.model.Stop
  * paths of RaptorRepository (previously two duplicated loops).
  *
  * Stop index -1 marks a coordinate endpoint (walk leg from/to an address or GPS point,
- * raptor-kmp 1.8+): it is resolved from the leg's own coordinates and the query labels.
+ * raptor-kmp 2.0+): it is resolved from the leg's own coordinates and the query labels.
  * Any other index that fails to resolve still invalidates the whole journey, as before.
  */
 internal fun mapLibraryJourneys(

@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * Kind of journey leg. TRANSIT and TRANSFER cover classic stop-to-stop journeys; the WALK_*
- * kinds come from coordinate-based queries (address/POI or GPS endpoints, raptor-kmp 1.8+).
+ * kinds come from coordinate-based queries (address/POI or GPS endpoints, raptor-kmp 2.0+).
  */
 @Serializable
 enum class JourneyLegKind {
