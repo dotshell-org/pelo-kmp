@@ -13,13 +13,9 @@ import eu.dotshell.pelo.generic.service.TransportServiceProvider
 import eu.dotshell.pelo.generic.utils.date.HolidayDetector
 import eu.dotshell.pelo.generic.utils.date.FrenchPublicHolidayStrategy
 import eu.dotshell.pelo.generic.utils.search.SearchUtils
-import eu.dotshell.pelo.generic.data.repository.routing.WalkingRouteRepository
 import io.raptor.Location
 import io.raptor.PeriodData
 import io.raptor.RaptorLibrary
-import io.raptor.WalkingParams
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import io.raptor.data.NetworkLoader
 import io.raptor.model.Route
 import io.raptor.model.Stop
@@ -106,12 +102,6 @@ class RaptorRepository private constructor(private val context: PlatformContext)
 
         // Set to false for production builds to reduce log overhead
         private const val DEBUG_LOGGING = false
-
-        // Point endpoints: candidate stops sent to the pedestrian router per endpoint, and the
-        // max accepted real-walk distance as a multiple of the search radius (drops stops whose
-        // street path detours absurdly, e.g. across a river)
-        private const val MAX_WALK_CANDIDATES = 25
-        private const val MAX_REAL_WALK_DETOUR = 2.0
 
         // Period constants
         private const val PERIOD_SATURDAY = "saturday"
@@ -690,10 +680,6 @@ class RaptorRepository private constructor(private val context: PlatformContext)
 
             Log.i(TAG, "getOptimizedPaths: Cache miss, calculating with Raptor")
 
-            // Real street walking distances for Point endpoints (memoized; falls back to the
-            // offline model when the router is unavailable). Outside the mutex: network I/O.
-            val (resolvedOrigin, resolvedDestination, walkOverride) = resolveWalks(origin, destination)
-
             // Period selection and the Raptor calculation share mutable period state (the
             // library's active period and the stop index). Hold the mutex across both, and
             // snapshot stopsByIndex while still locked: the @Volatile copy-on-write map captured
@@ -702,11 +688,10 @@ class RaptorRepository private constructor(private val context: PlatformContext)
             val (journeys, stopIndex) = mutex.withLock {
                 ensureCorrectPeriod(date) // Auto-select period based on selected date
                 val computed = raptorLibrary?.getOptimizedPaths(
-                    origin = resolvedOrigin,
-                    destination = resolvedDestination,
+                    origin = origin,
+                    destination = destination,
                     departureTime = depTime,
-                    blockedRouteNames = blockedRouteNames,
-                    directWalkSecondsOverride = walkOverride
+                    blockedRouteNames = blockedRouteNames
                 ) ?: emptyList()
                 computed to stopsByIndex
             }
@@ -726,69 +711,6 @@ class RaptorRepository private constructor(private val context: PlatformContext)
     }
 
     private fun Location.isEmptyStopIds(): Boolean = this is Location.StopIds && ids.isEmpty()
-
-    private fun Location.coords(): Pair<Double, Double>? = when (this) {
-        is Location.Point -> lat to lon
-        is Location.ResolvedPoint -> lat to lon
-        is Location.StopIds -> null
-    }
-
-    /**
-     * Upgrades a Point endpoint to a ResolvedPoint with real street walking distances (one OSRM
-     * table request, memoized). Durations use raptor's configured walking speed applied to the
-     * actual street distance (no detour factor). Any failure keeps the original Point, which
-     * falls back to raptor's offline great-circle model.
-     */
-    private suspend fun resolveWalksForLocation(location: Location): Location {
-        if (location !is Location.Point) return location
-        val walking = WalkingParams.DEFAULT
-        val candidates = nearbyStopCandidates(
-            stopsCache, location.lat, location.lon,
-            walking.maxAccessEgressDistanceMeters, MAX_WALK_CANDIDATES
-        )
-        if (candidates.isEmpty()) return location
-        val distances = WalkingRouteRepository.getInstance()
-            .getWalkingDistances(location.lat, location.lon, candidates.map { it.lat to it.lon })
-            ?: return location
-        val stops = buildStopWalks(
-            candidates, distances, walking.speedMetersPerSecond,
-            maxWalkDistanceMeters = walking.maxAccessEgressDistanceMeters * MAX_REAL_WALK_DETOUR
-        )
-        if (stops.isEmpty()) return location
-        return Location.ResolvedPoint(location.lat, location.lon, stops)
-    }
-
-    /**
-     * Real duration of the direct origin-to-destination walk when both endpoints are points and
-     * within raptor's direct-walk range; null keeps the offline estimate.
-     */
-    private suspend fun directWalkSecondsOverride(origin: Location, destination: Location): Int? {
-        val from = origin.coords() ?: return null
-        val to = destination.coords() ?: return null
-        val walking = WalkingParams.DEFAULT
-        val approx = approxWalkDistanceMeters(from.first, from.second, to.first, to.second)
-        if (approx > walking.maxDirectWalkDistanceMeters) return null
-        val distance = WalkingRouteRepository.getInstance()
-            .getWalkingDistanceMeters(from.first, from.second, to.first, to.second)
-            ?: return null
-        return kotlin.math.ceil(distance / walking.speedMetersPerSecond).toInt()
-    }
-
-    /**
-     * Resolves both endpoints and the direct-walk override in parallel (network calls are
-     * memoized in WalkingRouteRepository, so itinerary recalcs are effectively free).
-     */
-    private suspend fun resolveWalks(origin: Location, destination: Location): Triple<Location, Location, Int?> {
-        if (origin !is Location.Point && destination !is Location.Point) {
-            return Triple(origin, destination, null)
-        }
-        return coroutineScope {
-            val o = async { resolveWalksForLocation(origin) }
-            val d = async { resolveWalksForLocation(destination) }
-            val override = async { directWalkSecondsOverride(origin, destination) }
-            Triple(o.await(), d.await(), override.await())
-        }
-    }
 
     /**
      * Calculate optimized journeys that arrive by a specific time.
@@ -844,9 +766,6 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                 return@withContext emptyList()
             }
 
-            // Real street walking distances for Point endpoints (see getOptimizedPaths)
-            val (resolvedOrigin, resolvedDestination, walkOverride) = resolveWalks(origin, destination)
-
             // Period selection + the arrive-by Raptor calc share mutable period state; hold the
             // mutex across both and snapshot stopsByIndex while locked (see getOptimizedPaths).
             // ensureCorrectPeriod was previously never called here, so arrive-by silently used
@@ -854,12 +773,11 @@ class RaptorRepository private constructor(private val context: PlatformContext)
             val (journeys, stopIndex) = mutex.withLock {
                 ensureCorrectPeriod(date)
                 val computed = raptorLibrary?.getOptimizedPathsArriveBy(
-                    origin = resolvedOrigin,
-                    destination = resolvedDestination,
+                    origin = origin,
+                    destination = destination,
                     arrivalTime = arrivalTimeSeconds,
                     searchWindowMinutes = searchWindowMinutes,
-                    blockedRouteNames = blockedRouteNames,
-                    directWalkSecondsOverride = walkOverride
+                    blockedRouteNames = blockedRouteNames
                 ) ?: emptyList()
                 computed to stopsByIndex
             }

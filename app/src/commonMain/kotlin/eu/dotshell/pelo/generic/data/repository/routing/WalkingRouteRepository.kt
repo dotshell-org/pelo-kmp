@@ -16,23 +16,17 @@ import kotlin.math.roundToLong
 import kotlin.math.sqrt
 
 /**
- * Street-network walking data from the public OSRM foot router, with two uses:
- * - [getWalkingPath]/[getWalkingDistanceMeters]: one pair, real polyline + distance (map display
- *   and the direct-walk duration).
- * - [getWalkingDistances]: one-to-many distances in a single table request (access/egress walk
- *   times fed into the raptor optimization).
+ * Street-following walking paths for DISPLAY of walk legs (map polylines). Routing decisions and
+ * walk durations stay on raptor's offline haversine model — this only shapes the drawn line.
  *
- * Failures (offline, timeouts) return null and callers fall back to the offline great-circle
- * model. Successful results are memoized (itinerary recalcs reuse the same endpoints).
+ * Failures (offline, timeouts) return null and the caller falls back to a straight segment.
+ * Successful paths are memoized (walk legs are redrawn on every journey selection change).
  */
 class WalkingRouteRepository private constructor() {
 
     private val client = OsrmWalkingClient()
     private val cacheMutex = Mutex()
-    private val routeCache = LinkedHashMap<String, WalkRoute>()
-    private val tableCache = LinkedHashMap<String, List<Double?>>()
-
-    private class WalkRoute(val path: List<DoubleArray>, val distanceMeters: Double)
+    private val cache = LinkedHashMap<String, List<DoubleArray>>()
 
     /**
      * @return the street path as [lon, lat] points including the exact endpoints,
@@ -43,88 +37,30 @@ class WalkingRouteRepository private constructor() {
         fromLon: Double,
         toLat: Double,
         toLon: Double
-    ): List<DoubleArray>? = getWalkingRoute(fromLat, fromLon, toLat, toLon)?.path
-
-    /**
-     * @return the real street distance in meters, or null when unavailable.
-     */
-    suspend fun getWalkingDistanceMeters(
-        fromLat: Double,
-        fromLon: Double,
-        toLat: Double,
-        toLon: Double
-    ): Double? = getWalkingRoute(fromLat, fromLon, toLat, toLon)?.distanceMeters
-
-    private suspend fun getWalkingRoute(
-        fromLat: Double,
-        fromLon: Double,
-        toLat: Double,
-        toLon: Double
-    ): WalkRoute? {
+    ): List<DoubleArray>? {
         // Trivially short walks render fine as a straight segment; skip the network round-trip
         if (approxDistanceMeters(fromLat, fromLon, toLat, toLon) < MIN_FETCH_DISTANCE_METERS) return null
 
-        val key = routeKey(fromLat, fromLon, toLat, toLon)
-        cacheMutex.withLock { routeCache[key] }?.let { return it }
+        val key = cacheKey(fromLat, fromLon, toLat, toLon)
+        cacheMutex.withLock { cache[key] }?.let { return it }
 
         return withContext(ioDispatcher) {
             try {
                 withTimeout(REQUEST_TIMEOUT_MS) {
                     val response = client.route(fromLat, fromLon, toLat, toLon)
                     val path = buildWalkingPath(response, fromLat, fromLon, toLat, toLon)
-                    val distance = response.routes.firstOrNull()?.distance
-                    if (path != null && distance != null) {
-                        val route = WalkRoute(path, distance)
+                    if (path != null) {
                         cacheMutex.withLock {
-                            if (routeCache.size >= MAX_CACHE_ENTRIES) {
-                                routeCache.remove(routeCache.keys.first())
+                            if (cache.size >= MAX_CACHE_ENTRIES) {
+                                cache.remove(cache.keys.first())
                             }
-                            routeCache[key] = route
+                            cache[key] = path
                         }
-                        route
-                    } else null
+                    }
+                    path
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Walking route fetch failed: ${e.message}")
-                null
-            }
-        }
-    }
-
-    /**
-     * Real street distances (meters) from a point to each of [targets] (lat/lon pairs) in one
-     * table request. The result is parallel to [targets]; a null entry means that target is
-     * unreachable on foot. Returns null when the service is unavailable.
-     */
-    suspend fun getWalkingDistances(
-        fromLat: Double,
-        fromLon: Double,
-        targets: List<Pair<Double, Double>>
-    ): List<Double?>? {
-        if (targets.isEmpty()) return emptyList()
-
-        val key = tableKey(fromLat, fromLon, targets)
-        cacheMutex.withLock { tableCache[key] }?.let { return it }
-
-        return withContext(ioDispatcher) {
-            try {
-                withTimeout(REQUEST_TIMEOUT_MS) {
-                    val response = client.table(fromLat, fromLon, targets)
-                    val row = response.distances.firstOrNull()
-                    if (response.code == "Ok" && row != null && row.size == targets.size + 1) {
-                        // row[0] is source->source; targets start at index 1
-                        val distances = row.drop(1)
-                        cacheMutex.withLock {
-                            if (tableCache.size >= MAX_TABLE_CACHE_ENTRIES) {
-                                tableCache.remove(tableCache.keys.first())
-                            }
-                            tableCache[key] = distances
-                        }
-                        distances
-                    } else null
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Walking table fetch failed: ${e.message}")
                 null
             }
         }
@@ -135,7 +71,6 @@ class WalkingRouteRepository private constructor() {
         private const val REQUEST_TIMEOUT_MS = 5_000L
         private const val MIN_FETCH_DISTANCE_METERS = 40.0
         private const val MAX_CACHE_ENTRIES = 64
-        private const val MAX_TABLE_CACHE_ENTRIES = 16
 
         @Volatile
         private var INSTANCE: WalkingRouteRepository? = null
@@ -144,18 +79,10 @@ class WalkingRouteRepository private constructor() {
             return INSTANCE ?: WalkingRouteRepository().also { INSTANCE = it }
         }
 
-        private fun r(v: Double): Long = (v * 100_000).roundToLong() // ~1 m resolution
-
-        private fun routeKey(fromLat: Double, fromLon: Double, toLat: Double, toLon: Double): String =
-            "${r(fromLat)},${r(fromLon)}->${r(toLat)},${r(toLon)}"
-
-        private fun tableKey(fromLat: Double, fromLon: Double, targets: List<Pair<Double, Double>>): String =
-            buildString {
-                append(r(fromLat)).append(',').append(r(fromLon)).append(">>")
-                for ((lat, lon) in targets) {
-                    append(r(lat)).append(',').append(r(lon)).append(';')
-                }
-            }
+        private fun cacheKey(fromLat: Double, fromLon: Double, toLat: Double, toLon: Double): String {
+            fun r(v: Double): Long = (v * 100_000).roundToLong() // ~1 m resolution
+            return "${r(fromLat)},${r(fromLon)}->${r(toLat)},${r(toLon)}"
+        }
 
         private fun approxDistanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
             val kmPerDegLat = 111.32
