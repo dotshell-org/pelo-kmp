@@ -2,6 +2,7 @@ package eu.dotshell.pelo.generic.data.cache.journey
 
 import eu.dotshell.pelo.generic.data.cache.SerializableIntermediateStop
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLeg
+import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLegKind
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -20,7 +21,9 @@ data class SerializableJourneyLeg(
     val routeColor: String?,
     val isWalking: Boolean,
     val direction: String?,
-    val intermediateStops: List<SerializableIntermediateStop>
+    val intermediateStops: List<SerializableIntermediateStop>,
+    // Default mirrors JourneyLeg's: cache entries written before this field decode correctly
+    val legKind: JourneyLegKind = if (isWalking) JourneyLegKind.TRANSFER else JourneyLegKind.TRANSIT
 ) {
     fun toJourneyLeg() = JourneyLeg(
         fromStopId = fromStopId,
@@ -37,7 +40,8 @@ data class SerializableJourneyLeg(
         routeColor = routeColor,
         isWalking = isWalking,
         direction = direction,
-        intermediateStops = intermediateStops.map { it.toIntermediateStop() }
+        intermediateStops = intermediateStops.map { it.toIntermediateStop() },
+        legKind = legKind
     )
 
     companion object {
@@ -60,7 +64,8 @@ data class SerializableJourneyLeg(
                 SerializableIntermediateStop.Companion.fromIntermediateStop(
                     it
                 )
-            }
+            },
+            legKind = leg.legKind
         )
     }
 }

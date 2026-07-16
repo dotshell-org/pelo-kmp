@@ -13,6 +13,7 @@ import eu.dotshell.pelo.generic.service.TransportServiceProvider
 import eu.dotshell.pelo.generic.utils.date.HolidayDetector
 import eu.dotshell.pelo.generic.utils.date.FrenchPublicHolidayStrategy
 import eu.dotshell.pelo.generic.utils.search.SearchUtils
+import io.raptor.Location
 import io.raptor.PeriodData
 import io.raptor.RaptorLibrary
 import io.raptor.data.NetworkLoader
@@ -616,11 +617,37 @@ class RaptorRepository private constructor(private val context: PlatformContext)
         departureTimeSeconds: Int? = null,
         date: LocalDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date,
         blockedRouteNames: Set<String> = emptySet()
+    ): List<JourneyResult> = getOptimizedPaths(
+        origin = Location.StopIds(originStopIds),
+        destination = Location.StopIds(destinationStopIds),
+        departureTimeSeconds = departureTimeSeconds,
+        date = date,
+        blockedRouteNames = blockedRouteNames
+    )
+
+    /**
+     * Location-based variant: endpoints are stop-id sets and/or arbitrary WGS84 points
+     * (geocoded address/POI, GPS position). Point endpoints produce walk legs (access/egress
+     * or pure walk) whose coordinate ends use stopId "-1" and are labeled with
+     * [originLabel]/[destinationLabel].
+     *
+     * Only stop-to-stop queries are cached: coordinate keys would have to encode labels and
+     * coordinate rounding, and ad-hoc address queries don't repeat enough to be worth disk
+     * entries (the Raptor calc itself is milliseconds, memory-resident).
+     */
+    suspend fun getOptimizedPaths(
+        origin: Location,
+        destination: Location,
+        departureTimeSeconds: Int? = null,
+        date: LocalDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date,
+        blockedRouteNames: Set<String> = emptySet(),
+        originLabel: String? = null,
+        destinationLabel: String? = null
     ): List<JourneyResult> = withContext(Dispatchers.Default) {
         ensureInitialized()
 
         // Early return for empty inputs to avoid unnecessary computation
-        if (originStopIds.isEmpty() || destinationStopIds.isEmpty()) {
+        if (origin.isEmptyStopIds() || destination.isEmptyStopIds()) {
             Log.w(
                 TAG,
                 "getOptimizedPaths: origin or destination stop IDs are empty, skipping calculation"
@@ -631,29 +658,27 @@ class RaptorRepository private constructor(private val context: PlatformContext)
         try {
             val depTime = departureTimeSeconds ?: getCurrentTimeInSeconds()
 
-            // Smart time rounding: 15 min in off-peak, 5 min in peak hours
-            val roundedDepTime = getRoundedDepartureTime(depTime)
-
-            // Build cache key (includes date to ensure different periods are cached separately)
-            val cacheKey = buildCacheKey(
-                originStopIds,
-                destinationStopIds,
-                roundedDepTime,
-                date,
-                blockedRouteNames
-            )
+            // Cache key only for stop-to-stop queries (byte-identical to the historical key);
+            // smart time rounding: 15 min in off-peak, 5 min in peak hours
+            val cacheKey = if (origin is Location.StopIds && destination is Location.StopIds) {
+                buildCacheKey(
+                    origin.ids,
+                    destination.ids,
+                    getRoundedDepartureTime(depTime),
+                    date,
+                    blockedRouteNames
+                )
+            } else null
 
             // Cached (memory + disk) via JourneyCache, which owns its own 30-min memory LRU.
-            val cached = journeyDiskCache.get(cacheKey)
-            if (cached != null) {
-                return@withContext cached
+            if (cacheKey != null) {
+                val cached = journeyDiskCache.get(cacheKey)
+                if (cached != null) {
+                    return@withContext cached
+                }
             }
 
-            // Note: Empty checks already handled above, no need to check again
-            Log.i(
-                TAG,
-                "getOptimizedPaths: Cache miss, calculating with Raptor for ${originStopIds.size} origin(s) -> ${destinationStopIds.size} destination(s)"
-            )
+            Log.i(TAG, "getOptimizedPaths: Cache miss, calculating with Raptor")
 
             // Period selection and the Raptor calculation share mutable period state (the
             // library's active period and the stop index). Hold the mutex across both, and
@@ -663,97 +688,18 @@ class RaptorRepository private constructor(private val context: PlatformContext)
             val (journeys, stopIndex) = mutex.withLock {
                 ensureCorrectPeriod(date) // Auto-select period based on selected date
                 val computed = raptorLibrary?.getOptimizedPaths(
-                    originStopIds = originStopIds,
-                    destinationStopIds = destinationStopIds,
+                    origin = origin,
+                    destination = destination,
                     departureTime = depTime,
                     blockedRouteNames = blockedRouteNames
                 ) ?: emptyList()
                 computed to stopsByIndex
             }
 
-            // Performance: Pre-allocate results list with estimated capacity
-            val results = ArrayList<JourneyResult>(journeys.size)
-
-            // Use explicit for loop instead of mapNotNull to reduce lambda allocations
-            for (legs in journeys) {
-                if (legs.isEmpty()) continue
-
-                // Pre-allocate journey legs list
-                val journeyLegs = ArrayList<JourneyLeg>(legs.size)
-                var hasInvalidLeg = false
-
-                for (leg in legs) {
-                    // Use HashMap index for O(1) stop lookup (snapshot taken under the lock)
-                    val fromStop = stopIndex[leg.fromStopIndex]
-                    val toStop = stopIndex[leg.toStopIndex]
-
-                    if (fromStop == null || toStop == null) {
-                        if (DEBUG_LOGGING) {
-                            Log.w(
-                                "RaptorRepository",
-                                "getOptimizedPaths: Stop not found - fromIdx=${leg.fromStopIndex}, toIdx=${leg.toStopIndex}"
-                            )
-                        }
-                        hasInvalidLeg = true
-                        break
-                    }
-
-                    // Map intermediate stops using explicit for loop
-                    val intermediateIndices = leg.intermediateStopIndices
-                    val intermediateTimes = leg.intermediateArrivalTimes
-                    val intermediateStops = ArrayList<IntermediateStop>(intermediateIndices.size)
-
-                    for (idx in intermediateIndices.indices) {
-                        val stop = stopIndex[intermediateIndices[idx]]
-                        val arrivalTime =
-                            if (idx < intermediateTimes.size) intermediateTimes[idx] else null
-                        if (stop != null && arrivalTime != null) {
-                            intermediateStops.add(
-                                IntermediateStop(
-                                    stopName = stop.name,
-                                    arrivalTime = arrivalTime,
-                                    lat = stop.lat,
-                                    lon = stop.lon
-                                )
-                            )
-                        }
-                    }
-
-                    journeyLegs.add(
-                        JourneyLeg(
-                            fromStopId = fromStop.id.toString(),
-                            fromStopName = fromStop.name,
-                            fromLat = fromStop.lat,
-                            fromLon = fromStop.lon,
-                            toStopId = toStop.id.toString(),
-                            toStopName = toStop.name,
-                            toLat = toStop.lat,
-                            toLon = toStop.lon,
-                            departureTime = leg.departureTime,
-                            arrivalTime = leg.arrivalTime,
-                            routeName = leg.routeName,
-                            routeColor = null, // Library doesn't provide color
-                            isWalking = leg.isTransfer,
-                            direction = leg.direction,
-                            intermediateStops = intermediateStops
-                        )
-                    )
-                }
-
-                // Skip this journey if any leg was invalid
-                if (hasInvalidLeg || journeyLegs.isEmpty()) continue
-
-                results.add(
-                    JourneyResult(
-                        departureTime = legs.first().departureTime,
-                        arrivalTime = legs.last().arrivalTime,
-                        legs = journeyLegs
-                    )
-                )
-            }
+            val results = mapLibraryJourneys(journeys, stopIndex, originLabel, destinationLabel)
 
             // Cache (memory + disk) via JourneyCache.
-            if (results.isNotEmpty()) {
+            if (cacheKey != null && results.isNotEmpty()) {
                 journeyDiskCache.put(cacheKey, results)
             }
 
@@ -763,6 +709,8 @@ class RaptorRepository private constructor(private val context: PlatformContext)
             emptyList()
         }
     }
+
+    private fun Location.isEmptyStopIds(): Boolean = this is Location.StopIds && ids.isEmpty()
 
     /**
      * Calculate optimized journeys that arrive by a specific time.
@@ -783,14 +731,37 @@ class RaptorRepository private constructor(private val context: PlatformContext)
         searchWindowMinutes: Int = 120,
         date: LocalDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date,
         blockedRouteNames: Set<String> = emptySet()
+    ): List<JourneyResult> = getOptimizedPathsArriveBy(
+        origin = Location.StopIds(originStopIds),
+        destination = Location.StopIds(destinationStopIds),
+        arrivalTimeSeconds = arrivalTimeSeconds,
+        searchWindowMinutes = searchWindowMinutes,
+        date = date,
+        blockedRouteNames = blockedRouteNames
+    )
+
+    /**
+     * Location-based variant of the arrive-by search: endpoints are stop-id sets and/or
+     * arbitrary WGS84 points (see the location-based [getOptimizedPaths]). Never cached,
+     * like the historical arrive-by path.
+     */
+    suspend fun getOptimizedPathsArriveBy(
+        origin: Location,
+        destination: Location,
+        arrivalTimeSeconds: Int,
+        searchWindowMinutes: Int = 120,
+        date: LocalDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date,
+        blockedRouteNames: Set<String> = emptySet(),
+        originLabel: String? = null,
+        destinationLabel: String? = null
     ): List<JourneyResult> = withContext(Dispatchers.Default) {
         ensureInitialized()
         try {
-            if (originStopIds.isEmpty()) {
+            if (origin.isEmptyStopIds()) {
                 Log.w(TAG, "getOptimizedPathsArriveBy: originStopIds is empty!")
                 return@withContext emptyList()
             }
-            if (destinationStopIds.isEmpty()) {
+            if (destination.isEmptyStopIds()) {
                 Log.w(TAG, "getOptimizedPathsArriveBy: destinationStopIds is empty!")
                 return@withContext emptyList()
             }
@@ -802,8 +773,8 @@ class RaptorRepository private constructor(private val context: PlatformContext)
             val (journeys, stopIndex) = mutex.withLock {
                 ensureCorrectPeriod(date)
                 val computed = raptorLibrary?.getOptimizedPathsArriveBy(
-                    originStopIds = originStopIds,
-                    destinationStopIds = destinationStopIds,
+                    origin = origin,
+                    destination = destination,
                     arrivalTime = arrivalTimeSeconds,
                     searchWindowMinutes = searchWindowMinutes,
                     blockedRouteNames = blockedRouteNames
@@ -811,83 +782,7 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                 computed to stopsByIndex
             }
 
-            // Map results using the same logic as getOptimizedPaths
-            val results = ArrayList<JourneyResult>(journeys.size)
-
-            for (legs in journeys) {
-                if (legs.isEmpty()) continue
-
-                val journeyLegs = ArrayList<JourneyLeg>(legs.size)
-                var hasInvalidLeg = false
-
-                for (leg in legs) {
-                    val fromStop = stopIndex[leg.fromStopIndex]
-                    val toStop = stopIndex[leg.toStopIndex]
-
-                    if (fromStop == null || toStop == null) {
-                        if (DEBUG_LOGGING) {
-                            Log.w(
-                                TAG,
-                                "getOptimizedPathsArriveBy: Stop not found - fromIdx=${leg.fromStopIndex}, toIdx=${leg.toStopIndex}"
-                            )
-                        }
-                        hasInvalidLeg = true
-                        break
-                    }
-
-                    val intermediateIndices = leg.intermediateStopIndices
-                    val intermediateTimes = leg.intermediateArrivalTimes
-                    val intermediateStops = ArrayList<IntermediateStop>(intermediateIndices.size)
-
-                    for (idx in intermediateIndices.indices) {
-                        val stop = stopIndex[intermediateIndices[idx]]
-                        val arrivalTime =
-                            if (idx < intermediateTimes.size) intermediateTimes[idx] else null
-                        if (stop != null && arrivalTime != null) {
-                            intermediateStops.add(
-                                IntermediateStop(
-                                    stopName = stop.name,
-                                    arrivalTime = arrivalTime,
-                                    lat = stop.lat,
-                                    lon = stop.lon
-                                )
-                            )
-                        }
-                    }
-
-                    journeyLegs.add(
-                        JourneyLeg(
-                            fromStopId = fromStop.id.toString(),
-                            fromStopName = fromStop.name,
-                            fromLat = fromStop.lat,
-                            fromLon = fromStop.lon,
-                            toStopId = toStop.id.toString(),
-                            toStopName = toStop.name,
-                            toLat = toStop.lat,
-                            toLon = toStop.lon,
-                            departureTime = leg.departureTime,
-                            arrivalTime = leg.arrivalTime,
-                            routeName = leg.routeName,
-                            routeColor = null,
-                            isWalking = leg.isTransfer,
-                            direction = leg.direction,
-                            intermediateStops = intermediateStops
-                        )
-                    )
-                }
-
-                if (hasInvalidLeg || journeyLegs.isEmpty()) continue
-
-                results.add(
-                    JourneyResult(
-                        departureTime = legs.first().departureTime,
-                        arrivalTime = legs.last().arrivalTime,
-                        legs = journeyLegs
-                    )
-                )
-            }
-
-            results
+            mapLibraryJourneys(journeys, stopIndex, originLabel, destinationLabel)
         } catch (e: Exception) {
             Log.e(TAG, "Error calculating arrive-by paths: ${e.message}", e)
             emptyList()

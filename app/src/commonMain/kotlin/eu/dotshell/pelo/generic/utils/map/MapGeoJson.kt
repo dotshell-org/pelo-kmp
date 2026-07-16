@@ -7,6 +7,10 @@ import eu.dotshell.pelo.generic.service.TransportServiceProvider
 import eu.dotshell.pelo.generic.utils.LineColorHelper
 import eu.dotshell.pelo.generic.utils.geo.StopsGeoJsonManager
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
+import eu.dotshell.pelo.generic.data.repository.routing.WalkingRouteRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.json.add
@@ -324,11 +328,16 @@ suspend fun StopCollection.toStopsGeoJsonByPriority(
 /**
  * Converts a list of calculated itinerary journeys into a standard GeoJSON FeatureCollection string.
  * This reconstructs the actual cut line segments or draws straight fallback paths between stops/legs.
+ *
+ * @param fetchWalkingPaths true = fetch street-following walk paths from the pedestrian router
+ *        (may take a network round-trip); false = use only already-cached paths, never blocking —
+ *        callers paint instantly with false then refine with true.
  */
 suspend fun toItinerariesGeoJson(
     journeys: List<JourneyResult>,
     selectedJourney: JourneyResult?,
-    viewModel: TransportViewModel
+    viewModel: TransportViewModel,
+    fetchWalkingPaths: Boolean = true
 ): String {
     val journeysToDraw = selectedJourney?.let { listOf(it) } ?: journeys
     val lineNames = journeysToDraw.flatMap { journey ->
@@ -344,6 +353,26 @@ suspend fun toItinerariesGeoJson(
         } catch (_: Exception) {
             emptyList<Feature>()
         }
+    }
+
+    // Street-following geometry for walk legs, fetched in parallel (memoized in the repository;
+    // a null entry falls back to the straight segment below)
+    val walkingPaths: Map<Pair<Int, Int>, List<DoubleArray>> = coroutineScope {
+        val router = WalkingRouteRepository.getInstance()
+        journeysToDraw.withIndex().flatMap { (journeyIndex, journey) ->
+            journey.legs.withIndex()
+                .filter { (_, leg) -> leg.isWalking }
+                .map { (legIndex, leg) ->
+                    async {
+                        val path = if (fetchWalkingPaths) {
+                            router.getWalkingPath(leg.fromLat, leg.fromLon, leg.toLat, leg.toLon)
+                        } else {
+                            router.peekWalkingPath(leg.fromLat, leg.fromLon, leg.toLat, leg.toLon)
+                        }
+                        path?.let { (journeyIndex to legIndex) to it }
+                    }
+                }
+        }.awaitAll().filterNotNull().toMap()
     }
 
     return buildJsonObject {
@@ -401,24 +430,35 @@ suspend fun toItinerariesGeoJson(
                     }
 
                     if (!drewSection) {
+                        val walkPath = if (leg.isWalking) walkingPaths[journeyIndex to legIndex] else null
                         addJsonObject {
                             put("type", "Feature")
                             putJsonObject("geometry") {
                                 put("type", "LineString")
                                 putJsonArray("coordinates") {
-                                    addJsonArray {
-                                        add(leg.fromLon)
-                                        add(leg.fromLat)
-                                    }
-                                    for (stop in leg.intermediateStops) {
-                                        addJsonArray {
-                                            add(stop.lon)
-                                            add(stop.lat)
+                                    if (walkPath != null) {
+                                        // Real street path ([lon, lat] points, endpoints included)
+                                        for (point in walkPath) {
+                                            addJsonArray {
+                                                add(point[0])
+                                                add(point[1])
+                                            }
                                         }
-                                    }
-                                    addJsonArray {
-                                        add(leg.toLon)
-                                        add(leg.toLat)
+                                    } else {
+                                        addJsonArray {
+                                            add(leg.fromLon)
+                                            add(leg.fromLat)
+                                        }
+                                        for (stop in leg.intermediateStops) {
+                                            addJsonArray {
+                                                add(stop.lon)
+                                                add(stop.lat)
+                                            }
+                                        }
+                                        addJsonArray {
+                                            add(leg.toLon)
+                                            add(leg.toLat)
+                                        }
                                     }
                                 }
                             }
@@ -429,6 +469,31 @@ suspend fun toItinerariesGeoJson(
                                 put("legIndex", legIndex)
                             }
                         }
+                    }
+                }
+            }
+
+            // Coordinate endpoints (address / GPS point, stopId "-1"): a pin marker so the
+            // walk legs don't visually end nowhere. De-duplicated across journeys.
+            val endpointCoords = LinkedHashSet<Pair<Double, Double>>()
+            for (journey in journeysToDraw) {
+                for (leg in journey.legs) {
+                    if (leg.fromStopId == "-1") endpointCoords.add(leg.fromLon to leg.fromLat)
+                    if (leg.toStopId == "-1") endpointCoords.add(leg.toLon to leg.toLat)
+                }
+            }
+            for ((lon, lat) in endpointCoords) {
+                addJsonObject {
+                    put("type", "Feature")
+                    putJsonObject("geometry") {
+                        put("type", "Point")
+                        putJsonArray("coordinates") {
+                            add(lon)
+                            add(lat)
+                        }
+                    }
+                    putJsonObject("properties") {
+                        put("endpoint", "yes")
                     }
                 }
             }

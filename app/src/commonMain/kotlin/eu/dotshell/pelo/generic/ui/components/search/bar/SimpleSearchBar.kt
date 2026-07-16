@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -62,6 +65,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.data.repository.offline.search.SearchHistoryItem
 import eu.dotshell.pelo.generic.data.repository.offline.search.SearchType
+import eu.dotshell.pelo.generic.data.models.search.AddressSearchResult
 import eu.dotshell.pelo.generic.data.models.search.LineSearchResult
 import eu.dotshell.pelo.generic.data.models.search.StationSearchResult
 import eu.dotshell.pelo.generic.data.models.search.TransportSearchContent
@@ -79,9 +83,11 @@ fun SimpleSearchBar(
     modifier: Modifier = Modifier,
     searchResults: List<StationSearchResult>,
     lineSearchResults: List<LineSearchResult> = emptyList(),
+    addressResults: List<AddressSearchResult> = emptyList(),
     searchHistory: List<SearchHistoryItem> = emptyList(),
     onSearch: (StationSearchResult) -> Unit,
     onLineSearch: (LineSearchResult) -> Unit = {},
+    onAddressSearch: (AddressSearchResult) -> Unit = {},
     onHistoryItemClick: (SearchHistoryItem) -> Unit = {},
     onHistoryItemRemove: (SearchHistoryItem) -> Unit = {},
     onHistoryItemOptionsClick: (SearchHistoryItem) -> Unit = {},
@@ -97,7 +103,10 @@ fun SimpleSearchBar(
     externalOnQueryChange: ((String) -> Unit)? = null,
     focusNonce: Int = 0,
     minQueryLengthForResults: Int = 1,
-    showDirections: Boolean = true
+    showDirections: Boolean = true,
+    // Pinned "My location" row shown while the query is empty (itinerary pickers with GPS)
+    showMyPositionRow: Boolean = false,
+    onMyPositionClick: () -> Unit = {}
 ) {
     val strings = StringProvider(LocalPlatformContext.current)
     val placeholder = searchPlaceholder ?: strings["search"]
@@ -160,6 +169,7 @@ fun SimpleSearchBar(
     val pickOnlyStopRows = content == TransportSearchContent.STOPS_ONLY && !showHistory
     val trimmedQuery = queryText.trim()
     val showNoResults = trimmedQuery.length >= minQueryLengthForResults && trimmedQuery.length > 1 &&
+            addressResults.isEmpty() &&
             when (content) {
                 TransportSearchContent.STOPS_ONLY -> searchResults.isEmpty()
                 TransportSearchContent.LINES_ONLY -> lineSearchResults.isEmpty()
@@ -357,6 +367,41 @@ fun SimpleSearchBar(
                     ) {},
                 state = lazyListState
             ) {
+                if (queryText.isEmpty() && showMyPositionRow) {
+                    item(key = "my_position") {
+                        ListItem(
+                            headlineContent = {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 24.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.MyLocation,
+                                        contentDescription = null,
+                                        tint = AccentColor,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.size(12.dp))
+                                    Text(
+                                        strings["my_position"],
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            },
+                            colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
+                            modifier = Modifier
+                                .clickable {
+                                    setQueryText("")
+                                    setExpandedState(false)
+                                    keyboardController?.hide()
+                                    onMyPositionClick()
+                                }
+                                .fillMaxWidth()
+                        )
+                    }
+                }
+
                 if (queryText.isEmpty() && showHistory && searchHistory.isNotEmpty()) {
                     item(key = "history_header") {
                         SectionHeader(icon = Icons.Default.History, text = strings["recent_searches"])
@@ -375,7 +420,9 @@ fun SimpleSearchBar(
                                 setExpandedState(false)
                             },
                             onOptionsClick = {
-                                if (historyItem.type == SearchType.STOP) {
+                                if (historyItem.type == SearchType.STOP ||
+                                    historyItem.type == SearchType.ADDRESS
+                                ) {
                                     onHistoryItemClick(historyItem)
                                 }
                                 setQueryText("")
@@ -427,6 +474,19 @@ fun SimpleSearchBar(
                             }
                         }
                     }
+                }
+
+                // Geocoded addresses/POIs: straight after the stops, kept in Photon relevance
+                // order (not merged into the alphabetical sort above)
+                items(addressResults, key = { "addr_${it.lat}_${it.lon}" }) { address ->
+                    AddressSearchResultItem(
+                        result = address,
+                        onClick = {
+                            setQueryText("")
+                            setExpandedState(false)
+                            onAddressSearch(address)
+                        }
+                    )
                 }
 
                 item(key = "bottom_spacer") {

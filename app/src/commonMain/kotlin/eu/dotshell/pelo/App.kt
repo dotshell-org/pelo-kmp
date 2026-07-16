@@ -94,6 +94,7 @@ import eu.dotshell.pelo.generic.data.models.geojson.StopCollection
 import eu.dotshell.pelo.generic.data.models.geojson.StopFeature
 import eu.dotshell.pelo.generic.data.models.itinerary.ItineraryFieldTarget
 import eu.dotshell.pelo.generic.data.models.itinerary.SelectedStop
+import eu.dotshell.pelo.generic.data.models.search.AddressSearchResult
 import eu.dotshell.pelo.generic.data.models.search.TransportSearchContent
 import eu.dotshell.pelo.generic.data.models.stops.Favorite
 import eu.dotshell.pelo.generic.data.models.stops.StationInfo
@@ -431,12 +432,20 @@ private fun RootScaffold(
         key1 = activeJourneys,
         key2 = selectedJourney
     ) {
-        value = if (activeJourneys.isNotEmpty()) {
-            withContext(Dispatchers.Default) {
-                toItinerariesGeoJson(activeJourneys, selectedJourney, viewModel)
-            }
-        } else {
-            null
+        if (activeJourneys.isEmpty()) {
+            value = null
+            return@produceState
+        }
+        // Instant first paint: cached street walk paths where available, straight lines otherwise
+        value = withContext(Dispatchers.Default) {
+            toItinerariesGeoJson(activeJourneys, selectedJourney, viewModel, fetchWalkingPaths = false)
+        }
+        // Background refinement: fetch the missing street paths, then update only on change
+        val refined = withContext(Dispatchers.Default) {
+            toItinerariesGeoJson(activeJourneys, selectedJourney, viewModel, fetchWalkingPaths = true)
+        }
+        if (refined != value) {
+            value = refined
         }
     }
     var itineraryDeparture by remember { mutableStateOf<SelectedStop?>(null) }
@@ -444,22 +453,29 @@ private fun RootScaffold(
     var itineraryNearby by remember { mutableStateOf<List<String>>(emptyList()) }
     var itinerarySearchTarget by remember { mutableStateOf<ItineraryFieldTarget?>(null) }
     var itineraryArrivalSeed by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(itineraryArrivalSeed) {
-        val arrivalName = itineraryArrivalSeed ?: return@LaunchedEffect
-        runCatching { viewModel.raptorRepository.resolveStopIdsByName(arrivalName) }
-            .getOrDefault(emptyList()).takeIf { it.isNotEmpty() }
-            ?.let { itineraryArrival = SelectedStop(name = arrivalName, stopIds = it) }
+    // Captured at composable scope: string resources aren't readable inside LaunchedEffect
+    val myPositionLabel = StringProvider(context)["my_position"]
+    LaunchedEffect(itineraryActive, itineraryArrivalSeed) {
+        if (!itineraryActive) return@LaunchedEffect
+        val arrivalName = itineraryArrivalSeed
+        if (arrivalName != null) {
+            runCatching { viewModel.raptorRepository.resolveStopIdsByName(arrivalName) }
+                .getOrDefault(emptyList()).takeIf { it.isNotEmpty() }
+                ?.let { itineraryArrival = SelectedStop(name = arrivalName, stopIds = it) }
+        }
         val loc = userLocation
         if (loc != null && itineraryDeparture == null) {
+            // Departure = the actual GPS point: raptor walks to every stop in range natively.
+            // Nearby stop names are still collected for the stop-departure fallback UI.
+            itineraryDeparture = SelectedStop(
+                name = myPositionLabel,
+                stopIds = emptyList(),
+                lat = loc.latitude,
+                lon = loc.longitude
+            )
             val nearest = runCatching { viewModel.raptorRepository.findNearestStops(loc.latitude, loc.longitude, 5) }
                 .getOrDefault(emptyList())
-            val names = nearest.map { it.name }.distinct()
-            itineraryNearby = names
-            names.firstOrNull()?.let { depName ->
-                runCatching { viewModel.raptorRepository.resolveStopIdsByName(depName) }
-                    .getOrDefault(emptyList()).takeIf { it.isNotEmpty() }
-                    ?.let { itineraryDeparture = SelectedStop(name = depName, stopIds = it) }
-            }
+            itineraryNearby = nearest.map { it.name }.distinct()
         }
     }
 
@@ -552,6 +568,18 @@ private fun RootScaffold(
         closeSheet()
         itineraryArrival = null; itineraryDeparture = null
         itineraryArrivalSeed = name
+        itineraryActive = true
+    }
+    fun startItineraryToAddress(address: AddressSearchResult) {
+        closeSheet()
+        itineraryDeparture = null
+        itineraryArrivalSeed = null
+        itineraryArrival = SelectedStop(
+            name = address.label,
+            stopIds = emptyList(),
+            lat = address.lat,
+            lon = address.lon
+        )
         itineraryActive = true
     }
 
@@ -719,6 +747,7 @@ private fun RootScaffold(
                             showAddFavoriteDialog = true
                         },
                         onItinerarySelected = { name -> startItinerary(name) },
+                        onAddressItinerarySelected = { address -> startItineraryToAddress(address) },
                         isCenteredOnUser = isCenteredOnUser,
                         onFabClick = { isAtTarget ->
                             if (isAtTarget) {
@@ -930,6 +959,30 @@ private fun RootScaffold(
                         itinerarySearchTarget = null
                     }
                 },
+                onSearchAddresses = { q -> viewModel.searchAddresses(q) },
+                onAddressSelected = { address ->
+                    val sel = SelectedStop(
+                        name = address.label,
+                        stopIds = emptyList(),
+                        lat = address.lat,
+                        lon = address.lon
+                    )
+                    if (isDeparture) itineraryDeparture = sel else itineraryArrival = sel
+                    itinerarySearchTarget = null
+                },
+                showMyPosition = userLocation != null,
+                onMyPositionSelected = {
+                    userLocation?.let { loc ->
+                        val sel = SelectedStop(
+                            name = myPositionLabel,
+                            stopIds = emptyList(),
+                            lat = loc.latitude,
+                            lon = loc.longitude
+                        )
+                        if (isDeparture) itineraryDeparture = sel else itineraryArrival = sel
+                    }
+                    itinerarySearchTarget = null
+                },
             )
         }
 
@@ -1052,6 +1105,7 @@ private fun PlanContent(
     onLineSelected: (String) -> Unit,
     onAddFavoriteClick: () -> Unit,
     onItinerarySelected: (String) -> Unit,
+    onAddressItinerarySelected: (AddressSearchResult) -> Unit,
     isCenteredOnUser: Boolean,
     onFabClick: (Boolean) -> Unit,
     onFabReset: () -> Unit,
@@ -1304,6 +1358,9 @@ private fun PlanContent(
                         onStopPrimary = { result -> onStopSelected(result.stopName, result.stopId, result.lines) },
                         onStopSecondary = { result -> onItinerarySelected(result.stopName) },
                         onLineSelected = { line -> onLineSelected(line.lineName) },
+                        // Picking an address launches an itinerary towards it right away
+                        onSearchAddresses = { q -> viewModel.searchAddresses(q) },
+                        onAddressSelected = { address -> onAddressItinerarySelected(address) },
                         searchHistory = searchHistory,
                         onAddToHistory = { item ->
                             searchHistoryRepo.addToHistory(item)

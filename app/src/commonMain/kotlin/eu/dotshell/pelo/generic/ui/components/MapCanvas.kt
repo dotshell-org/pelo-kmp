@@ -414,6 +414,16 @@ fun MapCanvas(
                     width = const(4.dp),
                     dasharray = const(listOf(2.0, 2.0)),
                 )
+                // Coordinate endpoints (address / GPS point): same blue as the location dot
+                CircleLayer(
+                    id = "itinerary-endpoints",
+                    source = itinerarySource,
+                    filter = feature["endpoint"].convertToString() eq const("yes"),
+                    radius = const(6.dp),
+                    color = const(Color(0xFF3B82F6)),
+                    strokeColor = const(Color.White),
+                    strokeWidth = const(2.dp),
+                )
             }
 
             // ------------------------------------------------------------------

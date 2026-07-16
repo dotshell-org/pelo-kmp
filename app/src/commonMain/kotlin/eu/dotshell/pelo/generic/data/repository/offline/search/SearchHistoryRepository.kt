@@ -92,6 +92,9 @@ class SearchHistoryRepository(context: PlatformContext) {
                 at = now,
                 lineId = item.query
             )
+            // Addresses are personal places (labels + coordinates): they never leave the device.
+            // The itinerary flow already emits a scrubbed ~600 m geohash PlaceRef for them.
+            SearchType.ADDRESS -> return
         }
         TelemetryEmitter.emit(event)
     }

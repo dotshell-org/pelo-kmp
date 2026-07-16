@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Directions
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -58,6 +59,15 @@ fun HistoryListItem(
                     SearchConnectionBadge(lineName = historyItem.query, sizeDp = 44)
                     Spacer(modifier = Modifier.size(12.dp))
                 }
+                if (historyItem.type == SearchType.ADDRESS) {
+                    Icon(
+                        imageVector = Icons.Default.Place,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.size(12.dp))
+                }
                 Column(
                     modifier = Modifier.weight(1f)
                 ) {
@@ -74,6 +84,15 @@ fun HistoryListItem(
                         overflow = TextOverflow.Ellipsis,
                         fontWeight = FontWeight.Medium
                     )
+                    if (historyItem.type == SearchType.ADDRESS && historyItem.detail != null) {
+                        Text(
+                            historyItem.detail,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                     // For stops, show ALL line icons below the name
                     if (historyItem.type == SearchType.STOP && historyItem.lines.isNotEmpty()) {
                         Spacer(modifier = Modifier.size(6.dp))

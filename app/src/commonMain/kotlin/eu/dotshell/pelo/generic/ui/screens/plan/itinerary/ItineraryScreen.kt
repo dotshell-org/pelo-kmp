@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLeg
+import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLegKind
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
 import eu.dotshell.pelo.generic.data.models.itinerary.TimeMode
 import eu.dotshell.pelo.generic.ui.theme.AccentColor
@@ -223,6 +224,32 @@ fun CompactJourneyCard(
                 val arrowTint = remember(useLightColors) {
                     if (useLightColors) Color(0xFF6B7280) else SecondaryColor.copy(alpha = 0.5f)
                 }
+                // Start/end walks only (address, POI or GPS endpoints; the pure-walk journey
+                // shows as a single leading chip) — mid-journey transfer walks stay hidden
+                val startWalk = remember(journey.legs) {
+                    journey.legs.firstOrNull()?.takeIf {
+                        it.legKind == JourneyLegKind.WALK_ACCESS || it.legKind == JourneyLegKind.WALK_DIRECT
+                    }
+                }
+                val endWalk = remember(journey.legs) {
+                    journey.legs.lastOrNull()?.takeIf { it.legKind == JourneyLegKind.WALK_EGRESS }
+                }
+
+                if (startWalk != null) {
+                    WalkDurationChip(
+                        minutes = startWalk.durationMinutes,
+                        tint = arrowTint,
+                        textColor = primaryTextColor
+                    )
+                    if (nonWalkingLegs.isNotEmpty()) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = arrowTint,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
 
                 nonWalkingLegs.forEachIndexed { index, leg ->
                     val drawableName = LineIconResolver.getDrawableNameForLineName(leg.routeName ?: "")
@@ -261,6 +288,20 @@ fun CompactJourneyCard(
                             modifier = Modifier.size(24.dp)
                         )
                     }
+                }
+
+                if (endWalk != null) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = null,
+                        tint = arrowTint,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    WalkDurationChip(
+                        minutes = endWalk.durationMinutes,
+                        tint = arrowTint,
+                        textColor = primaryTextColor
+                    )
                 }
             }
         }

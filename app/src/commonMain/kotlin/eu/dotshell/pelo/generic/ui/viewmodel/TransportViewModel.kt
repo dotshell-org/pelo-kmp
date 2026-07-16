@@ -15,6 +15,7 @@ import eu.dotshell.pelo.generic.data.repository.TransportRepository
 import eu.dotshell.pelo.generic.data.repository.UserStopAlertsRepository
 import eu.dotshell.pelo.generic.data.repository.online.TrafficAlertsRepository
 import eu.dotshell.pelo.generic.data.repository.online.VehiclePositionsRepository
+import eu.dotshell.pelo.generic.data.repository.geocoding.GeocodingRepository
 import eu.dotshell.pelo.generic.data.repository.offline.FavoritesRepository
 import eu.dotshell.pelo.generic.data.repository.offline.SchedulesRepository
 import eu.dotshell.pelo.generic.data.offline.OfflineDataManager
@@ -30,6 +31,7 @@ import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLeg
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.RaptorStop
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.RaptorStopWithCoords
+import eu.dotshell.pelo.generic.data.models.search.AddressSearchResult
 import eu.dotshell.pelo.generic.data.models.search.LineSearchResult
 import eu.dotshell.pelo.generic.data.models.search.StationSearchResult
 import eu.dotshell.pelo.generic.utils.date.FrenchPublicHolidayStrategy
@@ -728,6 +730,9 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
 
     override suspend fun searchStops(query: String): List<StationSearchResult> =
         schedulesRepository.searchStopsByName(query)
+
+    override suspend fun searchAddresses(query: String): List<AddressSearchResult> =
+        GeocodingRepository.getInstance().searchAddresses(query)
 
     override fun searchLines(query: String): List<LineSearchResult> {
         return schedulesRepository.searchLinesByName(query)
@@ -1457,4 +1462,32 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         destinationStopIds: List<Int>,
         arrivalTimeSeconds: Int
     ): List<JourneyResult> = raptorRepository.getOptimizedPathsArriveBy(originStopIds, destinationStopIds, arrivalTimeSeconds)
+
+    override suspend fun getOptimizedPathsForLocations(
+        origin: io.raptor.Location,
+        destination: io.raptor.Location,
+        departureTimeSeconds: Int,
+        originLabel: String?,
+        destinationLabel: String?
+    ): List<JourneyResult> = raptorRepository.getOptimizedPaths(
+        origin = origin,
+        destination = destination,
+        departureTimeSeconds = departureTimeSeconds,
+        originLabel = originLabel,
+        destinationLabel = destinationLabel
+    )
+
+    override suspend fun getOptimizedPathsArriveByForLocations(
+        origin: io.raptor.Location,
+        destination: io.raptor.Location,
+        arrivalTimeSeconds: Int,
+        originLabel: String?,
+        destinationLabel: String?
+    ): List<JourneyResult> = raptorRepository.getOptimizedPathsArriveBy(
+        origin = origin,
+        destination = destination,
+        arrivalTimeSeconds = arrivalTimeSeconds,
+        originLabel = originLabel,
+        destinationLabel = destinationLabel
+    )
 }

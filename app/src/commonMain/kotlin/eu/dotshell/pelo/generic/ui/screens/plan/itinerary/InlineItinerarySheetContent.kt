@@ -49,8 +49,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.dotshell.pelo.generic.data.models.realtime.alerts.community.UserStopAlert
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.ItineraryPreferencesRepository
+import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLegKind
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
 import eu.dotshell.pelo.generic.data.models.itinerary.SelectedStop
+import eu.dotshell.pelo.generic.data.telemetry.PlaceRef
+import eu.dotshell.pelo.generic.data.telemetry.PrivacyScrubber
+import io.raptor.Location
 import eu.dotshell.pelo.generic.data.models.itinerary.TimeMode
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModel
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
@@ -75,6 +79,26 @@ import kotlinx.datetime.toLocalDateTime
 
 private const val MAX_ITINERARY_STOP_IDS_PER_SIDE = 64
 private const val MAX_ITINERARY_FALLBACK_STOPS = 2
+
+/**
+ * Raptor endpoint for this selection: an arbitrary point for coordinate endpoints (address/POI,
+ * GPS), the platform-id set for stops, null when unusable.
+ */
+private fun SelectedStop.toRaptorLocation(): Location? = when {
+    lat != null && lon != null -> Location.Point(lat, lon)
+    stopIds.isNotEmpty() -> Location.StopIds(stopIds.distinct().take(MAX_ITINERARY_STOP_IDS_PER_SIDE))
+    else -> null
+}
+
+/**
+ * Telemetry place reference. Stops keep their name as before; coordinate endpoints emit only a
+ * ~600 m geohash bucket — the raw address label and exact coordinates never leave the device.
+ */
+private fun SelectedStop.toPlaceRef(): PlaceRef? = when {
+    lat != null && lon != null -> PlaceRef(h3 = PrivacyScrubber.bucket(lat, lon))
+    name.isNotBlank() -> PlaceRef(stopId = name)
+    else -> null
+}
 
 private data class AvoidedJourneyUi(
     val journey: JourneyResult,
@@ -152,8 +176,8 @@ fun InlineItinerarySheetContent(
 
     suspend fun recalc() {
         suspend fun calculateJourneys(
-            originIds: List<Int>,
-            destinationIds: List<Int>,
+            origin: Location,
+            destination: Location,
             date: LocalDate,
             blockedNames: Set<String>,
             overrideTimeSeconds: Int? = null
@@ -161,20 +185,24 @@ fun InlineItinerarySheetContent(
             return withContext(ioDispatcher) {
                 if (timeMode == TimeMode.ARRIVAL) {
                     raptorRepository.getOptimizedPathsArriveBy(
-                        originStopIds = originIds,
-                        destinationStopIds = destinationIds,
+                        origin = origin,
+                        destination = destination,
                         arrivalTimeSeconds = overrideTimeSeconds ?: selectedTimeSeconds ?: defaultArrivalSeconds(),
                         searchWindowMinutes = 120,
                         date = date,
-                        blockedRouteNames = blockedNames
+                        blockedRouteNames = blockedNames,
+                        originLabel = departureStop?.name,
+                        destinationLabel = arrivalStop?.name
                     )
                 } else {
                     raptorRepository.getOptimizedPaths(
-                        originStopIds = originIds,
-                        destinationStopIds = destinationIds,
+                        origin = origin,
+                        destination = destination,
                         departureTimeSeconds = overrideTimeSeconds ?: selectedTimeSeconds,
                         date = date,
-                        blockedRouteNames = blockedNames
+                        blockedRouteNames = blockedNames,
+                        originLabel = departureStop?.name,
+                        destinationLabel = arrivalStop?.name
                     )
                 }
             }
@@ -262,11 +290,9 @@ fun InlineItinerarySheetContent(
             }
         }
 
-        val departureStopIds =
-            departureStop?.stopIds?.distinct()?.take(MAX_ITINERARY_STOP_IDS_PER_SIDE) ?: emptyList()
-        val arrivalStopIds =
-            arrivalStop?.stopIds?.distinct()?.take(MAX_ITINERARY_STOP_IDS_PER_SIDE) ?: emptyList()
-        if (departureStopIds.isEmpty() || arrivalStopIds.isEmpty()) {
+        val originLocation = departureStop?.toRaptorLocation()
+        val destinationLocation = arrivalStop?.toRaptorLocation()
+        if (originLocation == null || destinationLocation == null) {
             journeys = emptyList()
             journeysAvoidingAlerts = emptyList()
             selectedJourney = null
@@ -282,20 +308,20 @@ fun InlineItinerarySheetContent(
         selectedJourney = null
 
         // Telemetry: mint a new calc_id and emit search.itinerary before we kick off the heavy
-        // Raptor call. We use stop names (the canonical user-facing identifier from
-        // SelectedStop) as the place ref — both ends are known stops, so no privacy scrubbing
-        // is needed at this layer.
+        // Raptor call. Stops use their name as the place ref; coordinate endpoints (addresses,
+        // GPS) are scrubbed to a ~600 m geohash bucket in toPlaceRef — raw addresses and exact
+        // coordinates never leave the device.
         val calcId = randomId()
         lastCalcId = calcId
-        val originName = departureStop?.name.orEmpty()
-        val destName = arrivalStop?.name.orEmpty()
-        if (originName.isNotBlank() && destName.isNotBlank()) {
+        val originRef = departureStop?.toPlaceRef()
+        val destRef = arrivalStop?.toPlaceRef()
+        if (originRef != null && destRef != null) {
             eu.dotshell.pelo.generic.data.telemetry.TelemetryEmitter.emit(
                 eu.dotshell.pelo.generic.data.telemetry.TelemetryEvent.SearchItinerary(
                     eventId = randomId(),
                                 at = Clock.System.now().toString(),
-                    originRef = eu.dotshell.pelo.generic.data.telemetry.PlaceRef(stopId = originName),
-                    destRef = eu.dotshell.pelo.generic.data.telemetry.PlaceRef(stopId = destName)
+                    originRef = originRef,
+                    destRef = destRef
                 )
             )
         }
@@ -304,12 +330,16 @@ fun InlineItinerarySheetContent(
             val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
             val date = selectedDate ?: today
             journeys = calculateJourneys(
-                originIds = departureStopIds,
-                destinationIds = arrivalStopIds,
+                origin = originLocation,
+                destination = destinationLocation,
                 date = date,
                 blockedNames = blockedRouteNames
             )
-            if (journeys.isEmpty() && nearbyDepartureStops.isNotEmpty() && timeMode == TimeMode.DEPARTURE) {
+            // Nearby-stop fallback only applies to stop departures: a coordinate departure
+            // already competes with walking to every stop in range natively
+            if (journeys.isEmpty() && nearbyDepartureStops.isNotEmpty() &&
+                timeMode == TimeMode.DEPARTURE && departureStop?.isCoordinate != true
+            ) {
                 for (fallbackName in nearbyDepartureStops.take(MAX_ITINERARY_FALLBACK_STOPS)) {
                     if (fallbackName.equals(departureStop?.name, ignoreCase = true)) continue
 
@@ -320,8 +350,8 @@ fun InlineItinerarySheetContent(
                     if (fallbackIds.isEmpty()) continue
 
                     val fallbackJourneys = calculateJourneys(
-                        originIds = fallbackIds,
-                        destinationIds = arrivalStopIds,
+                        origin = Location.StopIds(fallbackIds),
+                        destination = destinationLocation,
                         date = date,
                         blockedNames = blockedRouteNames
                     )
@@ -342,19 +372,21 @@ fun InlineItinerarySheetContent(
             if (journeys.isEmpty() && timeMode == TimeMode.DEPARTURE && date == today) {
                 val hasServiceEarlierToday = withContext(ioDispatcher) {
                     raptorRepository.getOptimizedPaths(
-                        originStopIds = departureStopIds,
-                        destinationStopIds = arrivalStopIds,
+                        origin = originLocation,
+                        destination = destinationLocation,
                         departureTimeSeconds = 0,
                         date = today,
-                        blockedRouteNames = blockedRouteNames
+                        blockedRouteNames = blockedRouteNames,
+                        originLabel = departureStop?.name,
+                        destinationLabel = arrivalStop?.name
                     ).isNotEmpty()
                 }
 
                 if (hasServiceEarlierToday) {
                     val tomorrow = today.plus(1, DateTimeUnit.DAY)
                     journeys = calculateJourneys(
-                        originIds = departureStopIds,
-                        destinationIds = arrivalStopIds,
+                        origin = originLocation,
+                        destination = destinationLocation,
                         date = tomorrow,
                         blockedNames = blockedRouteNames,
                         overrideTimeSeconds = 0
@@ -389,18 +421,20 @@ fun InlineItinerarySheetContent(
                         seconds / 3600, (seconds % 3600) / 60
                     ).toInstant(TimeZone.currentSystemDefault()).toString()
                 } ?: nowIso
-                eu.dotshell.pelo.generic.data.telemetry.TelemetryEmitter.emit(
-                    eu.dotshell.pelo.generic.data.telemetry.TelemetryEvent.ItineraryCalculated(
-                        eventId = randomId(),
-                        at = nowIso,
-                        calcId = calcId,
-                        origin = eu.dotshell.pelo.generic.data.telemetry.PlaceRef(stopId = originName),
-                        dest = eu.dotshell.pelo.generic.data.telemetry.PlaceRef(stopId = destName),
-                        requestedAt = nowIso,
-                        departureAt = departureIso,
-                        options = options
+                if (originRef != null && destRef != null) {
+                    eu.dotshell.pelo.generic.data.telemetry.TelemetryEmitter.emit(
+                        eu.dotshell.pelo.generic.data.telemetry.TelemetryEvent.ItineraryCalculated(
+                            eventId = randomId(),
+                            at = nowIso,
+                            calcId = calcId,
+                            origin = originRef,
+                            dest = destRef,
+                            requestedAt = nowIso,
+                            departureAt = departureIso,
+                            options = options
+                        )
                     )
-                )
+                }
             }
         } catch (_: Exception) {
             errorText = "Erreur lors du calcul d'itineraire"
@@ -445,8 +479,8 @@ fun InlineItinerarySheetContent(
 
                 val blockedForAvoided = blockedSnapshot + routeNamesToAvoid
                 val avoidedJourneys = calculateJourneys(
-                    originIds = departureStopIds,
-                    destinationIds = arrivalStopIds,
+                    origin = originLocation,
+                    destination = destinationLocation,
                     date = dateSnapshot,
                     blockedNames = blockedForAvoided
                 )
@@ -537,6 +571,33 @@ fun InlineItinerarySheetContent(
                     val nonWalkingLegs = remember(selectedJourney?.legs) {
                         selectedJourney?.legs?.filterNot { it.isWalking }.orEmpty()
                     }
+                    // Start/end walks only — mid-journey transfer walks stay hidden
+                    val startWalk = remember(selectedJourney?.legs) {
+                        selectedJourney?.legs?.firstOrNull()?.takeIf {
+                            it.legKind == JourneyLegKind.WALK_ACCESS || it.legKind == JourneyLegKind.WALK_DIRECT
+                        }
+                    }
+                    val endWalk = remember(selectedJourney?.legs) {
+                        selectedJourney?.legs?.lastOrNull()?.takeIf { it.legKind == JourneyLegKind.WALK_EGRESS }
+                    }
+
+                    if (startWalk != null) {
+                        WalkDurationChip(
+                            minutes = startWalk.durationMinutes,
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            textColor = MaterialTheme.colorScheme.onSurface,
+                            iconSize = 24.dp,
+                            fontSize = 14.sp
+                        )
+                        if (nonWalkingLegs.isNotEmpty()) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
 
                     nonWalkingLegs.forEachIndexed { index, leg ->
                         val drawableName = LineIconResolver.getDrawableNameForLineName(leg.routeName ?: "")
@@ -576,6 +637,22 @@ fun InlineItinerarySheetContent(
                                 modifier = Modifier.size(24.dp)
                             )
                         }
+                    }
+
+                    if (endWalk != null) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        WalkDurationChip(
+                            minutes = endWalk.durationMinutes,
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            textColor = MaterialTheme.colorScheme.onSurface,
+                            iconSize = 24.dp,
+                            fontSize = 14.sp
+                        )
                     }
                 }
             }

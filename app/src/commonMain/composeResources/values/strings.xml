@@ -87,6 +87,7 @@
     <string name="language_title">Langue</string>
     <string name="language_system">Système</string>
     <string name="search_stop_placeholder">Rechercher un arrêt</string>
+    <string name="my_position">Ma position</string>
     <string name="time_less_than_minute">&lt; 1 min</string>
     <string name="time_in_minutes">dans %smin</string>
     <string name="time_in_hours_minutes">dans %1$sh%2$smin</string>
