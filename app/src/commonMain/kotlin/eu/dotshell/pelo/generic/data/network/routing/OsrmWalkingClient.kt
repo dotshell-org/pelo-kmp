@@ -1,8 +1,10 @@
 package eu.dotshell.pelo.generic.data.network.routing
 
+import eu.dotshell.pelo.generic.data.network.PUBLIC_SERVICES_USER_AGENT
 import eu.dotshell.pelo.platform.createHttpClientEngine
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.UserAgent
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.client.request.parameter
@@ -26,6 +28,9 @@ class OsrmWalkingClient {
     private val httpClient = HttpClient(createHttpClientEngine()) {
         install(ContentNegotiation) {
             json(json)
+        }
+        install(UserAgent) {
+            agent = PUBLIC_SERVICES_USER_AGENT
         }
     }
 
