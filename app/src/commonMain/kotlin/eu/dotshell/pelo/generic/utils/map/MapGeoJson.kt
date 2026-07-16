@@ -7,6 +7,10 @@ import eu.dotshell.pelo.generic.service.TransportServiceProvider
 import eu.dotshell.pelo.generic.utils.LineColorHelper
 import eu.dotshell.pelo.generic.utils.geo.StopsGeoJsonManager
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
+import eu.dotshell.pelo.generic.data.repository.routing.WalkingRouteRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.serialization.json.add
@@ -346,6 +350,22 @@ suspend fun toItinerariesGeoJson(
         }
     }
 
+    // Street-following geometry for walk legs, fetched in parallel (memoized in the repository;
+    // a null entry falls back to the straight segment below)
+    val walkingPaths: Map<Pair<Int, Int>, List<DoubleArray>> = coroutineScope {
+        journeysToDraw.withIndex().flatMap { (journeyIndex, journey) ->
+            journey.legs.withIndex()
+                .filter { (_, leg) -> leg.isWalking }
+                .map { (legIndex, leg) ->
+                    async {
+                        WalkingRouteRepository.getInstance()
+                            .getWalkingPath(leg.fromLat, leg.fromLon, leg.toLat, leg.toLon)
+                            ?.let { (journeyIndex to legIndex) to it }
+                    }
+                }
+        }.awaitAll().filterNotNull().toMap()
+    }
+
     return buildJsonObject {
         put("type", "FeatureCollection")
         putJsonArray("features") {
@@ -401,24 +421,35 @@ suspend fun toItinerariesGeoJson(
                     }
 
                     if (!drewSection) {
+                        val walkPath = if (leg.isWalking) walkingPaths[journeyIndex to legIndex] else null
                         addJsonObject {
                             put("type", "Feature")
                             putJsonObject("geometry") {
                                 put("type", "LineString")
                                 putJsonArray("coordinates") {
-                                    addJsonArray {
-                                        add(leg.fromLon)
-                                        add(leg.fromLat)
-                                    }
-                                    for (stop in leg.intermediateStops) {
-                                        addJsonArray {
-                                            add(stop.lon)
-                                            add(stop.lat)
+                                    if (walkPath != null) {
+                                        // Real street path ([lon, lat] points, endpoints included)
+                                        for (point in walkPath) {
+                                            addJsonArray {
+                                                add(point[0])
+                                                add(point[1])
+                                            }
                                         }
-                                    }
-                                    addJsonArray {
-                                        add(leg.toLon)
-                                        add(leg.toLat)
+                                    } else {
+                                        addJsonArray {
+                                            add(leg.fromLon)
+                                            add(leg.fromLat)
+                                        }
+                                        for (stop in leg.intermediateStops) {
+                                            addJsonArray {
+                                                add(stop.lon)
+                                                add(stop.lat)
+                                            }
+                                        }
+                                        addJsonArray {
+                                            add(leg.toLon)
+                                            add(leg.toLat)
+                                        }
                                     }
                                 }
                             }
