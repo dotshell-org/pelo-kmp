@@ -72,7 +72,8 @@ class WalkingRouteRepository private constructor() {
                     path
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Walking route fetch failed: ${e.message}")
+                // Class name only: Ktor exception messages embed the full request URL (coordinates)
+                Log.w(TAG, "Walking route fetch failed: ${e::class.simpleName}")
                 null
             }
         }

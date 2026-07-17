@@ -35,7 +35,8 @@ class GeocodingRepository private constructor() {
                     mapPhotonFeatures(response.features, limit)
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Address search failed: ${e.message}")
+                // Class name only: Ktor exception messages embed the full request URL (typed query)
+                Log.w(TAG, "Address search failed: ${e::class.simpleName}")
                 emptyList()
             }
         }
