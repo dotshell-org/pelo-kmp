@@ -11,6 +11,7 @@ import eu.dotshell.pelo.generic.ui.theme.isAppInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -562,11 +563,15 @@ fun InlineItinerarySheetContent(
                     modifier = Modifier.padding(start = 16.dp)
                 )
             } else {
-                // Show extra large line icons on the left when a journey is selected
+                // Show extra large line icons on the left when a journey is selected.
+                // Weighted + wrapping: the close button is measured first and keeps its normal
+                // size; the badge strip flows onto extra lines when the journey has many legs
                 val drawableProvider = DrawableProvider(context)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Start
+                FlowRow(
+                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically
                 ) {
                     val nonWalkingLegs = remember(selectedJourney?.legs) {
                         selectedJourney?.legs?.filterNot { it.isWalking }.orEmpty()
