@@ -14,7 +14,6 @@ import eu.dotshell.pelo.generic.data.network.transport.TransportApi
 import eu.dotshell.pelo.generic.data.network.transport.TransportLinesQuery
 import eu.dotshell.pelo.platform.Log
 import eu.dotshell.pelo.platform.createHttpClientEngine
-import eu.dotshell.pelo.specific.data.mapper.StopMapper
 import eu.dotshell.pelo.specific.data.mapper.TrafficAlertMapper
 import eu.dotshell.pelo.specific.data.mapper.TransportLineMapper
 import eu.dotshell.pelo.specific.data.model.LyonFeatureCollection
@@ -197,7 +196,8 @@ class LyonKtorClient(
                     id = stop.id,
                     nom = stop.name,
                     desserte = desserte,
-                    gid = stop.id
+                    gid = stop.id,
+                    zone = stop.zone
                 )
             )
         }

@@ -11,5 +11,6 @@ data class LineStopInfo(
     val stopName: String,
     val stopSequence: Int,
     val isCurrentStop: Boolean = false,
-    val connections: List<String> = emptyList()
+    val connections: List<String> = emptyList(),
+    val zone: String? = null
 )

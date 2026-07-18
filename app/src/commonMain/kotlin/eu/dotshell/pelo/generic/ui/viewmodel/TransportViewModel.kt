@@ -831,7 +831,8 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
                 stopId = stopFeature?.id ?: "${lineName.uppercase()}_${effectiveDirection}_$sequence",
                 stopName = displayStopName,
                 stopSequence = sequence,
-                isCurrentStop = displayStopName.equals(currentStopName, ignoreCase = true)
+                isCurrentStop = displayStopName.equals(currentStopName, ignoreCase = true),
+                zone = stopFeature?.properties?.zone
             )
         }
 
@@ -849,7 +850,8 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
                         stopName = stop.properties.nom,
                         stopSequence = stopSequenceByName[stop.properties.nom.uppercase()]
                             ?: (orderedStops.size + index + 1),
-                        isCurrentStop = stop.properties.nom.equals(currentStopName, ignoreCase = true)
+                        isCurrentStop = stop.properties.nom.equals(currentStopName, ignoreCase = true),
+                        zone = stop.properties.zone
                     )
                 }
                 .toList()
@@ -866,7 +868,8 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
                     stopId = stop.id,
                     stopName = stop.properties.nom,
                     stopSequence = index + 1,
-                    isCurrentStop = stop.properties.nom.equals(currentStopName, ignoreCase = true)
+                    isCurrentStop = stop.properties.nom.equals(currentStopName, ignoreCase = true),
+                    zone = stop.properties.zone
                 )
             }
             .toList()

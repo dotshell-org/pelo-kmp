@@ -5,6 +5,7 @@ import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.specific.data.local.LyonLinesParser
 import io.raptor.PeriodData
 import io.raptor.RaptorLibrary
+import io.raptor.data.NetworkLoader
 import java.io.File
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -65,6 +66,25 @@ class PeloSmokeTest {
         assertTrue(
             "one journey rides the metro A or B",
             journeys.any { journey -> journey.any { leg -> !leg.isTransfer && leg.routeName in setOf("A", "B") } }
+        )
+    }
+
+    @Test
+    fun bundledStopsCarryTclFareZones() {
+        // The RST3 stops binary carries a per-stop TCL fare zone (1..5 or "Zone Externe"),
+        // threaded through to the line-details bracket UI. Guard the domain and coverage.
+        val stops = NetworkLoader.loadStops(asset("raptor/stops_school_on_weekdays.bin").readBytes())
+        assertTrue("full network loaded (got ${stops.size})", stops.size > 5000)
+
+        val validZones = setOf("1", "2", "3", "4", "5", "Zone Externe")
+        val zoned = stops.count { it.zone != null }
+        stops.forEach { stop ->
+            val z = stop.zone
+            assertTrue("stop ${stop.id} has an unexpected zone '$z'", z == null || z in validZones)
+        }
+        assertTrue(
+            "at least 90% of stops carry a fare zone (got $zoned/${stops.size})",
+            zoned >= stops.size * 9 / 10
         )
     }
 
