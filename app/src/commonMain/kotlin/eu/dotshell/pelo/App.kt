@@ -335,7 +335,6 @@ private fun RootScaffold(
     DisposableEffect(headingProvider, locationPermissionGranted) {
         headingProvider.startUpdates { deg ->
             heading = deg
-            Log.d("Heading", "azimuth=$deg") // phase-1 verification only — removed in phase 2
         }
         onDispose {
             headingProvider.stopUpdates()
@@ -746,6 +745,7 @@ private fun RootScaffold(
                         viewModel = viewModel,
                         stops = filteredStopsCollection?.features,
                         userLocation = userLocation,
+                        heading = heading,
                         userFavorites = userFavorites,
                         showTopBar = !itineraryActive && !navigationState.isActive,
                         vehiclesGeoJson = vehiclesGeoJson,
@@ -1108,6 +1108,7 @@ private fun PlanContent(
     viewModel: TransportViewModel,
     stops: List<StopFeature>?,
     userLocation: Position?,
+    heading: Float?,
     userFavorites: List<Favorite>,
     showTopBar: Boolean,
     vehiclesGeoJson: String?,
@@ -1227,6 +1228,7 @@ private fun PlanContent(
                     lines = mapLines?.let { FeatureCollection(features = it) },
                     stops = filteredStopsCollection,
                     userLocation = userLocation,
+                    heading = heading,
                     vehiclesGeoJson = vehiclesGeoJson,
                     vehicleIconName = vehicleIconName,
                     selectedLineName = selectedLineName,
