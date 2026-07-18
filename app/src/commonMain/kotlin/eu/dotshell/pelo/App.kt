@@ -155,6 +155,7 @@ import eu.dotshell.pelo.generic.ui.viewmodel.findStopByCoordinates
 import eu.dotshell.pelo.generic.utils.location.GeoPoint
 import eu.dotshell.pelo.generic.utils.location.LocationPermissionSignal
 import eu.dotshell.pelo.generic.utils.location.LocationProvider
+import eu.dotshell.pelo.generic.utils.location.HeadingProvider
 import eu.dotshell.pelo.generic.service.NavigationModeController
 import eu.dotshell.pelo.generic.service.NavigationModeUiState
 import eu.dotshell.pelo.generic.ui.screens.plan.NavigationModeOverlay
@@ -298,8 +299,12 @@ private fun RootScaffold(
     val selectedLineName = selectedLine?.lineName
     
     var userLocation by remember { mutableStateOf<Position?>(null) }
+    // Device heading (degrees clockwise from north) for the direction cone on the location dot;
+    // null until the compass reports (or on devices without a magnetometer).
+    var heading by remember { mutableStateOf<Float?>(null) }
     var hasCenteredInitially by remember { mutableStateOf(false) }
     val locationProvider = remember { LocationProvider(context) }
+    val headingProvider = remember { HeadingProvider(context) }
     val cameraState = rememberCameraState(
         firstPosition = CameraPosition(
             target = org.maplibre.spatialk.geojson.Position(latitude = 45.75, longitude = 4.85),
@@ -322,6 +327,18 @@ private fun RootScaffold(
         }
         onDispose {
             locationProvider.stopUpdates()
+        }
+    }
+    // Compass updates for the direction cone. The provider already smooths and rate-limits, so we
+    // set the state directly. Started alongside location (the cone only shows with the dot) and
+    // stopped on dispose to release the sensor.
+    DisposableEffect(headingProvider, locationPermissionGranted) {
+        headingProvider.startUpdates { deg ->
+            heading = deg
+            Log.d("Heading", "azimuth=$deg") // phase-1 verification only — removed in phase 2
+        }
+        onDispose {
+            headingProvider.stopUpdates()
         }
     }
 
