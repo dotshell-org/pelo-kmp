@@ -297,6 +297,12 @@ fun LineDetailsBottomSheet(
     // Utilise directement lineStops car l'ordre est déjà correct depuis getStopsForLine avec directionId
     val displayedStops = lineStops
 
+    // Fare-zone brackets: compute the per-stop run segments once. When no stop carries a zone
+    // (older data, or networks without fare zones) every segment is NONE and the gutter is never
+    // shown — the layout is then byte-for-byte identical to before.
+    val zoneSegments = remember(displayedStops) { computeZoneSegments(displayedStops) }
+    val showZoneGutter = remember(zoneSegments) { zoneSegments.any { it.kind != ZoneSegmentKind.NONE } }
+
     val isOffline by viewModel.isOffline.collectAsState(initial = false)
     val alertsTimestampMillis by viewModel.alertsTimestampMillis.collectAsState(initial = null)
 
@@ -479,7 +485,11 @@ fun LineDetailsBottomSheet(
                                 isLast = index == displayedStops.size - 1,
                                 onStopClick = { onStopClick(stop.stopName) },
                                 isFavorite = favoriteStops.contains(stop.stopName),
-                                modifier = Modifier.padding(horizontal = 24.dp)
+                                zoneSegment = if (showZoneGutter) zoneSegments[index] else null,
+                                modifier = Modifier.padding(
+                                    start = if (showZoneGutter) 4.dp else 24.dp,
+                                    end = 24.dp
+                                )
                             )
                         }
                         item(key = "bottom_spacer") {
@@ -906,7 +916,8 @@ private fun StopItemWithLine(
     isLast: Boolean,
     modifier: Modifier = Modifier,
     onStopClick: () -> Unit = {},
-    isFavorite: Boolean = false
+    isFavorite: Boolean = false,
+    zoneSegment: ZoneSegment? = null
 ) {
     Row(
         modifier = modifier
@@ -916,6 +927,14 @@ private fun StopItemWithLine(
             .clickable { onStopClick() },
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (zoneSegment != null) {
+            ZoneBracketGutter(
+                segment = zoneSegment,
+                modifier = Modifier
+                    .width(30.dp)
+                    .fillMaxHeight()
+            )
+        }
         Box(modifier = Modifier
             .width(40.dp)
             .fillMaxHeight(), contentAlignment = Alignment.Center) {
