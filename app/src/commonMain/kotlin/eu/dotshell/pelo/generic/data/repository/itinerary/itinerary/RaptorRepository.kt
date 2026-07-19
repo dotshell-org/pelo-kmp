@@ -16,6 +16,7 @@ import eu.dotshell.pelo.generic.utils.search.SearchUtils
 import io.raptor.Location
 import io.raptor.PeriodData
 import io.raptor.RaptorLibrary
+import io.raptor.WalkingParams
 import io.raptor.data.NetworkLoader
 import io.raptor.model.Route
 import io.raptor.model.Stop
@@ -642,7 +643,8 @@ class RaptorRepository private constructor(private val context: PlatformContext)
         date: LocalDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date,
         blockedRouteNames: Set<String> = emptySet(),
         originLabel: String? = null,
-        destinationLabel: String? = null
+        destinationLabel: String? = null,
+        walking: WalkingParams = WalkingParams.DEFAULT
     ): List<JourneyResult> = withContext(Dispatchers.Default) {
         ensureInitialized()
 
@@ -691,6 +693,7 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                     origin = origin,
                     destination = destination,
                     departureTime = depTime,
+                    walking = walking,
                     blockedRouteNames = blockedRouteNames
                 ) ?: emptyList()
                 computed to stopsByIndex
@@ -753,7 +756,8 @@ class RaptorRepository private constructor(private val context: PlatformContext)
         date: LocalDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date,
         blockedRouteNames: Set<String> = emptySet(),
         originLabel: String? = null,
-        destinationLabel: String? = null
+        destinationLabel: String? = null,
+        walking: WalkingParams = WalkingParams.DEFAULT
     ): List<JourneyResult> = withContext(Dispatchers.Default) {
         ensureInitialized()
         try {
@@ -777,6 +781,7 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                     destination = destination,
                     arrivalTime = arrivalTimeSeconds,
                     searchWindowMinutes = searchWindowMinutes,
+                    walking = walking,
                     blockedRouteNames = blockedRouteNames
                 ) ?: emptyList()
                 computed to stopsByIndex

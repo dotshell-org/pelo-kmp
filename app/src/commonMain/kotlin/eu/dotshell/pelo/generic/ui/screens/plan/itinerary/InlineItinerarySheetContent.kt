@@ -52,10 +52,12 @@ import eu.dotshell.pelo.generic.data.models.realtime.alerts.community.UserStopAl
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.ItineraryPreferencesRepository
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLegKind
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
+import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.journeyWalkingMeters
 import eu.dotshell.pelo.generic.data.models.itinerary.SelectedStop
 import eu.dotshell.pelo.generic.data.telemetry.PlaceRef
 import eu.dotshell.pelo.generic.data.telemetry.PrivacyScrubber
 import io.raptor.Location
+import io.raptor.WalkingParams
 import eu.dotshell.pelo.generic.data.models.itinerary.TimeMode
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModel
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
@@ -80,6 +82,10 @@ import kotlinx.datetime.toLocalDateTime
 
 private const val MAX_ITINERARY_STOP_IDS_PER_SIDE = 64
 private const val MAX_ITINERARY_FALLBACK_STOPS = 2
+
+// "Closest stop, then walk" fallback: when nothing else is found, retry with a large access/egress
+// walk radius and only keep options whose total walk stays within this cap (meters).
+private const val LONG_WALK_METERS = 6000.0
 
 /**
  * Raptor endpoint for this selection: an arbitrary point for coordinate endpoints (address/POI,
@@ -152,6 +158,9 @@ fun InlineItinerarySheetContent(
     var selectedJourney by remember { mutableStateOf<JourneyResult?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
+    // Non-null when the shown journeys come from the "closest stop, then walk" fallback; holds the
+    // shortest total walk (meters) among them, for the banner label. Reset each recalc.
+    var longWalkFallbackMeters by remember { mutableStateOf<Double?>(null) }
     var previousStopPairKey by remember { mutableStateOf<String?>(null) }
     var recalcVersion by remember { mutableStateOf(0) }
     // When recalc() itself moves the search to "tomorrow" it writes selectedDate/selectedTimeSeconds,
@@ -181,7 +190,8 @@ fun InlineItinerarySheetContent(
             destination: Location,
             date: LocalDate,
             blockedNames: Set<String>,
-            overrideTimeSeconds: Int? = null
+            overrideTimeSeconds: Int? = null,
+            walking: WalkingParams = WalkingParams.DEFAULT
         ): List<JourneyResult> {
             return withContext(ioDispatcher) {
                 if (timeMode == TimeMode.ARRIVAL) {
@@ -193,7 +203,8 @@ fun InlineItinerarySheetContent(
                         date = date,
                         blockedRouteNames = blockedNames,
                         originLabel = departureStop?.name,
-                        destinationLabel = arrivalStop?.name
+                        destinationLabel = arrivalStop?.name,
+                        walking = walking
                     )
                 } else {
                     raptorRepository.getOptimizedPaths(
@@ -203,7 +214,8 @@ fun InlineItinerarySheetContent(
                         date = date,
                         blockedRouteNames = blockedNames,
                         originLabel = departureStop?.name,
-                        destinationLabel = arrivalStop?.name
+                        destinationLabel = arrivalStop?.name,
+                        walking = walking
                     )
                 }
             }
@@ -305,6 +317,7 @@ fun InlineItinerarySheetContent(
         val currentVersion = recalcVersion
         isLoading = true
         errorText = null
+        longWalkFallbackMeters = null
         journeysAvoidingAlerts = emptyList()
         selectedJourney = null
 
@@ -367,6 +380,31 @@ fun InlineItinerarySheetContent(
                         )
                         break
                     }
+                }
+            }
+
+            // "Closest stop, then walk" fallback — before the "tomorrow" fallback, so getting home
+            // TONIGHT via a longer walk beats punting to tomorrow's first bus. Retry with a large
+            // access/egress walk radius; keep only options whose total walk stays under the cap so we
+            // don't suggest an absurd multi-hour hike. Only meaningful for coordinate endpoints
+            // (a pure stop destination has no egress walk).
+            if (journeys.isEmpty()) {
+                val longWalk = WalkingParams(
+                    maxAccessEgressDistanceMeters = LONG_WALK_METERS,
+                    maxDirectWalkDistanceMeters = LONG_WALK_METERS
+                )
+                val longWalkJourneys = calculateJourneys(
+                    origin = originLocation,
+                    destination = destinationLocation,
+                    date = date,
+                    blockedNames = blockedRouteNames,
+                    walking = longWalk
+                ).filter { journeyWalkingMeters(it, longWalk.speedMetersPerSecond) <= LONG_WALK_METERS }
+
+                if (longWalkJourneys.isNotEmpty()) {
+                    journeys = longWalkJourneys
+                    longWalkFallbackMeters =
+                        longWalkJourneys.minOf { journeyWalkingMeters(it, longWalk.speedMetersPerSecond) }
                 }
             }
 
