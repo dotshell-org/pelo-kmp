@@ -163,6 +163,8 @@ fun InlineItinerarySheetContent(
     // shortest total walk (meters) among them, for the banner label. Reset each recalc.
     var longWalkFallbackMeters by remember { mutableStateOf<Double?>(null) }
     var previousStopPairKey by remember { mutableStateOf<String?>(null) }
+    var hasAttemptedFallback by remember { mutableStateOf(false) }
+    var lastFallbackStopName by remember { mutableStateOf<String?>(null) }
     var recalcVersion by remember { mutableStateOf(0) }
     // When recalc() itself moves the search to "tomorrow" it writes selectedDate/selectedTimeSeconds,
     // which are keys of the recalc LaunchedEffect. This flag swallows that one self-triggered
@@ -178,10 +180,21 @@ fun InlineItinerarySheetContent(
     // uses the current time for each new itinerary request.
     LaunchedEffect(departureStop?.name, arrivalStop?.name) {
         val currentPairKey = "${departureStop?.name.orEmpty()}->${arrivalStop?.name.orEmpty()}"
+        val isSystemFallbackUpdate = departureStop?.name != null && departureStop.name == lastFallbackStopName
+        
         if (previousStopPairKey != null && previousStopPairKey != currentPairKey) {
-            selectedTimeSeconds = null
-            selectedDate = null
+            // Only reset overrides if the user manually changed the stop, not on fallback
+            if (!isSystemFallbackUpdate) {
+                selectedTimeSeconds = null
+                selectedDate = null
+            }
         }
+        
+        if (!isSystemFallbackUpdate) {
+            hasAttemptedFallback = false
+            lastFallbackStopName = null
+        }
+        
         previousStopPairKey = currentPairKey
     }
 
@@ -353,7 +366,8 @@ fun InlineItinerarySheetContent(
             // Nearby-stop fallback only applies to stop departures: a coordinate departure
             // already competes with walking to every stop in range natively
             if (journeys.isEmpty() && nearbyDepartureStops.isNotEmpty() &&
-                timeMode == TimeMode.DEPARTURE && departureStop?.isCoordinate != true
+                timeMode == TimeMode.DEPARTURE && departureStop?.isCoordinate != true &&
+                !hasAttemptedFallback
             ) {
                 for (fallbackName in nearbyDepartureStops.take(MAX_ITINERARY_FALLBACK_STOPS)) {
                     if (fallbackName.equals(departureStop?.name, ignoreCase = true)) continue
@@ -373,6 +387,7 @@ fun InlineItinerarySheetContent(
 
                     if (fallbackJourneys.isNotEmpty()) {
                         journeys = fallbackJourneys
+                        lastFallbackStopName = fallbackName
                         onDepartureFallbackSelected(
                             SelectedStop(
                                 name = fallbackName,
@@ -383,6 +398,10 @@ fun InlineItinerarySheetContent(
                     }
                 }
             }
+            
+            // Always mark as attempted after the first recalc so that subsequent
+            // recalcs (like changing the time) don't trigger the fallback.
+            hasAttemptedFallback = true
 
             // "Closest stop, then walk" fallback — before the "tomorrow" fallback, so getting home
             // TONIGHT via a longer walk beats punting to tomorrow's first bus. Retry with a large
