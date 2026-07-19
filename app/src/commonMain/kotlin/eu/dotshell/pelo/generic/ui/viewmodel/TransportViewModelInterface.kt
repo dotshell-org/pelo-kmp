@@ -76,6 +76,7 @@ interface TransportViewModelInterface {
     fun parseLineCodesFromDesserte(desserte: String): List<String>
     fun getStopsFeaturesForLine(lineName: String): List<StopFeature>
     fun isStopsByLineIndexReady(): Boolean
+    fun getZoneForStopName(stopName: String): String?
 
     suspend fun resolveStopIdsByName(stopName: String, maxIds: Int = 10): List<Int>
     suspend fun findNearestStops(latitude: Double, longitude: Double, limit: Int): List<RaptorStop>

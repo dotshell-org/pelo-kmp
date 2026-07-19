@@ -796,7 +796,8 @@ fun InlineItinerarySheetContent(
                         .fillMaxWidth()
                         .weight(1f),
                     useLightColors = useLightColors,
-                    scrollAllContent = true
+                    scrollAllContent = true,
+                    getZoneForStopName = viewModel::getZoneForStopName
                 )
             }
         }

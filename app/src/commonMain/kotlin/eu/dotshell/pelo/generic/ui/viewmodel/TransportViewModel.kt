@@ -1493,4 +1493,27 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         originLabel = originLabel,
         destinationLabel = destinationLabel
     )
+
+    private var cachedZonesByNormalizedName: Map<String, String>? = null
+    private var cachedZonesStopsState: TransportStopsUiState? = null
+
+    override fun getZoneForStopName(stopName: String): String? {
+        val state = _stopsUiState.value
+        if (state !is TransportStopsUiState.Success) return null
+
+        if (state !== cachedZonesStopsState || cachedZonesByNormalizedName == null) {
+            val newCache = HashMap<String, String>()
+            state.stops.forEach { stop ->
+                val zone = stop.properties.zone
+                if (zone != null) {
+                    newCache[normalizeStopName(stop.properties.nom)] = zone
+                }
+            }
+            cachedZonesByNormalizedName = newCache
+            cachedZonesStopsState = state
+        }
+
+        val normalizedName = normalizeStopName(stopName)
+        return cachedZonesByNormalizedName?.get(normalizedName)
+    }
 }

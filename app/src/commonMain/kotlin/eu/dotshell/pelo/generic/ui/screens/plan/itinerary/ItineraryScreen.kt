@@ -65,6 +65,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.IntermediateStop
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLeg
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLegKind
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
@@ -527,7 +528,8 @@ fun JourneyDetailsSheetContent(
     onStartNavigation: () -> Unit = {},
     modifier: Modifier = Modifier,
     useLightColors: Boolean = false,
-    scrollAllContent: Boolean = false
+    scrollAllContent: Boolean = false,
+    getZoneForStopName: (String) -> String? = { null }
 ) {
     val strings = StringProvider(LocalPlatformContext.current)
     val primaryTextColor = if (useLightColors) PrimaryColor else SecondaryColor
@@ -570,13 +572,24 @@ fun JourneyDetailsSheetContent(
             if (scrollAllContent) {
                 Spacer(modifier = Modifier.height(16.dp))
             }
-            journey.legs.forEachIndexed { index, leg ->
-                key("${leg.fromStopId}_${leg.departureTime}") {
+            
+            val flatSections = remember(journey.legs) {
+                journey.legs.flatMap { leg -> splitLegByZones(leg, getZoneForStopName) }
+            }
+            var lastZone: String? = null
+
+            flatSections.forEachIndexed { index, section ->
+                if (section.zone != null && section.zone != lastZone) {
+                    ZoneDivider(section.zone)
+                    lastZone = section.zone
+                }
+                
+                key("${section.leg.fromStopId}_${section.leg.departureTime}_${index}") {
                     Box(modifier = Modifier.fillMaxWidth()) {
                         JourneyLegItem(
-                            leg = leg,
-                            isFirst = index == 0,
-                            isLast = index == journey.legs.size - 1,
+                            leg = section.leg,
+                            isFirst = index == 0 && section.isFirstOfOriginalLeg,
+                            isLast = index == flatSections.size - 1 && section.isLastOfOriginalLeg,
                             useLightColors = useLightColors
                         )
                     }
@@ -858,6 +871,126 @@ fun TimeSelectionRow(
         }
     }
 }
+
+private data class StopPoint(
+    val id: String?,
+    val name: String,
+    val time: Int,
+    val lat: Double,
+    val lon: Double
+)
+
+private data class LegSection(
+    val zone: String?,
+    val leg: JourneyLeg,
+    val isFirstOfOriginalLeg: Boolean,
+    val isLastOfOriginalLeg: Boolean
+)
+
+private fun createLegSection(
+    originalLeg: JourneyLeg,
+    zone: String?,
+    stops: List<StopPoint>,
+    isFirst: Boolean,
+    isLast: Boolean
+): LegSection {
+    val from = stops.first()
+    val to = stops.last()
+    val intermediates = stops.subList(1, stops.size - 1).map {
+        IntermediateStop(it.name, it.time, it.lat, it.lon)
+    }
+    
+    val newLeg = originalLeg.copy(
+        fromStopId = from.id ?: originalLeg.fromStopId,
+        fromStopName = from.name,
+        departureTime = from.time,
+        fromLat = from.lat,
+        fromLon = from.lon,
+        
+        toStopId = to.id ?: originalLeg.toStopId,
+        toStopName = to.name,
+        arrivalTime = to.time,
+        toLat = to.lat,
+        toLon = to.lon,
+        
+        intermediateStops = intermediates
+    )
+    return LegSection(zone, newLeg, isFirst, isLast)
+}
+
+private fun splitLegByZones(leg: JourneyLeg, getZone: (String) -> String?): List<LegSection> {
+    if (leg.isWalking) {
+        val zone = getZone(leg.toStopName) ?: getZone(leg.fromStopName)
+        return listOf(LegSection(zone, leg, true, true))
+    }
+
+    val allStops = mutableListOf<StopPoint>()
+    allStops.add(StopPoint(leg.fromStopId, leg.fromStopName, leg.departureTime, leg.fromLat, leg.fromLon))
+    leg.intermediateStops.forEach {
+        allStops.add(StopPoint(null, it.stopName, it.arrivalTime, it.lat, it.lon))
+    }
+    allStops.add(StopPoint(leg.toStopId, leg.toStopName, leg.arrivalTime, leg.toLat, leg.toLon))
+
+    val resolvedZones = allStops.map { getZone(it.name) }.toMutableList()
+    for (i in 1 until resolvedZones.size) {
+        if (resolvedZones[i] == null) resolvedZones[i] = resolvedZones[i-1]
+    }
+    for (i in resolvedZones.size - 2 downTo 0) {
+        if (resolvedZones[i] == null) resolvedZones[i] = resolvedZones[i+1]
+    }
+
+    val sections = mutableListOf<LegSection>()
+    var currentZone = resolvedZones[0]
+    var startIndex = 0
+
+    for (i in 1 until allStops.size) {
+        val z = resolvedZones[i]
+        if (z != currentZone && z != null && currentZone != null) {
+            val sectionStops = allStops.subList(startIndex, i + 1)
+            sections.add(createLegSection(leg, currentZone, sectionStops, startIndex == 0, false))
+            startIndex = i
+            currentZone = z
+        }
+    }
+    
+    val remainingStops = allStops.subList(startIndex, allStops.size)
+    if (remainingStops.size > 1) {
+        sections.add(createLegSection(leg, currentZone, remainingStops, startIndex == 0, true))
+    }
+
+    if (sections.isEmpty()) {
+        return listOf(LegSection(currentZone, leg, true, true))
+    }
+
+    return sections
+}
+
+@Composable
+private fun ZoneDivider(zone: String) {
+    val strings = StringProvider(LocalPlatformContext.current)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        androidx.compose.material3.HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+        )
+        Text(
+            text = strings["zone_label"].replace("%s", eu.dotshell.pelo.generic.ui.screens.plan.zoneShortLabel(zone)).uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
+        androidx.compose.material3.HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+        )
+    }
+}
+
 
 /**
  * Simple time picker dialog using wheel-style pickers
