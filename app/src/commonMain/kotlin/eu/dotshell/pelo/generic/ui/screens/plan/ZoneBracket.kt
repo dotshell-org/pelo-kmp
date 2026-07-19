@@ -1,25 +1,25 @@
 package eu.dotshell.pelo.generic.ui.screens.plan
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.data.models.gtfs.LineStopInfo
 import eu.dotshell.pelo.generic.ui.theme.bottomSheetContainerColor
+import eu.dotshell.pelo.platform.LocalPlatformContext
+import eu.dotshell.pelo.platform.StringProvider
 
 /**
  * Fare-zone bracket rendered in a left gutter of the line-details stop timeline. Consecutive stops
@@ -77,8 +77,9 @@ fun ZoneBracketGutter(segment: ZoneSegment, modifier: Modifier = Modifier) {
         Box(modifier)
         return
     }
-    val color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
     val container = bottomSheetContainerColor()
+    val strings = StringProvider(LocalPlatformContext.current)
 
     Box(
         modifier = modifier.drawBehind {
@@ -115,22 +116,17 @@ fun ZoneBracketGutter(segment: ZoneSegment, modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center
     ) {
         if (segment.showLabel && segment.zone != null) {
-            Box(
+            Text(
+                text = strings["zone_label"].replace("%s", zoneShortLabel(segment.zone)).lowercase(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
                 modifier = Modifier
-                    .defaultMinSize(minWidth = 20.dp, minHeight = 20.dp)
-                    .clip(RoundedCornerShape(50))
+                    .wrapContentSize(unbounded = true)
+                    .rotate(-90f)
                     .background(container)
-                    .border(1.5.dp, color, RoundedCornerShape(50))
-                    .padding(horizontal = 4.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = zoneShortLabel(segment.zone),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
-                )
-            }
+                    .padding(start = 16.dp, end = 4.dp)
+            )
         }
     }
 }

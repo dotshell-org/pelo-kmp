@@ -216,4 +216,5 @@
     <string name="category_bus">Bus</string>
     <string name="category_cars_du_rhone">Cars du Rhône TCL unifié</string>
     <string name="category_junior_direct">Junior Direct</string>
+    <string name="zone_label">Zone %s</string>
 </resources>
