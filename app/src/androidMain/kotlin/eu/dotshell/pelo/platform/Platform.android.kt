@@ -18,3 +18,29 @@ actual fun appVersionName(context: PlatformContext): String = try {
 } catch (e: Exception) {
     "unknown"
 }
+
+actual fun exportFile(context: PlatformContext, filename: String, content: String) {
+    try {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            val contentValues = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, filename)
+                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/json")
+                put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS)
+            }
+            val uri = context.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+            if (uri != null) {
+                context.contentResolver.openOutputStream(uri)?.use { it.write(content.toByteArray()) }
+                showToast(context, "Fichier téléchargé dans les Téléchargements")
+            } else {
+                showToast(context, "Erreur lors du téléchargement")
+            }
+        } else {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            val clip = android.content.ClipData.newPlainText("JSON", content)
+            clipboard.setPrimaryClip(clip)
+            showToast(context, "Copié dans le presse-papiers (version Android trop ancienne)")
+        }
+    } catch (e: Exception) {
+        showToast(context, "Erreur : ${e.message}")
+    }
+}

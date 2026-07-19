@@ -60,48 +60,20 @@ fun TermsConsentScreen(
     modifier: Modifier = Modifier
 ) {
     var showDetails by remember { mutableStateOf(false) }
-    var showPrivacyDetails by remember { mutableStateOf(false) }
     var hasAcknowledgedTerms by remember { mutableStateOf(false) }
-    var hasAcknowledgedPrivacy by remember { mutableStateOf(false) }
     val acknowledgementText = consent.acknowledgementLabel
     val acknowledgementLinkText = consent.acknowledgementLinkText
-    val privacyAcknowledgementText = consent.privacyAcknowledgementLabel
-    val privacyAcknowledgementLinkText = consent.privacyAcknowledgementLinkText
     val consentLinkColor = MaterialTheme.colorScheme.onSurface
     val acknowledgementAnnotated = remember(acknowledgementText, acknowledgementLinkText, consentLinkColor) {
         buildConsentAnnotated(acknowledgementText, acknowledgementLinkText, "TERMS", consentLinkColor)
     }
-    val privacyAcknowledgementAnnotated = remember(
-        privacyAcknowledgementText,
-        privacyAcknowledgementLinkText,
-        consentLinkColor
-    ) {
-        buildConsentAnnotated(
-            privacyAcknowledgementText,
-            privacyAcknowledgementLinkText,
-            "PRIVACY",
-            consentLinkColor
-        )
-    }
 
     if (showDetails) {
-        val privacySections = legalSections.filter { it.title == consent.privacySectionTitle }
-        val detailsSections = if (showPrivacyDetails && privacySections.isNotEmpty()) {
-            privacySections
-        } else {
-            legalSections
-        }
-        val detailsTitle = if (showPrivacyDetails) {
-            consent.privacyDetailsTitle
-        } else {
-            consent.detailsTitle
-        }
         TermsConsentDetailsScreen(
-            title = detailsTitle,
-            sections = detailsSections,
+            title = consent.detailsTitle,
+            sections = legalSections,
             onBackClick = {
                 showDetails = false
-                showPrivacyDetails = false
             },
             modifier = modifier
         )
@@ -183,20 +155,6 @@ fun TermsConsentScreen(
                     annotatedText = acknowledgementAnnotated,
                     tag = "TERMS",
                     onLinkClick = {
-                        showPrivacyDetails = false
-                        showDetails = true
-                    }
-                )
-
-                Spacer(Modifier.height(12.dp))
-
-                ConsentCheckboxRow(
-                    checked = hasAcknowledgedPrivacy,
-                    onCheckedChange = { hasAcknowledgedPrivacy = it },
-                    annotatedText = privacyAcknowledgementAnnotated,
-                    tag = "PRIVACY",
-                    onLinkClick = {
-                        showPrivacyDetails = true
                         showDetails = true
                     }
                 )
@@ -206,7 +164,7 @@ fun TermsConsentScreen(
                 Button(
                     onClick = onAccept,
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = hasAcknowledgedTerms && hasAcknowledgedPrivacy,
+                    enabled = hasAcknowledgedTerms,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
                         contentColor = MaterialTheme.colorScheme.onPrimary,

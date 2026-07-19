@@ -218,7 +218,7 @@
       },
       {
         "title": "Traitement des données et confidentialité",
-        "content": "Pelo est conçue selon le principe de la protection des données dès la conception.\n\n5.1. Stockage Local Exclusif\nVos arrêts favoris et l'historique détaillé de vos trajets sont stockés exclusivement en local sur votre appareil. Dotshell ne dispose d'aucun accès à ces informations. Vous pouvez supprimer cet historique à tout moment depuis l'écran « Confidentialité ».\n\n5.2. Cas particulier des Favoris (Connexion Socket)\nPour permettre la mise à jour en temps réel de vos lignes et arrêts favoris, une connexion technique temporaire (socket) est établie à l'ouverture de l'application et rompue dès sa fermeture.\n• Cet échange est strictement anonyme.\n• Aucune donnée permettant de vous identifier n'est transmise ou enregistrée sur un serveur externe.\n• Ce flux sert uniquement à la synchronisation technique des données de transport durant votre session de navigation.\n\n5.3. Partage de données pour améliorer le réseau\nL'Application transmet à Dotshell, à chaque fermeture, un message anonyme rattaché à un identifiant qui change toutes les 24 heures. Ce message contient :\n• Vos heures d'ouverture et de fermeture de l'app\n• Vos recherches d'arrêts et de lignes\n• Les itinéraires que vous calculez et choisissez\n• Les arrêts franchis pendant une navigation (jamais les coordonnées GPS brutes)\n• Vos clics sur les lignes et arrêts\n• Les alertes officielles que vous avez lues\n• Les alertes de trafic que vous avez signalées\n• Un profil d'usage anonyme calculé localement (occasionnel / régulier / intensif + jusqu'à 5 lignes habituelles)\n\nL'identifiant journalier est généré aléatoirement, ne contient aucun lien avec votre téléphone et est régénéré chaque jour : il est impossible de vous suivre dans la durée. Les données transmises ne peuvent pas être retrouvées individuellement et sont automatiquement purgées après 90 jours.\n\nVos arrêts favoris, l'historique détaillé de vos trajets, et le contenu textuel de vos saisies libres (adresses) ne sont **jamais** transmis. Les adresses utilisées dans un calcul d'itinéraire sont transformées localement en un identifiant de zone géographique d'environ 460 m avant tout envoi.\n\n5.4. Absence de revente à des annonceurs\nDotshell ne vend pas vos données à des annonceurs ou à des courtiers en données. Les données agrégées et anonymes peuvent être utilisées ou partagées avec des Autorités Organisatrices de la Mobilité dans une finalité d'amélioration du service de transport public.\n"
+        "content": "Pelo est conçue selon le principe de la protection des données dès la conception.\n\n5.1. Stockage Local Exclusif\nVos arrêts favoris et l'historique détaillé de vos trajets sont stockés exclusivement en local sur votre appareil. Dotshell ne dispose d'aucun accès à ces informations. Vous pouvez supprimer cet historique à tout moment depuis l'écran « Confidentialité ».\n\n5.2. Partage de données pour améliorer le réseau\nL'Application transmet à Dotshell, à chaque fermeture, un message anonyme rattaché à un identifiant qui change toutes les 24 heures. Ce message contient :\n• Vos heures d'ouverture et de fermeture de l'app\n• Vos recherches d'arrêts et de lignes\n• Les itinéraires que vous calculez et choisissez\n• Les arrêts franchis pendant une navigation (jamais les coordonnées GPS brutes)\n• Vos clics sur les lignes et arrêts\n• Les alertes officielles que vous avez lues\n• Les alertes de trafic que vous avez signalées\n• Un profil d'usage anonyme calculé localement (occasionnel / régulier / intensif + jusqu'à 5 lignes habituelles)\n\nL'identifiant journalier est généré aléatoirement, ne contient aucun lien avec votre téléphone et est régénéré chaque jour : il est impossible de vous suivre dans la durée. Les données transmises ne peuvent pas être retrouvées individuellement et sont automatiquement purgées après 90 jours.\n\nVos arrêts favoris, l'historique détaillé de vos trajets, et le contenu textuel de vos saisies libres (adresses) ne sont **jamais** transmis. Les adresses utilisées dans un calcul d'itinéraire sont transformées localement en un identifiant de zone géographique d'environ 460 m avant tout envoi.\n\n5.3. Absence de revente à des annonceurs\nDotshell ne vend pas vos données à des annonceurs ou à des courtiers en données. Les données agrégées et anonymes peuvent être utilisées ou partagées avec des Autorités Organisatrices de la Mobilité dans une finalité d'amélioration du service de transport public.\n"
       },
       {
         "title": "Responsabilité",
@@ -253,17 +253,17 @@
   "consent": {
     "version": 1,
     "title": "Conditions d'utilisation",
-    "intro": "Pour acceder a Pelo, vous devez accepter les conditions d'utilisation et la politique de confidentialite.\nVous pouvez consulter les details complets a tout moment.\n",
+    "intro": "Pour accéder à Pelo, vous devez lire et accepter les Conditions Générales d'Utilisation (lesquelles incluent notre politique de confidentialité).\nVous pourrez consulter les détails complets à tout moment.\n",
     "summary": [
-      "Vous acceptez les conditions d'utilisation et la politique de confidentialite.",
-      "Vos donnees personnelles restent sur votre appareil, sauf pour le partage prevu par la politique de confidentialite.",
-      "Sans acceptation, l'application ne peut pas etre utilisee."
+      "Vous acceptez les conditions d'utilisation et la politique de confidentialité.",
+      "Vos données personnelles restent sur votre appareil, sauf pour le partage prévu par la politique de confidentialité.",
+      "Sans acceptation, l'application ne peut pas être utilisée."
     ],
-    "acceptLabel": "J'accepte",
+    "acceptLabel": "Continuer",
     "declineLabel": "Je refuse",
-    "declineNote": "Sans acceptation des conditions, l'application ne peut pas etre utilisee.\n",
-    "acknowledgementLabel": "J'ai lu et approuve les conditions d'utilisation",
-    "acknowledgementLinkText": "conditions d'utilisation",
+    "declineNote": "Sans acceptation des conditions, l'application ne peut pas être utilisée.\n",
+    "acknowledgementLabel": "J'ai lu et j'accepte les Conditions Générales d'Utilisation",
+    "acknowledgementLinkText": "Conditions Générales d'Utilisation",
     "privacyAcknowledgementLabel": "J'ai lu et approuve la politique de confidentialite",
     "privacyAcknowledgementLinkText": "politique de confidentialite",
     "privacyDetailsTitle": "Politique de confidentialite",

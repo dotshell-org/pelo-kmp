@@ -14,3 +14,30 @@ actual fun appVersionName(context: PlatformContext): String =
     NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleShortVersionString") as? String ?: "unknown"
 
 actual val ioDispatcher: CoroutineDispatcher = Dispatchers.Default
+
+actual fun exportFile(context: PlatformContext, filename: String, content: String) {
+    try {
+        val tempDir = platform.Foundation.NSTemporaryDirectory()
+        val filePath = tempDir + filename
+        val url = platform.Foundation.NSURL.fileURLWithPath(filePath)
+        
+        val stringContent = content as platform.Foundation.NSString
+        stringContent.writeToFile(filePath, atomically = true, encoding = platform.Foundation.NSUTF8StringEncoding, error = null)
+        
+        val activityViewController = platform.UIKit.UIActivityViewController(
+            activityItems = listOf(url),
+            applicationActivities = null
+        )
+        
+        val window = platform.UIKit.UIApplication.sharedApplication.keyWindow
+        val rootViewController = window?.rootViewController
+        
+        if (platform.UIKit.UIDevice.currentDevice.userInterfaceIdiom == platform.UIKit.UIUserInterfaceIdiomPad) {
+            activityViewController.popoverPresentationController?.sourceView = rootViewController?.view
+        }
+        
+        rootViewController?.presentViewController(activityViewController, animated = true, completion = null)
+    } catch (e: Exception) {
+        println("Export error: ${e.message}")
+    }
+}

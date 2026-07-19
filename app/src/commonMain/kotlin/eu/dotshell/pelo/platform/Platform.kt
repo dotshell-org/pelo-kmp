@@ -25,3 +25,8 @@ expect fun appVersionName(context: PlatformContext): String
  * (Dispatchers.IO is JVM-only / internal in commonMain — cf. KMP_IOS_HANDOFF §4.1.)
  */
 expect val ioDispatcher: CoroutineDispatcher
+
+/**
+ * Export a file to the user (saves to downloads on Android, share sheet on iOS).
+ */
+expect fun exportFile(context: PlatformContext, filename: String, content: String)

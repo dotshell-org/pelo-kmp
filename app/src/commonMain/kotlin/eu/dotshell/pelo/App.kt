@@ -1559,13 +1559,7 @@ private fun SettingsTab(viewModel: TransportViewModel, modifier: Modifier = Modi
                     onWipeHistory = {
                         scope.launch(ioDispatcher) {
                             runCatching {
-                                LocalHistoryStorage(context).wipeAll()
-                                Settings(context, "pelo_prefs").clear()
-                                Settings(context, "pelo_search_history").clear()
                                 TelemetryEmitter.wipePendingAndState()
-                                withContext(Dispatchers.Main) {
-                                    viewModel.loadFavorites()
-                                }
                             }
                         }
                     },
