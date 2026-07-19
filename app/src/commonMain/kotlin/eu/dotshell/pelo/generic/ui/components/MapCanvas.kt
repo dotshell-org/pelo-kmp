@@ -480,6 +480,10 @@ fun MapCanvas(
                             iconImage = iconImageExpr,
                             iconOffset = const(DpOffset(0.dp, (slot * 8).dp)),
                             iconAllowOverlap = const(true),
+                            // Stay out of the global collision index: otherwise every
+                            // live-vehicle source update re-runs symbol placement and
+                            // makes all transport icons flash.
+                            iconIgnorePlacement = const(true),
                             onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
                         )
                     }
@@ -543,6 +547,7 @@ fun MapCanvas(
                     source = vehicleSource,
                     iconImage = vehicleIconImage,
                     iconAllowOverlap = const(true),
+                    iconIgnorePlacement = const(true),
                     onClick = { f ->
                         val nom = f.firstOrNull()?.properties?.get("lineName")?.jsonPrimitive?.contentOrNull
                         if (nom != null) { onVehicleClick(nom); ClickResult.Consume } else ClickResult.Pass
