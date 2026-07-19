@@ -1,0 +1,23 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="72dp"
+    android:height="72dp"
+    android:viewportWidth="72"
+    android:viewportHeight="72">
+    <!-- Direction cone for the user-location dot: apex at bottom-center (the anchor point, over the
+         dot), widening upward. At icon-rotate 0 it points to map north; rotated by the compass
+         heading it points where the phone faces. Translucent blue matching the dot (0xFF3B82F6). -->
+    <path android:pathData="M36,72 L4,28 Q36,12 68,28 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="36"
+                android:centerY="72"
+                android:gradientRadius="56"
+                android:type="radial">
+                <item android:offset="0.0" android:color="#8A3B82F6" />
+                <item android:offset="0.5" android:color="#4D3B82F6" />
+                <item android:offset="1.0" android:color="#003B82F6" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

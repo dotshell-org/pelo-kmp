@@ -52,8 +52,10 @@ import org.maplibre.compose.expressions.dsl.feature
 import org.maplibre.compose.expressions.dsl.image
 import org.maplibre.compose.expressions.dsl.lte
 import org.maplibre.compose.expressions.dsl.switch
+import org.maplibre.compose.expressions.value.IconRotationAlignment
 import org.maplibre.compose.expressions.value.ImageValue
 import org.maplibre.compose.expressions.value.StringValue
+import org.maplibre.compose.expressions.value.SymbolAnchor
 import org.maplibre.compose.layers.CircleLayer
 import org.maplibre.compose.layers.LineLayer
 import org.maplibre.compose.layers.SymbolLayer
@@ -105,6 +107,7 @@ fun MapCanvas(
     stops: StopCollection? = null,
     itineraryGeoJson: String? = null,
     userLocation: Position? = null,
+    heading: Float? = null,
     vehiclesGeoJson: String? = null,
     vehicleIconName: String? = null,
     selectedLineName: String? = null,
@@ -294,6 +297,11 @@ fun MapCanvas(
     val tramPainter: Painter =
         if (drawableProvider.hasDrawable("ic_tramway_vehicle")) drawableProvider.getPainter("ic_tramway_vehicle")
         else fallbackPainter
+
+    // Direction cone for the user-location dot (resolved here, in the stable outer scope).
+    val conePainter: Painter? =
+        if (drawableProvider.hasDrawable("user_heading_cone")) drawableProvider.getPainter("user_heading_cone")
+        else null
 
     val baseStyle = remember(styleUrl, context) {
         if (styleUrl.startsWith("asset://")) {
@@ -543,8 +551,21 @@ fun MapCanvas(
             }
 
             // ------------------------------------------------------------------
-            // User location dot
+            // User location: direction cone (below the dot) + dot
             // ------------------------------------------------------------------
+            if (userLocation != null && heading != null && conePainter != null) {
+                SymbolLayer(
+                    id = "user-heading",
+                    source = userSource,
+                    iconImage = image(conePainter, DpSize(72.dp, 72.dp)),
+                    iconRotate = const(heading),
+                    // Map-aligned so the cone points at the real-world heading even when the map is
+                    // rotated; anchored at its apex so it pivots around the dot.
+                    iconRotationAlignment = const(IconRotationAlignment.Map),
+                    iconAnchor = const(SymbolAnchor.Bottom),
+                    iconAllowOverlap = const(true),
+                )
+            }
             if (userLocation != null) {
                 CircleLayer(
                     id = "user-location",
