@@ -413,9 +413,26 @@ fun InlineItinerarySheetContent(
                     maxAccessEgressDistanceMeters = LONG_WALK_METERS,
                     maxDirectWalkDistanceMeters = LONG_WALK_METERS
                 )
+                
+                var fallbackOrigin = originLocation
+                if (departureStop != null && !departureStop.isCoordinate) {
+                    val coords = raptorRepository.getAllStopsWithCoords().firstOrNull { it.name.equals(departureStop.name, ignoreCase = true) }
+                    if (coords?.lat != null && coords.lon != null) {
+                        fallbackOrigin = Location.Point(coords.lat, coords.lon)
+                    }
+                }
+                
+                var fallbackDestination = destinationLocation
+                if (arrivalStop != null && !arrivalStop.isCoordinate) {
+                    val coords = raptorRepository.getAllStopsWithCoords().firstOrNull { it.name.equals(arrivalStop.name, ignoreCase = true) }
+                    if (coords?.lat != null && coords.lon != null) {
+                        fallbackDestination = Location.Point(coords.lat, coords.lon)
+                    }
+                }
+
                 val longWalkJourneys = calculateJourneys(
-                    origin = originLocation,
-                    destination = destinationLocation,
+                    origin = fallbackOrigin,
+                    destination = fallbackDestination,
                     date = date,
                     blockedNames = blockedRouteNames,
                     walking = longWalk
