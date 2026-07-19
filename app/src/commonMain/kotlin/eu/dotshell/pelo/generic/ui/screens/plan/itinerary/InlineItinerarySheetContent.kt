@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CircularProgressIndicator
@@ -756,6 +757,39 @@ fun InlineItinerarySheetContent(
                         .weight(1f),
                     contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
+                    longWalkFallbackMeters?.let { meters ->
+                        item {
+                            // 4200 m -> "4,2 km" (tenths, locale-aware decimal separator).
+                            val tenths = kotlin.math.round(meters / 100.0).toInt()
+                            val sep = strings["decimal_separator"]
+                            val kmStr = "${tenths / 10}$sep${tenths % 10} km"
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 10.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.DirectionsWalk,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = strings["itinerary_long_walk_fallback"].replace("%s", kmStr),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
                     if (showSearchBars) {
                         item {
                             TimeSelectionRow(
