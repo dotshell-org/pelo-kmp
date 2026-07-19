@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.border
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DirectionsWalk
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CircularProgressIndicator
@@ -52,10 +53,12 @@ import eu.dotshell.pelo.generic.data.models.realtime.alerts.community.UserStopAl
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.ItineraryPreferencesRepository
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLegKind
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
+import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.journeyWalkingMeters
 import eu.dotshell.pelo.generic.data.models.itinerary.SelectedStop
 import eu.dotshell.pelo.generic.data.telemetry.PlaceRef
 import eu.dotshell.pelo.generic.data.telemetry.PrivacyScrubber
 import io.raptor.Location
+import io.raptor.WalkingParams
 import eu.dotshell.pelo.generic.data.models.itinerary.TimeMode
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModel
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
@@ -80,6 +83,10 @@ import kotlinx.datetime.toLocalDateTime
 
 private const val MAX_ITINERARY_STOP_IDS_PER_SIDE = 64
 private const val MAX_ITINERARY_FALLBACK_STOPS = 2
+
+// "Closest stop, then walk" fallback: when nothing else is found, retry with a large access/egress
+// walk radius and only keep options whose total walk stays within this cap (meters).
+private const val LONG_WALK_METERS = 6000.0
 
 /**
  * Raptor endpoint for this selection: an arbitrary point for coordinate endpoints (address/POI,
@@ -152,7 +159,12 @@ fun InlineItinerarySheetContent(
     var selectedJourney by remember { mutableStateOf<JourneyResult?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
+    // Non-null when the shown journeys come from the "closest stop, then walk" fallback; holds the
+    // shortest total walk (meters) among them, for the banner label. Reset each recalc.
+    var longWalkFallbackMeters by remember { mutableStateOf<Double?>(null) }
     var previousStopPairKey by remember { mutableStateOf<String?>(null) }
+    var hasAttemptedFallback by remember { mutableStateOf(false) }
+    var lastFallbackStopName by remember { mutableStateOf<String?>(null) }
     var recalcVersion by remember { mutableStateOf(0) }
     // When recalc() itself moves the search to "tomorrow" it writes selectedDate/selectedTimeSeconds,
     // which are keys of the recalc LaunchedEffect. This flag swallows that one self-triggered
@@ -168,10 +180,21 @@ fun InlineItinerarySheetContent(
     // uses the current time for each new itinerary request.
     LaunchedEffect(departureStop?.name, arrivalStop?.name) {
         val currentPairKey = "${departureStop?.name.orEmpty()}->${arrivalStop?.name.orEmpty()}"
+        val isSystemFallbackUpdate = departureStop?.name != null && departureStop.name == lastFallbackStopName
+        
         if (previousStopPairKey != null && previousStopPairKey != currentPairKey) {
-            selectedTimeSeconds = null
-            selectedDate = null
+            // Only reset overrides if the user manually changed the stop, not on fallback
+            if (!isSystemFallbackUpdate) {
+                selectedTimeSeconds = null
+                selectedDate = null
+            }
         }
+        
+        if (!isSystemFallbackUpdate) {
+            hasAttemptedFallback = false
+            lastFallbackStopName = null
+        }
+        
         previousStopPairKey = currentPairKey
     }
 
@@ -181,7 +204,8 @@ fun InlineItinerarySheetContent(
             destination: Location,
             date: LocalDate,
             blockedNames: Set<String>,
-            overrideTimeSeconds: Int? = null
+            overrideTimeSeconds: Int? = null,
+            walking: WalkingParams = WalkingParams.DEFAULT
         ): List<JourneyResult> {
             return withContext(ioDispatcher) {
                 if (timeMode == TimeMode.ARRIVAL) {
@@ -193,7 +217,8 @@ fun InlineItinerarySheetContent(
                         date = date,
                         blockedRouteNames = blockedNames,
                         originLabel = departureStop?.name,
-                        destinationLabel = arrivalStop?.name
+                        destinationLabel = arrivalStop?.name,
+                        walking = walking
                     )
                 } else {
                     raptorRepository.getOptimizedPaths(
@@ -203,7 +228,8 @@ fun InlineItinerarySheetContent(
                         date = date,
                         blockedRouteNames = blockedNames,
                         originLabel = departureStop?.name,
-                        destinationLabel = arrivalStop?.name
+                        destinationLabel = arrivalStop?.name,
+                        walking = walking
                     )
                 }
             }
@@ -305,6 +331,7 @@ fun InlineItinerarySheetContent(
         val currentVersion = recalcVersion
         isLoading = true
         errorText = null
+        longWalkFallbackMeters = null
         journeysAvoidingAlerts = emptyList()
         selectedJourney = null
 
@@ -339,7 +366,8 @@ fun InlineItinerarySheetContent(
             // Nearby-stop fallback only applies to stop departures: a coordinate departure
             // already competes with walking to every stop in range natively
             if (journeys.isEmpty() && nearbyDepartureStops.isNotEmpty() &&
-                timeMode == TimeMode.DEPARTURE && departureStop?.isCoordinate != true
+                timeMode == TimeMode.DEPARTURE && departureStop?.isCoordinate != true &&
+                !hasAttemptedFallback
             ) {
                 for (fallbackName in nearbyDepartureStops.take(MAX_ITINERARY_FALLBACK_STOPS)) {
                     if (fallbackName.equals(departureStop?.name, ignoreCase = true)) continue
@@ -359,6 +387,7 @@ fun InlineItinerarySheetContent(
 
                     if (fallbackJourneys.isNotEmpty()) {
                         journeys = fallbackJourneys
+                        lastFallbackStopName = fallbackName
                         onDepartureFallbackSelected(
                             SelectedStop(
                                 name = fallbackName,
@@ -367,6 +396,52 @@ fun InlineItinerarySheetContent(
                         )
                         break
                     }
+                }
+            }
+            
+            // Always mark as attempted after the first recalc so that subsequent
+            // recalcs (like changing the time) don't trigger the fallback.
+            hasAttemptedFallback = true
+
+            // "Closest stop, then walk" fallback — before the "tomorrow" fallback, so getting home
+            // TONIGHT via a longer walk beats punting to tomorrow's first bus. Retry with a large
+            // access/egress walk radius; keep only options whose total walk stays under the cap so we
+            // don't suggest an absurd multi-hour hike. Only meaningful for coordinate endpoints
+            // (a pure stop destination has no egress walk).
+            if (journeys.isEmpty()) {
+                val longWalk = WalkingParams(
+                    maxAccessEgressDistanceMeters = LONG_WALK_METERS,
+                    maxDirectWalkDistanceMeters = LONG_WALK_METERS
+                )
+                
+                var fallbackOrigin = originLocation
+                if (departureStop != null && !departureStop.isCoordinate) {
+                    val coords = raptorRepository.getAllStopsWithCoords().firstOrNull { it.name.equals(departureStop.name, ignoreCase = true) }
+                    if (coords?.lat != null && coords.lon != null) {
+                        fallbackOrigin = Location.Point(coords.lat, coords.lon)
+                    }
+                }
+                
+                var fallbackDestination = destinationLocation
+                if (arrivalStop != null && !arrivalStop.isCoordinate) {
+                    val coords = raptorRepository.getAllStopsWithCoords().firstOrNull { it.name.equals(arrivalStop.name, ignoreCase = true) }
+                    if (coords?.lat != null && coords.lon != null) {
+                        fallbackDestination = Location.Point(coords.lat, coords.lon)
+                    }
+                }
+
+                val longWalkJourneys = calculateJourneys(
+                    origin = fallbackOrigin,
+                    destination = fallbackDestination,
+                    date = date,
+                    blockedNames = blockedRouteNames,
+                    walking = longWalk
+                ).filter { journeyWalkingMeters(it, longWalk.speedMetersPerSecond) <= LONG_WALK_METERS }
+
+                if (longWalkJourneys.isNotEmpty()) {
+                    journeys = longWalkJourneys
+                    longWalkFallbackMeters =
+                        longWalkJourneys.minOf { journeyWalkingMeters(it, longWalk.speedMetersPerSecond) }
                 }
             }
 
@@ -718,6 +793,39 @@ fun InlineItinerarySheetContent(
                         .weight(1f),
                     contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
+                    longWalkFallbackMeters?.let { meters ->
+                        item {
+                            // 4200 m -> "4,2 km" (tenths, locale-aware decimal separator).
+                            val tenths = kotlin.math.round(meters / 100.0).toInt()
+                            val sep = strings["decimal_separator"]
+                            val kmStr = "${tenths / 10}$sep${tenths % 10} km"
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 10.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.DirectionsWalk,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = strings["itinerary_long_walk_fallback"].replace("%s", kmStr),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
                     if (showSearchBars) {
                         item {
                             TimeSelectionRow(

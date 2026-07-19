@@ -217,4 +217,6 @@
     <string name="category_cars_du_rhone">Cars du Rhône TCL unifié</string>
     <string name="category_junior_direct">Junior Direct</string>
     <string name="zone_label">Zone %s</string>
+    <string name="itinerary_long_walk_fallback">Aucun trajet direct à cette heure — au plus proche, puis %s à pied.</string>
+    <string name="decimal_separator">,</string>
 </resources>
