@@ -41,7 +41,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -77,7 +79,11 @@ fun SettingsScreen(
     onTelemetryClick: () -> Unit = {},
     onAboutClick: () -> Unit = {},
     onThemeClick: () -> Unit = {},
-    isAboutMenu: Boolean = false
+    isAboutMenu: Boolean = false,
+    // Runs an on-demand dataset update check and returns a `timetable_*` STRING KEY for
+    // the result (resolved to text here, since the string accessor is @Composable). Null
+    // hides the row (feature not configured, or not the About menu).
+    onCheckForUpdates: (suspend () -> String)? = null
 ) {
     var clickCount by remember { mutableIntStateOf(0) }
     var isEasterEggActive by remember { mutableStateOf(false) }
@@ -201,6 +207,30 @@ fun SettingsScreen(
                         title = strings["timetable_data_title"],
                         subtitle = subtitle,
                         onClick = null,
+                        showChevron = false
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+
+                if (onCheckForUpdates != null) {
+                    val updateScope = rememberCoroutineScope()
+                    var statusKey by remember { mutableStateOf<String?>(null) }
+                    var isChecking by remember { mutableStateOf(false) }
+                    // Key held as plain state; resolved to text here, in composition.
+                    val statusSubtitle = statusKey?.let { strings[it] }
+                    SettingsMenuRow(
+                        title = strings["timetable_check_updates"],
+                        subtitle = statusSubtitle,
+                        onClick = if (isChecking) null else {
+                            {
+                                isChecking = true
+                                statusKey = "timetable_checking"
+                                updateScope.launch {
+                                    statusKey = onCheckForUpdates()
+                                    isChecking = false
+                                }
+                            }
+                        },
                         showChevron = false
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

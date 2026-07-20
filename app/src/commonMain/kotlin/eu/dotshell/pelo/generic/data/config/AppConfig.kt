@@ -15,7 +15,19 @@ data class AppConfig(
     @SerialName("itinerarySettings") val itinerarySettings: ItinerarySettingsData,
     @SerialName("telemetry") val telemetry: TelemetryConfigData? = null,
     @SerialName("consent") val consent: ConsentConfigData,
-    @SerialName("realtime") val realtime: RealtimeConfigData = RealtimeConfigData()
+    @SerialName("realtime") val realtime: RealtimeConfigData = RealtimeConfigData(),
+    @SerialName("datasetUpdate") val datasetUpdate: DatasetUpdateConfigData? = null
+)
+
+/**
+ * Where the app fetches over-the-air timetable updates. Absent (null) disables the
+ * feature entirely: the app then only ever uses its bundled data. [city] is the path
+ * segment on the server, letting the sibling apps point at their own datasets.
+ */
+@Serializable
+data class DatasetUpdateConfigData(
+    val baseUrl: String,
+    val city: String
 )
 
 /**

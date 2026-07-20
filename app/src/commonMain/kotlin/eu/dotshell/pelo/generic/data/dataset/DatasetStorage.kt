@@ -22,7 +22,7 @@ import okio.buffer
  * `current`, `pending` and `staging` are siblings under one root, hence one
  * filesystem, so `atomicMove` between them is a real atomic rename.
  */
-class DatasetStorage(private val root: String, private val fs: FileSystem = FileSystem.SYSTEM) {
+class DatasetStorage(val root: String, private val fs: FileSystem = FileSystem.SYSTEM) {
 
     val currentDir: String get() = "$root/current"
     val pendingDir: String get() = "$root/pending"

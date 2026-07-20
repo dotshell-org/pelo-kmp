@@ -13,6 +13,12 @@ actual fun createHttpClientEngine(): HttpClientEngineFactory<*> = Darwin
 actual fun appVersionName(context: PlatformContext): String =
     NSBundle.mainBundle.objectForInfoDictionaryKey("CFBundleShortVersionString") as? String ?: "unknown"
 
+// TODO(iOS): a real check needs NWPathMonitor, which reports asynchronously — it does
+// not fit this synchronous shape. Until that lands, return the conservative default
+// (false), so iOS never auto-downloads a dataset over a possibly-metered link. The
+// feature is effectively off on iOS, matching its currently unverified status.
+actual fun isUnmeteredNetwork(context: PlatformContext): Boolean = false
+
 actual val ioDispatcher: CoroutineDispatcher = Dispatchers.Default
 
 actual fun exportFile(context: PlatformContext, filename: String, content: String) {

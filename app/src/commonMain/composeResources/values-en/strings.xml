@@ -62,6 +62,12 @@
     <string name="timetable_data_expiring">Valid until %s — please update the app</string>
     <string name="timetable_data_expired">Expired since %s — please update the app</string>
     <string name="month_names">January,February,March,April,May,June,July,August,September,October,November,December</string>
+    <string name="timetable_check_updates">Check for updates</string>
+    <string name="timetable_checking">Checking…</string>
+    <string name="timetable_up_to_date">Timetables are up to date</string>
+    <string name="timetable_update_ready">Update downloaded — applies on next launch</string>
+    <string name="timetable_update_incompatible">Update needs a newer app version</string>
+    <string name="timetable_check_failed">Couldn\'t check right now</string>
     <string name="legal_title">Legal notice / Terms</string>
     <string name="credits_title">Credits</string>
     <string name="contact_title">Contact us</string>
