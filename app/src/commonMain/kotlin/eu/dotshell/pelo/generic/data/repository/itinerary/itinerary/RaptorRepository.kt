@@ -4,6 +4,7 @@ import eu.dotshell.pelo.platform.ioDispatcher
 
 import eu.dotshell.pelo.platform.Log
 import eu.dotshell.pelo.platform.PlatformContext
+import eu.dotshell.pelo.generic.data.dataset.DatasetLifecycle
 import eu.dotshell.pelo.generic.data.dataset.DatasetStore
 import eu.dotshell.pelo.platform.FileSystem
 import eu.dotshell.pelo.generic.data.cache.journey.JourneyCache
@@ -66,6 +67,9 @@ class RaptorRepository private constructor(private val context: PlatformContext)
     // Decided once per process (i.e. once per cold start), which is exactly when a
     // newly applied dataset is meant to take effect.
     private val datasetStore by lazy { DatasetStore.from(fileSystem) }
+    // Cold-start promote/guard for downloaded datasets. Driven from initialize() before
+    // any dataset file is read; the network-side check lives in DatasetUpdateManager.
+    private val datasetLifecycle by lazy { DatasetLifecycle(fileSystem) }
 
     private var raptorLibrary: RaptorLibrary? = null
     private var stopsCache: List<Stop> = emptyList()
@@ -169,6 +173,13 @@ class RaptorRepository private constructor(private val context: PlatformContext)
             try {
                 val startTime = Clock.System.now().toEpochMilliseconds()
 
+                // Apply a downloaded dataset, if one is staged, and roll back one that has
+                // repeatedly failed to load — BOTH before any dataset file is read, so the
+                // active tree is settled for this whole session. Promotion happens once,
+                // here at cold start, never under a live RaptorLibrary.
+                datasetLifecycle.prepareForLoad()
+                datasetLifecycle.beginLoad()
+
                 // Verify all required assets exist before attempting to load them
                 val requiredAssets = listOf(
                     "holidays.json",
@@ -241,6 +252,10 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                 }
 
                 isInitialized = true
+
+                // The active dataset loaded cleanly: clear its init-failure count so a
+                // future transient failure starts from zero, not from a stale tally.
+                datasetLifecycle.loadSucceeded()
 
                 Log.i(
                     TAG,

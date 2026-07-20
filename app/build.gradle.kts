@@ -136,6 +136,15 @@ android {
     namespace = "eu.dotshell.pelo"
     compileSdk = 36
 
+    testOptions {
+        unitTests {
+            // Let android.util.Log (and other android.* stubs) return defaults instead
+            // of throwing "not mocked" in plain JVM unit tests, so common code that logs
+            // can be exercised without an instrumented device.
+            isReturnDefaultValues = true
+        }
+    }
+
     defaultConfig {
         applicationId = "eu.dotshell.pelo"
         minSdk = 24
