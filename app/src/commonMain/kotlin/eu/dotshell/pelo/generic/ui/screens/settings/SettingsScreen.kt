@@ -51,11 +51,18 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import eu.dotshell.pelo.generic.data.dataset.DataFreshness
+import eu.dotshell.pelo.generic.data.dataset.DatasetFreshness
+import eu.dotshell.pelo.generic.data.dataset.DatasetInfoLoader
 import eu.dotshell.pelo.platform.DrawableProvider
+import eu.dotshell.pelo.platform.FileSystem
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
 import androidx.compose.material3.MaterialTheme
 import kotlinx.coroutines.delay
+import kotlinx.datetime.Clock
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 
 @Composable
 fun SettingsScreen(
@@ -78,6 +85,35 @@ fun SettingsScreen(
     val drawableProvider = DrawableProvider(LocalPlatformContext.current)
     val strings = StringProvider(LocalPlatformContext.current)
 
+    // Timetable validity, read once from the bundled dataset.json. Null whenever the
+    // dataset predates that file or carries no usable end date — the row is then hidden
+    // rather than showing a half-truth.
+    val platformContext = LocalPlatformContext.current
+    // Resolved here because the string accessor is itself @Composable and cannot be
+    // called from inside remember's calculation block.
+    val monthNames = strings["month_names"]
+    val validUntilTemplate = strings["timetable_data_valid_until"]
+    val expiringTemplate = strings["timetable_data_expiring"]
+    val expiredTemplate = strings["timetable_data_expired"]
+    val timetableDataSubtitle: String? = remember(platformContext, monthNames) {
+        val info = DatasetInfoLoader.load(FileSystem(platformContext))
+        val endDate = DatasetFreshness.parseIsoDate(info?.validity?.endDate)
+        if (endDate == null) {
+            null
+        } else {
+            val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
+            val formatted = DatasetFreshness.formatLongDate(
+                endDate,
+                monthNames.split(",").map { it.trim() }
+            )
+            when (DatasetFreshness.classify(endDate, today)) {
+                DataFreshness.EXPIRED -> expiredTemplate
+                DataFreshness.EXPIRING_SOON -> expiringTemplate
+                DataFreshness.VALID -> validUntilTemplate
+                DataFreshness.UNKNOWN -> null
+            }?.replace("%s", formatted)
+        }
+    }
 
     // Reset click count after 2 seconds
     LaunchedEffect(clickCount) {
@@ -158,6 +194,17 @@ fun SettingsScreen(
                     showChevron = false
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                // Timetable freshness. Absent for datasets built before the pipeline
+                // started emitting dataset.json, in which case the row is simply skipped.
+                timetableDataSubtitle?.let { subtitle ->
+                    SettingsMenuRow(
+                        title = strings["timetable_data_title"],
+                        subtitle = subtitle,
+                        onClick = null,
+                        showChevron = false
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
                 SettingsMenuRow(
                     title = strings["legal_title"],
                     onClick = onLegalClick
