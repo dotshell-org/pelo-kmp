@@ -83,6 +83,17 @@ actual class FileSystem actual constructor(private val context: PlatformContext)
         } else null
     }
 
+    actual fun readFileBytes(path: String): ByteArray? {
+        val fullPath = "${filesDir()}/$path"
+        if (!NSFileManager.defaultManager.fileExistsAtPath(fullPath)) return null
+        val data = NSData.dataWithContentsOfFile(fullPath) ?: return null
+        val length = data.length.toInt()
+        if (length == 0) return ByteArray(0)
+        return ByteArray(length).apply {
+            usePinned { pinned -> memcpy(pinned.addressOf(0), data.bytes, data.length) }
+        }
+    }
+
     @Suppress("CAST_NEVER_SUCCEEDS")
     actual fun writeFile(path: String, content: String) {
         val fullPath = "${filesDir()}/$path"

@@ -38,14 +38,15 @@ object DatasetInfoLoader {
         attempted = true
 
         return try {
-            if (!fileSystem.assetExists(DATASET_FILE)) {
-                Log.i(TAG, "$DATASET_FILE not bundled; skipping dataset metadata")
+            val store = DatasetStore.from(fileSystem)
+            // Present if a downloaded dataset is active (its sentinel IS dataset.json) or
+            // the bundle ships one. Datasets built before this file existed have neither.
+            val present = store.usingOverride || fileSystem.assetExists(DATASET_FILE)
+            if (!present) {
+                Log.i(TAG, "$DATASET_FILE not available; skipping dataset metadata")
                 return null
             }
-            val parsed = json.decodeFromString(
-                DatasetInfo.serializer(),
-                fileSystem.readAsset(DATASET_FILE)
-            )
+            val parsed = json.decodeFromString(DatasetInfo.serializer(), store.readText(DATASET_FILE))
             cached = parsed
             parsed
         } catch (e: Exception) {

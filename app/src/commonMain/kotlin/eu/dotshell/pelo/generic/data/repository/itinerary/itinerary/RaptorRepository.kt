@@ -4,6 +4,7 @@ import eu.dotshell.pelo.platform.ioDispatcher
 
 import eu.dotshell.pelo.platform.Log
 import eu.dotshell.pelo.platform.PlatformContext
+import eu.dotshell.pelo.generic.data.dataset.DatasetStore
 import eu.dotshell.pelo.platform.FileSystem
 import eu.dotshell.pelo.generic.data.cache.journey.JourneyCache
 import eu.dotshell.pelo.generic.data.repository.itinerary.holiday.HolidayPeriod
@@ -61,6 +62,10 @@ class RaptorRepository private constructor(private val context: PlatformContext)
 
     // Cross-platform asset access (reads `.bin`/JSON from composeResources via okio/AssetManager).
     private val fileSystem = FileSystem(context)
+    // Resolves dataset files from a downloaded override when present, else the bundle.
+    // Decided once per process (i.e. once per cold start), which is exactly when a
+    // newly applied dataset is meant to take effect.
+    private val datasetStore by lazy { DatasetStore.from(fileSystem) }
 
     private var raptorLibrary: RaptorLibrary? = null
     private var stopsCache: List<Stop> = emptyList()
@@ -199,8 +204,8 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                 ).map { periodId ->
                     PeriodData(
                         periodId = periodId,
-                        stopsBytes = fileSystem.readAssetBytes("raptor/stops_$periodId.bin"),
-                        routesBytes = fileSystem.readAssetBytes("raptor/routes_$periodId.bin")
+                        stopsBytes = datasetStore.readBytes("raptor/stops_$periodId.bin"),
+                        routesBytes = datasetStore.readBytes("raptor/routes_$periodId.bin")
                     )
                 }
 
@@ -334,14 +339,14 @@ class RaptorRepository private constructor(private val context: PlatformContext)
 
     private fun getRoutesForPeriod(periodId: String): List<Route> {
         routesByPeriod[periodId]?.let { return it }
-        val loaded = NetworkLoader.loadRoutes(fileSystem.readAssetBytes("raptor/routes_$periodId.bin"))
+        val loaded = NetworkLoader.loadRoutes(datasetStore.readBytes("raptor/routes_$periodId.bin"))
         routesByPeriod = routesByPeriod + (periodId to loaded)
         return loaded
     }
 
     private fun getStopsForPeriod(periodId: String): List<Stop> {
         stopsByPeriod[periodId]?.let { return it }
-        val loaded = NetworkLoader.loadStops(fileSystem.readAssetBytes("raptor/stops_$periodId.bin"))
+        val loaded = NetworkLoader.loadStops(datasetStore.readBytes("raptor/stops_$periodId.bin"))
         stopsByPeriod = stopsByPeriod + (periodId to loaded)
         return loaded
     }
