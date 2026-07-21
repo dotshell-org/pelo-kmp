@@ -92,12 +92,12 @@ class DatasetUpdatePolicyTest {
     @Test
     fun `urls follow the epoch layout and tolerate a trailing slash in the base`() {
         assertEquals(
-            "https://dotshell.eu/lyon/epoch-2-3/latest.json",
-            DatasetUrls.latest("https://dotshell.eu/", "lyon")
+            "https://api.dotshell.eu/lyon/epoch-2-3/latest.json",
+            DatasetUrls.latest("https://api.dotshell.eu/", "lyon")
         )
         assertEquals(
-            "https://dotshell.eu/lyon/epoch-2-3/20260720-abcdef01/raptor/stops_saturday.bin",
-            DatasetUrls.file("https://dotshell.eu", "lyon", "20260720-abcdef01", "raptor/stops_saturday.bin")
+            "https://api.dotshell.eu/lyon/epoch-2-3/20260720-abcdef01/raptor/stops_saturday.bin",
+            DatasetUrls.file("https://api.dotshell.eu", "lyon", "20260720-abcdef01", "raptor/stops_saturday.bin")
         )
     }
 }

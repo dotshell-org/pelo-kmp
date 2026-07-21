@@ -21,7 +21,7 @@ object DatasetFormat {
  * Builds the dataset server URLs. Pure: the base URL and city are passed in so the
  * source of that configuration stays out of the URL logic (and out of tests).
  *
- * [baseUrl] is the origin, e.g. `https://dotshell.eu`; [city] the path segment, e.g.
+ * [baseUrl] is the origin, e.g. `https://api.dotshell.eu`; [city] the path segment, e.g.
  * `lyon`. Layout served by `deploy/nginx.conf`:
  *
  *   {base}/{city}/{epoch}/latest.json

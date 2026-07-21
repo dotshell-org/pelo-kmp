@@ -446,7 +446,7 @@
     }
   },
   "datasetUpdate": {
-    "baseUrl": "https://dotshell.eu",
+    "baseUrl": "https://api.dotshell.eu",
     "city": "lyon"
   }
 }
