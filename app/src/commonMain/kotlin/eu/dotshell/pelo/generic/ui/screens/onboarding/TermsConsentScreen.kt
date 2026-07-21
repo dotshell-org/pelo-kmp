@@ -1,8 +1,6 @@
 package eu.dotshell.pelo.generic.ui.screens.onboarding
 
 import androidx.compose.foundation.Image
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import eu.dotshell.pelo.generic.ui.theme.isAppInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -95,23 +93,12 @@ fun TermsConsentScreen(
                     .padding(top = 8.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                // In light mode the logo is shown in negative so it reads on the light background.
-                val invertColorFilter = remember {
-                    ColorFilter.colorMatrix(
-                        ColorMatrix(
-                            floatArrayOf(
-                                -1f, 0f, 0f, 0f, 255f,
-                                0f, -1f, 0f, 0f, 255f,
-                                0f, 0f, -1f, 0f, 255f,
-                                0f, 0f, 0f, 1f, 0f,
-                            )
-                        )
-                    )
-                }
+                // Theme-specific logo: white-on-dark in dark mode, dark-on-white in light mode.
                 Image(
-                    painter = drawableProvider.getPainter("ic_launcher_foreground"),
+                    painter = drawableProvider.getPainter(
+                        if (isAppInDarkTheme()) "logo_pelo_dark" else "logo_pelo_light"
+                    ),
                     contentDescription = "Logo Pelo",
-                    colorFilter = if (isAppInDarkTheme()) null else invertColorFilter,
                     modifier = Modifier
                         .size(160.dp)
                         .padding(bottom = 20.dp)
