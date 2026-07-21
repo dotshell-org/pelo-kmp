@@ -89,6 +89,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import eu.dotshell.pelo.generic.data.config.AppConfigLoader
+import eu.dotshell.pelo.generic.data.dataset.DatasetUpdates
 import eu.dotshell.pelo.generic.data.models.geojson.FeatureCollection
 import eu.dotshell.pelo.generic.data.models.geojson.StopCollection
 import eu.dotshell.pelo.generic.data.models.geojson.StopFeature
@@ -200,6 +201,12 @@ fun App(
                 runCatching { vm.raptorRepository.initialize() }
                     .onSuccess { Log.i("PeloApp", "Raptor initialized") }
                     .onFailure { Log.e("PeloApp", "Raptor init failed: ${it.message}") }
+
+                // Over-the-air timetable check: after init, and gated to at most once a
+                // day on an unmetered network. Downloads (if any) apply at the NEXT cold
+                // start, so this can never disturb the session that just loaded.
+                runCatching { DatasetUpdates.forApp(context)?.maybeCheck() }
+                    .onFailure { Log.w("PeloApp", "Dataset update check skipped: ${it.message}") }
                 Log.i("PeloApp", "ioDispatcher: done")
             } catch (t: Throwable) {
                 Log.e("PeloApp", "Transport data init failed: ${t.message}")
@@ -1566,18 +1573,23 @@ private fun SettingsTab(viewModel: TransportViewModel, modifier: Modifier = Modi
                 )
             }
             "theme" -> ThemeSettingsScreen(onBackClick = navigateBack)
-            "about" -> SettingsScreen(
-                versionName = appVersionName(context),
-                onBackClick = navigateBack,
-                onItineraryClick = {},
-                onLegalClick = { navigateTo("legal") },
-                onCreditsClick = { navigateTo("credits") },
-                onContactClick = { navigateTo("contact") },
-                onTelemetryClick = {},
-                onThemeClick = {},
-
-                isAboutMenu = true
-            )
+            "about" -> {
+                val datasetScheduler = remember(context) { DatasetUpdates.forApp(context) }
+                SettingsScreen(
+                    versionName = appVersionName(context),
+                    onBackClick = navigateBack,
+                    onItineraryClick = {},
+                    onLegalClick = { navigateTo("legal") },
+                    onCreditsClick = { navigateTo("credits") },
+                    onContactClick = { navigateTo("contact") },
+                    onTelemetryClick = {},
+                    onThemeClick = {},
+                    isAboutMenu = true,
+                    onCheckForUpdates = datasetScheduler?.let { scheduler ->
+                        { DatasetUpdates.statusStringKey(scheduler.checkNow()) }
+                    }
+                )
+            }
             else -> SettingsScreen(
                 versionName = appVersionName(context),
                 onBackClick = navigateBack,

@@ -57,6 +57,17 @@
     <string name="intermediate_stops">%1$s arrêt%2$s</string>
     <string name="logo_pelo">Logo Pelo</string>
     <string name="app_version_title">Version de l\'application</string>
+    <string name="timetable_data_title">Données horaires</string>
+    <string name="timetable_data_valid_until">Valables jusqu\'au %s</string>
+    <string name="timetable_data_expiring">Valables jusqu\'au %s — mettez à jour l\'application</string>
+    <string name="timetable_data_expired">Périmées depuis le %s — mettez à jour l\'application</string>
+    <string name="month_names">janvier,février,mars,avril,mai,juin,juillet,août,septembre,octobre,novembre,décembre</string>
+    <string name="timetable_check_updates">Rechercher une mise à jour</string>
+    <string name="timetable_checking">Recherche en cours…</string>
+    <string name="timetable_up_to_date">Données à jour</string>
+    <string name="timetable_update_ready">Mise à jour téléchargée — active au prochain démarrage</string>
+    <string name="timetable_update_incompatible">Mise à jour indisponible pour cette version de l\'application</string>
+    <string name="timetable_check_failed">Recherche impossible pour le moment</string>
     <string name="legal_title">Mentions légales / CGU</string>
     <string name="credits_title">Crédits</string>
     <string name="contact_title">Nous contacter</string>

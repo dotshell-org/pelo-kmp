@@ -35,6 +35,13 @@ expect class FileSystem(context: PlatformContext) {
     fun readFile(path: String): String?
 
     /**
+     * Read a file from the app-private files directory as raw bytes, or null if it
+     * does not exist. Unlike [readFile], this is safe for binary content (the `.bin`
+     * timetables), which [readFile]'s text decoding would corrupt.
+     */
+    fun readFileBytes(path: String): ByteArray?
+
+    /**
      * Write a file to the app-private files directory.
      */
     fun writeFile(path: String, content: String)

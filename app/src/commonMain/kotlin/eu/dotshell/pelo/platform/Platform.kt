@@ -30,3 +30,10 @@ expect val ioDispatcher: CoroutineDispatcher
  * Export a file to the user (saves to downloads on Android, share sheet on iOS).
  */
 expect fun exportFile(context: PlatformContext, filename: String, content: String)
+
+/**
+ * True when the active network is NOT metered — i.e. safe to pull a large timetable
+ * dataset over. Used to keep multi-megabyte downloads off cellular by default.
+ * Conservative: when connectivity cannot be determined, returns false.
+ */
+expect fun isUnmeteredNetwork(context: PlatformContext): Boolean

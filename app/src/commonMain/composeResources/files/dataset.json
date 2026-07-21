@@ -1,0 +1,94 @@
+{
+    "schema_version": 2,
+    "tool_version": "0.3.0",
+    "createdAt": "2026-07-20T12:56:44.214852032Z",
+    "input": {
+        "gtfs_path": "/tmp/raptor_gtfs_14705303345477504325"
+    },
+    "layout": "flat",
+    "lines": null,
+    "validity": {
+        "start_date": "2026-07-20",
+        "end_date": "2026-11-17",
+        "source": "feed_info",
+        "feed_publisher": "TCL"
+    },
+    "periods": [
+        {
+            "name": "saturday",
+            "description": "Saturday service",
+            "files": {
+                "routes": "raptor/routes_saturday.bin",
+                "stops": "raptor/stops_saturday.bin"
+            },
+            "checksums": {
+                "raptor/routes_saturday.bin": "9b0b3e9a8cce26d532f2c1e595c8a5a8c40ba72e1c5a77474f75fafa02a1eca0",
+                "raptor/stops_saturday.bin": "91375b1de3c45374a030d206fa1e90e9ae1a5d6d93fde40099055a49f01f2512"
+            },
+            "stats": {
+                "stops": 14361,
+                "routes": 420,
+                "trips": 27201,
+                "stop_times": 532861,
+                "transfers": 5383
+            }
+        },
+        {
+            "name": "sunday",
+            "description": "Sunday service",
+            "files": {
+                "routes": "raptor/routes_sunday.bin",
+                "stops": "raptor/stops_sunday.bin"
+            },
+            "checksums": {
+                "raptor/routes_sunday.bin": "95a82de8276c2ac96dbc5681487ce549bbbe32fbc9dca616d80d224ec0511086",
+                "raptor/stops_sunday.bin": "9bc0901ce250843568740548817cbaa3f229b545aa120d00895293895e01f663"
+            },
+            "stats": {
+                "stops": 14361,
+                "routes": 359,
+                "trips": 16685,
+                "stop_times": 296839,
+                "transfers": 5383
+            }
+        },
+        {
+            "name": "school_on_weekdays",
+            "description": "Weekdays during school term",
+            "files": {
+                "routes": "raptor/routes_school_on_weekdays.bin",
+                "stops": "raptor/stops_school_on_weekdays.bin"
+            },
+            "checksums": {
+                "raptor/routes_school_on_weekdays.bin": "0fb4b181116e00e13440372ba310705094d1e330e0a6b2a14f4f371e8541c7cc",
+                "raptor/stops_school_on_weekdays.bin": "adef4d093d9494b6b193e557eab1d74cc8e8dcae11ae8b8d958310cd28c568ba"
+            },
+            "stats": {
+                "stops": 14361,
+                "routes": 1695,
+                "trips": 66005,
+                "stop_times": 1290235,
+                "transfers": 5383
+            }
+        },
+        {
+            "name": "school_off_weekdays",
+            "description": "Weekdays during school holidays",
+            "files": {
+                "routes": "raptor/routes_school_off_weekdays.bin",
+                "stops": "raptor/stops_school_off_weekdays.bin"
+            },
+            "checksums": {
+                "raptor/routes_school_off_weekdays.bin": "fc03221f703faf024e96b6e09a7ba60141d856f412d9ffdca464b4316fcf8a6b",
+                "raptor/stops_school_off_weekdays.bin": "c4e0a5494247f7a4cd311f287c860635ede177146f65f767253873e8c3de1e34"
+            },
+            "stats": {
+                "stops": 14361,
+                "routes": 1915,
+                "trips": 78737,
+                "stop_times": 1514429,
+                "transfers": 5383
+            }
+        }
+    ]
+}

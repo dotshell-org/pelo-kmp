@@ -69,6 +69,11 @@ actual class FileSystem actual constructor(private val context: PlatformContext)
         return if (file.exists()) file.readText() else null
     }
 
+    actual fun readFileBytes(path: String): ByteArray? {
+        val file = File(context.filesDir, path)
+        return if (file.exists()) file.readBytes() else null
+    }
+
     actual fun writeFile(path: String, content: String) {
         val file = File(context.filesDir, path)
         file.parentFile?.mkdirs()

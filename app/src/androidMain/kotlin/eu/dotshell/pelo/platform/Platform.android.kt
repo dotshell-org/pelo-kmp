@@ -12,6 +12,16 @@ actual val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 
 actual fun createHttpClientEngine(): HttpClientEngineFactory<*> = OkHttp
 
+actual fun isUnmeteredNetwork(context: PlatformContext): Boolean = try {
+    val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+    val caps = cm.getNetworkCapabilities(cm.activeNetwork)
+    caps != null &&
+        caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_NOT_METERED) &&
+        caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET)
+} catch (_: Exception) {
+    false
+}
+
 actual fun appVersionName(context: PlatformContext): String = try {
     val info = context.packageManager.getPackageInfo(context.packageName, 0)
     info.versionName ?: "unknown"
