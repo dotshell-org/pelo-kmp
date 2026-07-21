@@ -36,7 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -93,10 +92,10 @@ fun TermsConsentScreen(
                     .padding(top = 8.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                // Theme-specific logo: white-on-dark in dark mode, dark-on-white in light mode.
+                // Icon-only mark (no wordmark), theme-specific: white-on-dark / dark-on-white.
                 Image(
                     painter = drawableProvider.getPainter(
-                        if (isAppInDarkTheme()) "logo_pelo_dark" else "logo_pelo_light"
+                        if (isAppInDarkTheme()) "pelo_mark_dark" else "pelo_mark_light"
                     ),
                     contentDescription = "Logo Pelo",
                     modifier = Modifier
@@ -192,10 +191,8 @@ private fun ConsentCheckboxRow(
         ClickableText(
             text = annotatedText,
             modifier = Modifier.weight(1f),
-            style = TextStyle(
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 14.sp,
-                lineHeight = 20.sp
+            style = MaterialTheme.typography.bodyMedium.copy(
+                color = MaterialTheme.colorScheme.onSurface
             ),
             onClick = { offset ->
                 annotatedText.getStringAnnotations(
