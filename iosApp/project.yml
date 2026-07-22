@@ -53,9 +53,18 @@ targets:
         ENABLE_USER_SCRIPT_SANDBOXING: "NO"
         FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]: $(inherited) ../app/build/bin/iosArm64/debugFramework
         FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]: $(inherited) ../app/build/bin/iosSimulatorArm64/debugFramework
+        # ComposeApp MUST be linked explicitly, and BEFORE MapLibre. Swift's `import
+        # ComposeApp` only auto-links it (LC_LINKER_OPTION), which ld processes *after*
+        # every command-line input — so MapLibre.framework, which publicly exports its
+        # own HarfBuzz, would satisfy Skia/Skiko's hb_shape, hb_shape_full,
+        # hb_ot_font_set_funcs and hb_shape_plan_destroy. The two HarfBuzz copies have
+        # incompatible struct layouts, so the first text shaping segfaults
+        # (EXC_BAD_ACCESS on 0x4c61746e… — the 'Latn' script tag read as a pointer).
+        # Naming the static framework here puts it ahead of MapLibre on the link line,
+        # so Skiko's own HarfBuzz wins. Resolved by name via FRAMEWORK_SEARCH_PATHS
+        # above, so the right slice is picked for device vs simulator.
+        OTHER_LDFLAGS: $(inherited) -framework ComposeApp
     dependencies:
-      - framework: ../app/build/bin/iosSimulatorArm64/debugFramework/ComposeApp.framework
-        embed: false
       - package: MapLibre
         product: MapLibre
     preBuildScripts:
@@ -64,7 +73,11 @@ targets:
         script: |
           export JAVA_HOME="$HOME/Library/Java/jdk-21.0.11+10/Contents/Home"
           export ANDROID_HOME="$HOME/Library/Android/sdk"
-          "$PROJECT_DIR/../gradlew" -p "$PROJECT_DIR/.." :app:linkDebugFrameworkIosSimulatorArm64
+          if [[ "$SDK_NAME" == *simulator* ]]; then
+            "$PROJECT_DIR/../gradlew" -p "$PROJECT_DIR/.." :app:linkDebugFrameworkIosSimulatorArm64
+          else
+            "$PROJECT_DIR/../gradlew" -p "$PROJECT_DIR/.." :app:linkDebugFrameworkIosArm64
+          fi
     postBuildScripts:
       - name: Copy Compose resources into the app bundle
         basedOnDependencyAnalysis: false

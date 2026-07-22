@@ -22,12 +22,7 @@ import platform.UIKit.UIViewController
  */
 object IosPlatformContext : PlatformContext()
 
-/**
- * Compose entry point, exported to Swift as `ComposeAppKt.MainViewController()`. Provides the iOS
- * [PlatformContext] and hosts the shared [App] (commonMain). The iosApp Xcode target wraps this
- * UIViewController in SwiftUI.
- */
-fun MainViewController(): UIViewController {
+fun initializeKmpDependencies() {
     TransportServiceProvider.initialize(IosPlatformContext)
     try {
         val telemetryConfig = AppConfigLoader.getConfig().telemetry
@@ -41,6 +36,14 @@ fun MainViewController(): UIViewController {
         Log.w("MainViewController", "Failed to initialize Telemetry: ${e.message}")
     }
     LanguageManager.init(IosPlatformContext)
+}
+
+/**
+ * Compose entry point, exported to Swift as `ComposeAppKt.MainViewController()`. Provides the iOS
+ * [PlatformContext] and hosts the shared [App] (commonMain). The iosApp Xcode target wraps this
+ * UIViewController in SwiftUI.
+ */
+fun MainViewController(): UIViewController {
 
     return ComposeUIViewController {
         CompositionLocalProvider(LocalPlatformContext provides IosPlatformContext) {
