@@ -5,6 +5,9 @@ import io.ktor.client.engine.darwin.Darwin
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import platform.Foundation.NSBundle
+import okio.FileSystem
+import okio.Path.Companion.toPath
+import platform.UIKit.popoverPresentationController
 
 actual abstract class PlatformContext
 
@@ -27,8 +30,9 @@ actual fun exportFile(context: PlatformContext, filename: String, content: Strin
         val filePath = tempDir + filename
         val url = platform.Foundation.NSURL.fileURLWithPath(filePath)
         
-        val stringContent = content as platform.Foundation.NSString
-        stringContent.writeToFile(filePath, atomically = true, encoding = platform.Foundation.NSUTF8StringEncoding, error = null)
+        FileSystem.SYSTEM.write(filePath.toPath()) {
+            writeUtf8(content)
+        }
         
         val activityViewController = platform.UIKit.UIActivityViewController(
             activityItems = listOf(url),

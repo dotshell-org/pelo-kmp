@@ -6,6 +6,7 @@ import okio.Path
 import okio.Path.Companion.toPath
 import okio.blackholeSink
 import okio.buffer
+import okio.use
 
 /**
  * okio-backed file operations for the downloaded-dataset lifecycle, rooted at a
