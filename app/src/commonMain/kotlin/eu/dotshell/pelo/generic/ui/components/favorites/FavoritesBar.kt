@@ -36,10 +36,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import eu.dotshell.pelo.generic.data.models.stops.Favorite
 import androidx.compose.material3.MaterialTheme
 
@@ -58,8 +56,9 @@ fun FavoritesBar(
     modifier: Modifier = Modifier
 ) {
     var favoriteToDelete by remember { mutableStateOf<Favorite?>(null) }
-    val chipTextStyle = TextStyle(
-        fontSize = 14.sp,
+    // Derive from the Material typography (labelLarge = 14.sp Medium) so the chips
+    // inherit the app font; a bare TextStyle(...) would fall back to the system font.
+    val chipTextStyle = MaterialTheme.typography.labelLarge.copy(
         fontWeight = FontWeight.Medium,
         color = MaterialTheme.colorScheme.onSurface
     )

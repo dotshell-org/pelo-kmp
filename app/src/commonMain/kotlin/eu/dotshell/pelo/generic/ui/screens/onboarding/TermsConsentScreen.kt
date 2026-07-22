@@ -1,8 +1,6 @@
 package eu.dotshell.pelo.generic.ui.screens.onboarding
 
 import androidx.compose.foundation.Image
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import eu.dotshell.pelo.generic.ui.theme.isAppInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,7 +36,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -95,23 +92,12 @@ fun TermsConsentScreen(
                     .padding(top = 8.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                // In light mode the logo is shown in negative so it reads on the light background.
-                val invertColorFilter = remember {
-                    ColorFilter.colorMatrix(
-                        ColorMatrix(
-                            floatArrayOf(
-                                -1f, 0f, 0f, 0f, 255f,
-                                0f, -1f, 0f, 0f, 255f,
-                                0f, 0f, -1f, 0f, 255f,
-                                0f, 0f, 0f, 1f, 0f,
-                            )
-                        )
-                    )
-                }
+                // Icon-only mark (no wordmark), theme-specific: white-on-dark / dark-on-white.
                 Image(
-                    painter = drawableProvider.getPainter("ic_launcher_foreground"),
+                    painter = drawableProvider.getPainter(
+                        if (isAppInDarkTheme()) "pelo_mark_dark" else "pelo_mark_light"
+                    ),
                     contentDescription = "Logo Pelo",
-                    colorFilter = if (isAppInDarkTheme()) null else invertColorFilter,
                     modifier = Modifier
                         .size(160.dp)
                         .padding(bottom = 20.dp)
@@ -205,10 +191,8 @@ private fun ConsentCheckboxRow(
         ClickableText(
             text = annotatedText,
             modifier = Modifier.weight(1f),
-            style = TextStyle(
-                color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 14.sp,
-                lineHeight = 20.sp
+            style = MaterialTheme.typography.bodyMedium.copy(
+                color = MaterialTheme.colorScheme.onSurface
             ),
             onClick = { offset ->
                 annotatedText.getStringAnnotations(

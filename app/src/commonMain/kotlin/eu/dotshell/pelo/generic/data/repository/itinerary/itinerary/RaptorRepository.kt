@@ -19,7 +19,6 @@ import io.raptor.Location
 import io.raptor.PeriodData
 import io.raptor.RaptorLibrary
 import io.raptor.WalkingParams
-import io.raptor.data.NetworkLoader
 import io.raptor.model.Route
 import io.raptor.model.Stop
 import kotlinx.coroutines.Dispatchers
@@ -91,14 +90,6 @@ class RaptorRepository private constructor(private val context: PlatformContext)
     // Performance: Cache of normalized stop names to avoid repeated normalization during search
     private var normalizedStopNames: Map<Stop, String> = emptyMap()
     private var stopIdsByNormalizedName: Map<String, List<Int>> = emptyMap()
-    // Lazy-loaded per period to avoid reading all 8 binary files at startup.
-    // Copy-on-write @Volatile maps (no ConcurrentHashMap in commonMain): reads are lock-free;
-    // a write replaces the whole immutable map. A benign race just re-loads a period (idempotent).
-    @Volatile
-    private var routesByPeriod: Map<String, List<Route>> = emptyMap()
-    @Volatile
-    private var stopsByPeriod: Map<String, List<Stop>> = emptyMap()
-
     // Performance: Cached result of checkAssetsAvailable() to avoid repeated file I/O
     @Volatile
     private var cachedAssetsAvailable: Boolean? = null
@@ -215,13 +206,15 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                 ).map { periodId ->
                     PeriodData(
                         periodId = periodId,
-                        stopsBytes = datasetStore.readBytes("raptor/stops_$periodId.bin"),
-                        routesBytes = datasetStore.readBytes("raptor/routes_$periodId.bin")
+                        // Lazy providers (raptor-kmp 2.1.0+): only the active period's .bin files
+                        // are read and its Network built at cold start; the other schedule periods
+                        // are read on demand when first selected/queried.
+                        stopsProvider = { datasetStore.readBytes("raptor/stops_$periodId.bin") },
+                        routesProvider = { datasetStore.readBytes("raptor/routes_$periodId.bin") }
                     )
                 }
 
                 raptorLibrary = RaptorLibrary(periods)
-                // routesByPeriod and stopsByPeriod are now lazy-loaded per period on first access
 
                 // Set initial period based on current day
                 updatePeriodForDate(Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date)
@@ -243,14 +236,9 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                     )
                 }
 
-                // Pre-heat current period caches to avoid lazy file I/O on first
-                // getDesserteForStop call (which happens during stop enrichment at startup).
-                val currentPeriod = raptorLibrary?.getCurrentPeriod()
-                if (currentPeriod != null) {
-                    getRoutesForPeriod(currentPeriod)
-                    getStopsForPeriod(currentPeriod)
-                }
-
+                // The current period's Network is already built (searchStopsByName above), so
+                // getRoutesForPeriod/getStopsForPeriod now reuse the engine's parsed data on the
+                // first getDesserteForStop call — no separate pre-heat parse needed.
                 isInitialized = true
 
                 // The active dataset loaded cleanly: clear its init-failure count so a
@@ -352,19 +340,14 @@ class RaptorRepository private constructor(private val context: PlatformContext)
         }
     }
 
-    private fun getRoutesForPeriod(periodId: String): List<Route> {
-        routesByPeriod[periodId]?.let { return it }
-        val loaded = NetworkLoader.loadRoutes(datasetStore.readBytes("raptor/routes_$periodId.bin"))
-        routesByPeriod = routesByPeriod + (periodId to loaded)
-        return loaded
-    }
+    // Delegate to the engine's already-parsed per-period data (built lazily on first access) so the
+    // current period is never parsed twice — the RaptorLibrary Network IS the cache. For a
+    // non-active period this triggers its deferred Network build on demand (e.g. line filter).
+    private fun getRoutesForPeriod(periodId: String): List<Route> =
+        raptorLibrary?.getRoutes(periodId) ?: emptyList()
 
-    private fun getStopsForPeriod(periodId: String): List<Stop> {
-        stopsByPeriod[periodId]?.let { return it }
-        val loaded = NetworkLoader.loadStops(datasetStore.readBytes("raptor/stops_$periodId.bin"))
-        stopsByPeriod = stopsByPeriod + (periodId to loaded)
-        return loaded
-    }
+    private fun getStopsForPeriod(periodId: String): List<Stop> =
+        raptorLibrary?.getStops(periodId) ?: emptyList()
 
     /**
      * Distinct route names of the school-term weekday network (the superset
