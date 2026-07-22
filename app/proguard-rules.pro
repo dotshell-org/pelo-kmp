@@ -157,3 +157,8 @@
 -keep class org.maplibre.android.style.sources.GeoJsonOptions { *; }
 -keep class org.maplibre.android.style.sources.GeoJsonSource { *; }
 -dontwarn org.maplibre.android.**
+
+# ProfileInstaller must survive R8 (full mode + strict keep rules here) intact, or its
+# ProfileInstallReceiver answers install/skip broadcasts with result=0 and the packaged Baseline
+# Profile never gets installed — silently, in real release builds, not just macrobenchmarks.
+-keep class androidx.profileinstaller.** { *; }
