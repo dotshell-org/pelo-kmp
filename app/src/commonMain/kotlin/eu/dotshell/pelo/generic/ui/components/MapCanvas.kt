@@ -70,6 +70,11 @@ private const val EMPTY_FEATURE_COLLECTION = """{"type":"FeatureCollection","fea
 private const val STOP_RENDER_MIN_ZOOM = 12.0
 private const val BUS_RENDER_MIN_ZOOM = 16.0
 
+// Default light style whose descriptor is also bundled (composeResources/files/positron.json,
+// kept byte-identical to the remote). MapCanvas renders it from the bundle to skip the cold-start
+// descriptor fetch; the URL stays the offline-download key in config.json's mapStyles.
+private const val BUNDLED_POSITRON_STYLE_URL = "https://tiles.openfreemap.org/styles/positron"
+
 /**
  * Cross-platform map canvas built on maplibre-compose (declarative).
  *
@@ -304,8 +309,17 @@ fun MapCanvas(
         else null
 
     val baseStyle = remember(styleUrl, context) {
-        if (styleUrl.startsWith("asset://")) {
-            val assetName = styleUrl.removePrefix("asset://")
+        // Styles shipped as a local descriptor render from the bundled JSON so cold start skips the
+        // style-descriptor network fetch. `asset://` styles carry the file name directly; the
+        // default `positron` keeps its http URL in config (authoritative for offline tile download,
+        // and MapLibre still serves offline-cached tiles matched by tile URL) but is mapped to its
+        // bundled descriptor here. Falls back to the network URL if the asset can't be read.
+        val assetName = when {
+            styleUrl.startsWith("asset://") -> styleUrl.removePrefix("asset://")
+            styleUrl == BUNDLED_POSITRON_STYLE_URL -> "positron.json"
+            else -> null
+        }
+        if (assetName != null) {
             val fileSystem = FileSystem(context)
             runCatching {
                 val json = fileSystem.readAsset(assetName)
