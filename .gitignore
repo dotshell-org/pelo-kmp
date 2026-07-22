@@ -26,6 +26,7 @@ scripts/.venv
 
 .kotlin
 app/build
+baselineprofile/build
 
 # iOS / XcodeGen — regenerate the project with:
 #   /tmp/xcodegen-dist/xcodegen/bin/xcodegen generate --spec iosApp/project.yml
