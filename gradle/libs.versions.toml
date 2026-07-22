@@ -34,6 +34,9 @@ kotlinxDatetime = "0.6.2"
 kamelImage = "1.0.5"
 okhttp = "4.12.0"
 okio = "3.9.1"
+benchmark = "1.5.0-alpha07"
+uiautomator = "2.4.0"
+testRunner = "1.7.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -66,6 +69,9 @@ material = { group = "com.google.android.material", name = "material", version.r
 google-play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
 raptor-kt = { group = "eu.dotshell", name = "raptor-kmp", version.ref = "raptorKt" }
 androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileinstaller" }
+androidx-benchmark-macro-junit4 = { group = "androidx.benchmark", name = "benchmark-macro-junit4", version.ref = "benchmark" }
+androidx-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "uiautomator" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "testRunner" }
 androidx-compose-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }
 transport-runtime = { group = "com.google.android.datatransport", name = "transport-runtime", version.ref = "transportRuntime" }
 androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics", version.ref = "uiGraphics" }
@@ -95,3 +101,5 @@ kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref 
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
+android-test = { id = "com.android.test", version.ref = "agp" }
+baselineprofile = { id = "androidx.baselineprofile", version.ref = "benchmark" }
