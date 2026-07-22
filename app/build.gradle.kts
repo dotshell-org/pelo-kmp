@@ -125,6 +125,17 @@ compose.resources {
     generateResClass = always
 }
 
+// Compose compiler stability/skippability reports — off by default (they add build overhead).
+// Enable to hunt recomposition hotspots; output lands in app/build/compose_compiler/:
+//   ./gradlew :app:assembleDebug -PcomposeCompilerReports=true
+composeCompiler {
+    if (project.findProperty("composeCompilerReports") == "true") {
+        val dir = layout.buildDirectory.dir("compose_compiler")
+        reportsDestination.set(dir)
+        metricsDestination.set(dir)
+    }
+}
+
 android {
     signingConfigs {
         create("release") {
