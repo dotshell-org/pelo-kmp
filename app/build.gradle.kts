@@ -128,9 +128,9 @@ compose.resources {
 android {
     signingConfigs {
         create("release") {
-            storeFile = rootProject.file("pelotcl.jks")
+            storeFile = file("/home/tristan/Pelo.jks")
             storePassword = localProperties.getProperty("RELEASE_STORE_PASSWORD") ?: ""
-            keyAlias = "key0"
+            keyAlias = localProperties.getProperty("RELEASE_KEY_ALIAS") ?: "pelo-kmp"
             keyPassword = localProperties.getProperty("RELEASE_KEY_PASSWORD") ?: ""
         }
     }
@@ -150,7 +150,7 @@ android {
         applicationId = "eu.dotshell.pelo"
         minSdk = 24
         targetSdk = 36
-        versionCode = 5
+        versionCode = 6
         versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
