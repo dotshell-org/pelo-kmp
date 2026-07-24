@@ -40,8 +40,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.data.models.ui.AllSchedulesInfo
-import eu.dotshell.pelo.generic.ui.theme.Orange500
-import eu.dotshell.pelo.generic.ui.theme.Red500
+import eu.dotshell.pelo.generic.ui.theme.Amber500
+import eu.dotshell.pelo.generic.ui.theme.AccentColor
 import eu.dotshell.pelo.generic.utils.LineColorHelper
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.platform.DrawableProvider
@@ -68,8 +68,8 @@ private fun getAllDayScheduleColor(hour: String, minute: String, defaultColor: C
 
     return when {
         diffMinutes < 0 -> Color.Gray
-        diffMinutes < 2 -> Red500
-        diffMinutes < 15 -> Orange500
+        diffMinutes < 2 -> AccentColor
+        diffMinutes < 15 -> Amber500
         else -> defaultColor
     }
 }

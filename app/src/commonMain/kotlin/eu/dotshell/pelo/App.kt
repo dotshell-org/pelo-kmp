@@ -140,6 +140,9 @@ import eu.dotshell.pelo.generic.ui.screens.settings.about.CreditsScreen
 import eu.dotshell.pelo.generic.ui.screens.settings.about.LegalScreen
 
 import eu.dotshell.pelo.generic.ui.theme.AccentColor
+import eu.dotshell.pelo.generic.ui.theme.AccentColorShade
+import eu.dotshell.pelo.generic.ui.theme.Sand200
+import eu.dotshell.pelo.generic.ui.theme.Sand400
 import eu.dotshell.pelo.generic.ui.theme.bottomSheetContainerColor
 import eu.dotshell.pelo.generic.ui.theme.floatingControlBorder
 import eu.dotshell.pelo.generic.ui.theme.isAppInDarkTheme
@@ -1319,11 +1322,11 @@ private fun PlanContent(
                                     }
 
                                     // Draw North halves
-                                    drawPath(northLeftPath, Color(0xFFEF4444))      // Bright Red
-                                    drawPath(northRightPath, Color(0xFFDC2626)) // Darker Red for shadow
+                                    drawPath(northLeftPath, AccentColor)        // Brand orange
+                                    drawPath(northRightPath, AccentColorShade)  // Darker orange for shadow
 
                                     // Draw South halves
-                                    drawPath(southLeftPath, Color(0xFFE5E7EB))      // Light grey
+                                    drawPath(southLeftPath, Sand200)            // Light sand
                                     drawPath(southRightPath, Color.White)       // Pure white for highlight
                                 }
                             }
@@ -1429,11 +1432,11 @@ private fun PlanContent(
                             )
 
                             val buttonColor = when {
-                                hasVehicles -> Color(0xFFEF4444)
-                                isActiveNoVehicles -> Color(0xFF9CA3AF)
+                                hasVehicles -> AccentColor
+                                isActiveNoVehicles -> Sand400
                                 else -> MaterialTheme.colorScheme.surface
                             }
-                            // White reads on the red/grey active states; onSurface on the themed idle state.
+                            // White reads on the orange/sand active states; onSurface on the themed idle state.
                             val buttonContentColor = if (hasVehicles || isActiveNoVehicles) Color.White else MaterialTheme.colorScheme.onSurface
 
                             Row(

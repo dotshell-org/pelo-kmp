@@ -76,8 +76,8 @@ import eu.dotshell.pelo.generic.data.models.realtime.alerts.official.TrafficAler
 import eu.dotshell.pelo.generic.data.telemetry.TelemetryEvent
 import eu.dotshell.pelo.generic.data.telemetry.emitTelemetryEvent
 import eu.dotshell.pelo.generic.ui.theme.Green500
-import eu.dotshell.pelo.generic.ui.theme.Orange500
-import eu.dotshell.pelo.generic.ui.theme.Red500
+import eu.dotshell.pelo.generic.ui.theme.Amber500
+import eu.dotshell.pelo.generic.ui.theme.AccentColor
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportLinesUiState
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModelInterface
 import eu.dotshell.pelo.generic.utils.LineColorHelper
@@ -126,8 +126,8 @@ private fun getScheduleColorBasedOnTime(scheduleTime: String): Color {
         }
 
         return when (diffMinutes) {
-            in 0..<2 -> Red500
-            in 2..<15 -> Orange500
+            in 0..<2 -> AccentColor
+            in 2..<15 -> Amber500
             else -> Green500
         }
     } catch (_: Exception) {

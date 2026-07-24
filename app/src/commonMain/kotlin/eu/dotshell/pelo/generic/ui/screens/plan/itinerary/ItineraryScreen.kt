@@ -73,6 +73,9 @@ import eu.dotshell.pelo.generic.data.models.itinerary.TimeMode
 import eu.dotshell.pelo.generic.ui.theme.AccentColor
 import eu.dotshell.pelo.generic.ui.theme.Gray700
 import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
+import eu.dotshell.pelo.generic.ui.theme.Sand50
+import eu.dotshell.pelo.generic.ui.theme.Sand100
+import eu.dotshell.pelo.generic.ui.theme.Sand200
 import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
 import eu.dotshell.pelo.generic.utils.LineColorHelper
 import kotlinx.datetime.Clock
@@ -108,16 +111,16 @@ fun CompactJourneyCard(
         if (useLightColors) PrimaryColor else SecondaryColor
     }
     val secondaryTextColor = remember(useLightColors) {
-        if (useLightColors) Color(0xFF4B5563) else SecondaryColor.copy(alpha = 0.7f)
+        if (useLightColors) PrimaryColor else SecondaryColor.copy(alpha = 0.7f)
     }
     val chipBackgroundColor = remember(useLightColors) {
-        if (useLightColors) Color(0xFFF3F4F6) else SecondaryColor.copy(alpha = 0.15f)
+        if (useLightColors) Sand100 else SecondaryColor.copy(alpha = 0.15f)
     }
     val baseBackgroundColor = remember(useLightColors) {
-        if (useLightColors) Color(0xFFF9FAFB) else SecondaryColor.copy(alpha = 0.1f)
+        if (useLightColors) Sand50 else SecondaryColor.copy(alpha = 0.1f)
     }
     val pressedColor = remember(useLightColors) {
-        if (useLightColors) Color(0xFFF3F4F6) else SecondaryColor.copy(alpha = 0.16f)
+        if (useLightColors) Sand100 else SecondaryColor.copy(alpha = 0.16f)
     }
     val backgroundColor by animateColorAsState(
         targetValue = if (isPressed) pressedColor else baseBackgroundColor,
@@ -223,7 +226,7 @@ fun CompactJourneyCard(
                     journey.legs.filterNot { it.isWalking }
                 }
                 val arrowTint = remember(useLightColors) {
-                    if (useLightColors) Color(0xFF6B7280) else SecondaryColor.copy(alpha = 0.5f)
+                    if (useLightColors) PrimaryColor else SecondaryColor.copy(alpha = 0.5f)
                 }
                 // Start/end walks only (address, POI or GPS endpoints; the pure-walk journey
                 // shows as a single leading chip) — mid-journey transfer walks stay hidden
@@ -327,10 +330,10 @@ private fun JourneyLegItem(
         if (useLightColors) PrimaryColor else SecondaryColor
     }
     val secondaryTextColor = remember(useLightColors) {
-        if (useLightColors) Color(0xFF4B5563) else SecondaryColor.copy(alpha = 0.7f)
+        if (useLightColors) PrimaryColor else SecondaryColor.copy(alpha = 0.7f)
     }
     val tertiaryTextColor = remember(useLightColors) {
-        if (useLightColors) Color(0xFF6B7280) else SecondaryColor.copy(alpha = 0.6f)
+        if (useLightColors) PrimaryColor else SecondaryColor.copy(alpha = 0.6f)
     }
 
     // State for expanding intermediate stops
@@ -484,7 +487,7 @@ private fun JourneyLegItem(
                                 )
                                 Text(
                                     text = stop.formatArrivalTime(),
-                                    color = if (useLightColors) Color(0xFF9CA3AF) else SecondaryColor.copy(
+                                    color = if (useLightColors) PrimaryColor else SecondaryColor.copy(
                                         alpha = 0.5f
                                     ),
                                     style = MaterialTheme.typography.bodySmall
@@ -534,9 +537,9 @@ fun JourneyDetailsSheetContent(
     val strings = StringProvider(LocalPlatformContext.current)
     val primaryTextColor = if (useLightColors) PrimaryColor else SecondaryColor
     val secondaryTextColor =
-        if (useLightColors) Color(0xFF4B5563) else SecondaryColor.copy(alpha = 0.7f)
+        if (useLightColors) PrimaryColor else SecondaryColor.copy(alpha = 0.7f)
     val chipBackgroundColor =
-        if (useLightColors) Color(0xFFF3F4F6) else SecondaryColor.copy(alpha = 0.15f)
+        if (useLightColors) Sand100 else SecondaryColor.copy(alpha = 0.15f)
     val bottomBarHeight = 72.dp
 
     // Memoize formatted duration to avoid recalculation on recomposition
@@ -718,19 +721,19 @@ fun TimeSelectionRow(
 ) {
     val strings = StringProvider(LocalPlatformContext.current)
     val containerColor = remember(useLightColors) {
-        if (useLightColors) Color(0xFFF9FAFB) else SecondaryColor.copy(alpha = 0.1f)
+        if (useLightColors) Sand50 else SecondaryColor.copy(alpha = 0.1f)
     }
     val selectedModeBackground = remember(useLightColors) {
-        if (useLightColors) Color(0xFFE5E7EB) else SecondaryColor.copy(alpha = 0.2f)
+        if (useLightColors) Sand200 else SecondaryColor.copy(alpha = 0.2f)
     }
     val pickerBackground = remember(useLightColors) {
-        if (useLightColors) Color(0xFFF3F4F6) else SecondaryColor.copy(alpha = 0.15f)
+        if (useLightColors) Sand100 else SecondaryColor.copy(alpha = 0.15f)
     }
     val primaryTextColor = remember(useLightColors) {
         if (useLightColors) PrimaryColor else SecondaryColor
     }
     val secondaryTextColor = remember(useLightColors) {
-        if (useLightColors) Color(0xFF4B5563) else SecondaryColor.copy(alpha = 0.6f)
+        if (useLightColors) PrimaryColor else SecondaryColor.copy(alpha = 0.6f)
     }
 
     Column(

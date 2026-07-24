@@ -298,6 +298,9 @@ val Rose950 = Color(0xFF4C0519)
  */
 val BrandOrange = Color(0xFFB26633)
 
+/** [BrandOrange] darkened ~20%, for the shaded half of two-tone marks such as the compass needle. */
+val BrandOrangeDark = Color(0xFF8E5229)
+
 /**
  * The sand ramp that replaces the neutral grays on light surfaces (filled fields, containers,
  * chips) and tints the light basemap. [Sand50]/[Sand100]/[Sand200]/[Sand300] are the four values
@@ -319,6 +322,7 @@ val Sand400 = Color(0xFFC5AA6D)
 val PrimaryColor = Color.Black
 val SecondaryColor = Color.White
 val AccentColor = BrandOrange
+val AccentColorShade = BrandOrangeDark
 
 // Neutral (non-bluish) dark gray used for bottom sheets in dark mode, so they read as a
 // distinct surface above the pure-black navbar and map rather than blending into them.

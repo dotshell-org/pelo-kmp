@@ -162,7 +162,9 @@ fun AlertReportBottomSheet(
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
+                        // Search affordance, not an error state: it follows the brand accent like
+                        // every other search icon in the app.
+                        tint = MaterialTheme.colorScheme.tertiary,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(12.dp))

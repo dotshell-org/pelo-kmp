@@ -381,7 +381,8 @@ suspend fun toItinerariesGeoJson(
             for ((journeyIndex, journey) in journeysToDraw.withIndex()) {
                 for ((legIndex, leg) in journey.legs.withIndex()) {
                     val lineColor = if (leg.isWalking) {
-                        "#6B7280"
+                        // Walking legs are drawn in black, like every other neutral map pictogram.
+                        "#000000"
                     } else {
                         LineColorHelper.getColorForLineStringAux(leg.routeName ?: "")
                     }

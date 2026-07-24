@@ -3,8 +3,8 @@ package eu.dotshell.pelo.generic.utils.schedule
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import eu.dotshell.pelo.generic.ui.theme.Green500
-import eu.dotshell.pelo.generic.ui.theme.Orange500
-import eu.dotshell.pelo.generic.ui.theme.Red500
+import eu.dotshell.pelo.generic.ui.theme.Amber500
+import eu.dotshell.pelo.generic.ui.theme.AccentColor
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -49,9 +49,11 @@ object DepartureManager {
 
         if (diff < 0) return Green500
 
+        // Urgency ramp: the charte turns the imminent tier orange, so the middle tier moves to
+        // amber to stay distinguishable from it at small text sizes.
         return when (diff) {
-            in 0..1 -> Red500
-            in 2..14 -> Orange500
+            in 0..1 -> AccentColor
+            in 2..14 -> Amber500
             else -> Green500
         }
     }

@@ -132,7 +132,7 @@ fun MapCanvas(
         object : Painter() {
             override val intrinsicSize: Size = Size(14f, 14f)
             override fun DrawScope.onDraw() {
-                drawCircle(color = Color(0xFF1F2937))
+                drawCircle(color = Color.Black)
             }
         }
     }
@@ -513,7 +513,7 @@ fun MapCanvas(
                     minZoom = if (itineraryGeoJson != null) 12.5f else 16f,
                     filter = feature["stop_priority"].convertToString() eq const("0"),
                     radius = const(3.dp),
-                    color = const(Color(0xFF6B7280)),
+                    color = const(Color.Black),
                     onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
                 )
                 CircleLayer(
@@ -522,7 +522,7 @@ fun MapCanvas(
                     minZoom = if (itineraryGeoJson != null) 12.5f else 13f,
                     filter = feature["stop_priority"].convertToString() eq const("1"),
                     radius = const(4.dp),
-                    color = const(Color(0xFF1F2937)),
+                    color = const(Color.Black),
                     onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
                 )
                 CircleLayer(
@@ -531,7 +531,7 @@ fun MapCanvas(
                     minZoom = if (itineraryGeoJson != null) 12.5f else 0f,
                     filter = feature["stop_priority"].convertToString() eq const("2"),
                     radius = const(5.dp),
-                    color = const(Color(0xFF1F2937)),
+                    color = const(Color.Black),
                     onClick = { f -> onStop(f.firstOrNull()?.properties?.get("nom")?.jsonPrimitive?.contentOrNull) },
                 )
             }
