@@ -349,7 +349,7 @@ private fun SettingsMenuRow(
     Row(
         modifier = rowModifier
             .background(pressedBackgroundColor)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = 18.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(
@@ -359,7 +359,7 @@ private fun SettingsMenuRow(
                 text = title,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.SemiBold
             )
             if (!subtitle.isNullOrBlank()) {
                 Text(

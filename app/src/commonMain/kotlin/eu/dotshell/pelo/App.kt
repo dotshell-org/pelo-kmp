@@ -1491,7 +1491,7 @@ private fun PlanContent(
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
                                         text = "LIVE",
-                                        fontWeight = FontWeight.Medium,
+                                        fontWeight = FontWeight.Bold,
                                         color = buttonContentColor,
                                         fontSize = 14.sp
                                     )
