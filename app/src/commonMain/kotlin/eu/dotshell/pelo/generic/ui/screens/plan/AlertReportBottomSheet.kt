@@ -21,6 +21,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
@@ -63,14 +64,6 @@ import eu.dotshell.pelo.generic.data.models.search.LineSearchResult
 import eu.dotshell.pelo.generic.data.models.search.StationSearchResult
 import eu.dotshell.pelo.generic.ui.components.search.TransportSearchBar
 import eu.dotshell.pelo.generic.data.models.search.TransportSearchContent
-import eu.dotshell.pelo.generic.ui.theme.Gray800
-import eu.dotshell.pelo.generic.ui.theme.Gray900
-import eu.dotshell.pelo.generic.ui.theme.Red500
-import eu.dotshell.pelo.generic.ui.theme.Red600
-import eu.dotshell.pelo.generic.ui.theme.Red700
-import eu.dotshell.pelo.generic.ui.theme.Red800
-import eu.dotshell.pelo.generic.ui.theme.Red900
-import eu.dotshell.pelo.generic.ui.theme.Red950
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModelInterface
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.generic.utils.LineColorHelper
@@ -82,19 +75,23 @@ import eu.dotshell.pelo.platform.randomId
 import eu.dotshell.pelo.platform.showToast
 import kotlinx.coroutines.launch
 
-enum class AlertType(val id: String, val label: String, val icon: ImageVector, val color: Color, val isStop: Boolean, val isLine: Boolean) {
+/**
+ * The reportable alert types. They no longer carry a colour: the charte gives every report tile
+ * the same sand container and a black pictogram, so the type is told apart by its icon and label.
+ */
+enum class AlertType(val id: String, val label: String, val icon: ImageVector, val isStop: Boolean, val isLine: Boolean) {
     // STOP_ALERT_TYPES=closure,delay,elevator,crowding,works,strike,fire
     // LINE_ALERT_TYPES=interruption,congestion,works,strike
-    
-    CLOSURE("closure", "Arrêt Fermé", Icons.Default.Block, Red500, isStop = true, isLine = false),
-    DELAY("delay", "Retard", Icons.Default.Schedule, Red600, isStop = true, isLine = false),
-    ELEVATOR("elevator", "Ascenseur HS", Icons.Default.Elevator, Red700, isStop = true, isLine = false),
-    CROWDING("crowding", "Forte Foule", Icons.Default.Groups, Red800, isStop = true, isLine = false),
-    WORKS("works", "Travaux", Icons.Default.Engineering, Red900, isStop = true, isLine = true),
-    STRIKE("strike", "Grève", Icons.Default.EmojiPeople, Red950, isStop = true, isLine = true),
-    FIRE("fire", "Incendie", Icons.Default.Whatshot, Color.Black, isStop = true, isLine = false),
-    INTERRUPTION("interruption", "Interruption", Icons.Default.Pause, Gray900, isStop = false, isLine = true),
-    CONGESTION("congestion", "Traffic Elevé", Icons.AutoMirrored.Filled.TrendingUp, Gray800, isStop = false, isLine = true)
+
+    CLOSURE("closure", "Arrêt Fermé", Icons.Default.Block, isStop = true, isLine = false),
+    DELAY("delay", "Retard", Icons.Default.Schedule, isStop = true, isLine = false),
+    ELEVATOR("elevator", "Ascenseur HS", Icons.Default.Elevator, isStop = true, isLine = false),
+    CROWDING("crowding", "Forte Foule", Icons.Default.Groups, isStop = true, isLine = false),
+    WORKS("works", "Travaux", Icons.Default.Engineering, isStop = true, isLine = true),
+    STRIKE("strike", "Grève", Icons.Default.EmojiPeople, isStop = true, isLine = true),
+    FIRE("fire", "Incendie", Icons.Default.Whatshot, isStop = true, isLine = false),
+    INTERRUPTION("interruption", "Interruption", Icons.Default.Pause, isStop = false, isLine = true),
+    CONGESTION("congestion", "Traffic Elevé", Icons.AutoMirrored.Filled.TrendingUp, isStop = false, isLine = true)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -457,15 +454,15 @@ fun AlertButton(
         Box(
             modifier = Modifier
                 .size(64.dp)
-                .clip(CircleShape)
-                .background(alertType.color),
+                .clip(RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = alertType.icon,
                 contentDescription = null,
                 modifier = Modifier.size(32.dp),
-                tint = Color.White
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
         Spacer(modifier = Modifier.height(8.dp))
