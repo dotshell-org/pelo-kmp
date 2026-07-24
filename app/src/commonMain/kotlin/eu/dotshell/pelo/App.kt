@@ -176,6 +176,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.maplibre.spatialk.geojson.Position
+import eu.dotshell.pelo.generic.data.repository.geocoding.GeocodingRepository
 
 @Composable
 fun App(
@@ -449,6 +450,15 @@ private fun RootScaffold(
     var itineraryActive by remember { mutableStateOf(false) }
     var activeJourneys by remember { mutableStateOf<List<JourneyResult>>(emptyList()) }
     var selectedJourney by remember { mutableStateOf<JourneyResult?>(null) }
+    // Marker for a point the user picked by holding the map. Cleared with the itinerary.
+    var droppedPin by remember { mutableStateOf<Position?>(null) }
+    // Resolved in composition: the string accessor is @Composable and cannot be called from
+    // the coroutine that names the pin.
+    val droppedPinLabel = StringProvider(context)["dropped_pin"]
+
+    LaunchedEffect(itineraryActive) {
+        if (!itineraryActive) droppedPin = null
+    }
 
     LaunchedEffect(itineraryActive) {
         if (itineraryActive) {
@@ -610,6 +620,26 @@ private fun RootScaffold(
             lon = address.lon
         )
         itineraryActive = true
+    }
+
+    /**
+     * Drops a pin where the user held the map and routes to it. The point is named by reverse
+     * geocoding, which is best-effort: a failure (offline, rate limited, nowhere in particular)
+     * falls back to a generic label rather than leaving the user with nothing.
+     */
+    fun startItineraryToDroppedPin(latitude: Double, longitude: Double) {
+        droppedPin = Position(latitude = latitude, longitude = longitude)
+        scope.launch {
+            val geocoded = GeocodingRepository.getInstance().reverseGeocode(latitude, longitude)
+            startItineraryToAddress(
+                geocoded ?: AddressSearchResult(
+                    label = droppedPinLabel,
+                    detail = null,
+                    lat = latitude,
+                    lon = longitude,
+                )
+            )
+        }
     }
 
     LaunchedEffect(selectedStation?.nom, selectedLine?.currentStationName, stops) {
@@ -778,6 +808,8 @@ private fun RootScaffold(
                         },
                         onItinerarySelected = { name -> startItinerary(name) },
                         onAddressItinerarySelected = { address -> startItineraryToAddress(address) },
+                        onMapLongPress = { lat, lon -> startItineraryToDroppedPin(lat, lon) },
+                        droppedPin = droppedPin,
                         isCenteredOnUser = isCenteredOnUser,
                         onFabClick = { isAtTarget ->
                             if (isAtTarget) {
@@ -1137,6 +1169,8 @@ private fun PlanContent(
     onAddFavoriteClick: () -> Unit,
     onItinerarySelected: (String) -> Unit,
     onAddressItinerarySelected: (AddressSearchResult) -> Unit,
+    onMapLongPress: (latitude: Double, longitude: Double) -> Unit,
+    droppedPin: Position?,
     isCenteredOnUser: Boolean,
     onFabClick: (Boolean) -> Unit,
     onFabReset: () -> Unit,
@@ -1263,6 +1297,8 @@ private fun PlanContent(
                             )
                         )
                     },
+                    onMapLongPress = onMapLongPress,
+                    droppedPin = droppedPin,
                     onMapMoved = onFabReset,
                 )
 

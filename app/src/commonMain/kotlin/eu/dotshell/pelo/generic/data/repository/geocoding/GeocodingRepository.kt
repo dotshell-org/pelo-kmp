@@ -42,6 +42,24 @@ class GeocodingRepository private constructor() {
         }
     }
 
+    /**
+     * Names the coordinate the user dropped a pin on. Returns null when the geocoder has nothing
+     * usable — offline, rate limited, or a point in the middle of nowhere — and the caller is
+     * expected to fall back to a generic label rather than block on it.
+     */
+    suspend fun reverseGeocode(latitude: Double, longitude: Double): AddressSearchResult? =
+        withContext(ioDispatcher) {
+            try {
+                withTimeout(REQUEST_TIMEOUT_MS) {
+                    val response = client.reverse(latitude, longitude)
+                    response.features.firstNotNullOfOrNull(::photonFeatureToResult)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Reverse geocoding failed: ${e::class.simpleName}")
+                null
+            }
+        }
+
     companion object {
         private const val TAG = "GeocodingRepository"
         private const val MIN_QUERY_LENGTH = 3

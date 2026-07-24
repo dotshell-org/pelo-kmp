@@ -24,6 +24,7 @@
     <string name="alert_report_title">Signaler une alerte</string>
     <string name="alert_report_search_hint">Commencez par rechercher un arrêt ou une ligne.</string>
     <string name="nearest_stop">Arrêt le plus proche</string>
+    <string name="dropped_pin">Point sur la carte</string>
     <string name="itinerary">Itinéraire</string>
     <string name="add_to_favorites">Ajouter aux favoris</string>
     <string name="no_schedule_for_stop">Aucun horaire disponible pour cet arrêt</string>

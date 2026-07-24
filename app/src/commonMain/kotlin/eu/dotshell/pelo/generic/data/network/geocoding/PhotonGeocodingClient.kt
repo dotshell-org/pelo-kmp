@@ -44,8 +44,18 @@ class PhotonGeocodingClient {
             parameter("lon", BIAS_LON)
         }.body()
 
+    /** Nearest addressable feature to a coordinate, for naming a point picked on the map. */
+    suspend fun reverse(latitude: Double, longitude: Double, limit: Int = 1): PhotonResponse =
+        httpClient.get(REVERSE_URL) {
+            parameter("lat", latitude)
+            parameter("lon", longitude)
+            parameter("lang", "fr")
+            parameter("limit", limit)
+        }.body()
+
     companion object {
         private const val BASE_URL = "https://photon.komoot.io/api/"
+        private const val REVERSE_URL = "https://photon.komoot.io/reverse"
 
         // Location bias: results near Lyon rank first (hard filtering happens in the repository)
         private const val BIAS_LAT = 45.75

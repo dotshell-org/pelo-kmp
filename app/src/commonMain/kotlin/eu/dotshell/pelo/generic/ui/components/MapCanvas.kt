@@ -70,6 +70,13 @@ import org.maplibre.spatialk.geojson.Point
 import org.maplibre.spatialk.geojson.Geometry
 import org.maplibre.spatialk.geojson.Feature
 import org.maplibre.compose.sources.getBaseSource
+import eu.dotshell.pelo.generic.ui.theme.AccentColor
+import kotlinx.coroutines.withTimeoutOrNull
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitEachGesture
 
 private const val EMPTY_FEATURE_COLLECTION = """{"type":"FeatureCollection","features":[]}"""
 private const val STOP_RENDER_MIN_ZOOM = 12.0
@@ -96,6 +103,9 @@ private const val BASEMAP_VECTOR_SOURCE_ID = "openmaptiles"
  * neighbourhoods, suburbs, towns — and `poi` covers named points such as shops and venues.
  */
 private val BASEMAP_PLACE_SOURCE_LAYERS = listOf("place", "poi")
+
+/** How long a finger must stay still on the map before it counts as dropping a pin. */
+private const val LONG_PRESS_HOLD_MS = 2_000L
 
 /** A named basemap feature usable as an itinerary destination. */
 private data class NamedPlace(val name: String, val latitude: Double, val longitude: Double)
@@ -158,6 +168,10 @@ fun MapCanvas(
     onVehicleClick: (lineName: String) -> Unit = {},
     /** A named place or POI of the vector basemap was tapped. Never fires on Satellite. */
     onBasemapPlaceClick: (name: String, latitude: Double, longitude: Double) -> Unit = { _, _, _ -> },
+    /** The user held a finger still on the map for [LONG_PRESS_HOLD_MS]. */
+    onMapLongPress: (latitude: Double, longitude: Double) -> Unit = { _, _ -> },
+    /** Marker for a point the user dropped, drawn above the transport layers. */
+    droppedPin: Position? = null,
     onMapMoved: () -> Unit = {},
     centerOn: Position? = null,
     focusZoom: Double? = null,
@@ -389,8 +403,43 @@ fun MapCanvas(
         )
     }
 
+    // Drop-a-pin gesture. Watched in the Initial pass and never consumed, so the map still
+    // receives every pan, pinch and tap — this only notices a finger that stays put. MapLibre's
+    // own long-click fires far earlier (~500 ms) and is deliberately not used: the gesture is
+    // meant to be a deliberate hold, not something a slow tap triggers by accident.
+    val density = LocalDensity.current
+    val longPressModifier = if (interactive) {
+        Modifier.pointerInput(cameraState, onMapLongPress, density) {
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                val origin = down.position
+                val heldStill = withTimeoutOrNull(LONG_PRESS_HOLD_MS) {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val change = event.changes.firstOrNull { it.id == down.id }
+                        val abandoned = change == null ||
+                            !change.pressed ||
+                            event.changes.size > 1 ||
+                            (change.position - origin).getDistance() > viewConfiguration.touchSlop
+                        if (abandoned) break
+                    }
+                } == null
+                if (heldStill) {
+                    val projection = cameraState.projection
+                    if (projection != null) {
+                        val offset = with(density) { DpOffset(origin.x.toDp(), origin.y.toDp()) }
+                        val target = projection.positionFromScreenLocation(offset)
+                        onMapLongPress(target.latitude, target.longitude)
+                    }
+                }
+            }
+        }
+    } else {
+        Modifier
+    }
+
     MaplibreMap(
-        modifier = modifier,
+        modifier = modifier.then(longPressModifier),
         baseStyle = baseStyle,
         cameraState = cameraState,
         options = mapOptions,
@@ -428,6 +477,16 @@ fun MapCanvas(
             }
             val userSourceData = remember(userLocationGeoJson) { GeoJsonData.JsonString(userLocationGeoJson) }
             val userSource = rememberGeoJsonSource(data = userSourceData)
+
+            val droppedPinGeoJson = remember(droppedPin) {
+                if (droppedPin != null) {
+                    """{"type":"Feature","geometry":{"type":"Point","coordinates":[${droppedPin.longitude},${droppedPin.latitude}]},"properties":{}}"""
+                } else {
+                    EMPTY_FEATURE_COLLECTION
+                }
+            }
+            val droppedPinSourceData = remember(droppedPinGeoJson) { GeoJsonData.JsonString(droppedPinGeoJson) }
+            val droppedPinSource = rememberGeoJsonSource(data = droppedPinSourceData)
 
             // ------------------------------------------------------------------
             // Basemap places
@@ -676,6 +735,20 @@ fun MapCanvas(
                     source = userSource,
                     radius = const(8.dp),
                     color = const(Color(0xFF3B82F6)),
+                )
+            }
+
+            // ------------------------------------------------------------------
+            // Dropped pin — last, so it sits above every other marker.
+            // ------------------------------------------------------------------
+            if (droppedPin != null) {
+                CircleLayer(
+                    id = "dropped-pin",
+                    source = droppedPinSource,
+                    radius = const(9.dp),
+                    color = const(AccentColor),
+                    strokeColor = const(Color.White),
+                    strokeWidth = const(3.dp),
                 )
             }
         }

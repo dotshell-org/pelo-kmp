@@ -24,6 +24,7 @@
     <string name="alert_report_title">Report an alert</string>
     <string name="alert_report_search_hint">Start by searching for a stop or a line.</string>
     <string name="nearest_stop">Nearest stop</string>
+    <string name="dropped_pin">Point on the map</string>
     <string name="itinerary">Directions</string>
     <string name="add_to_favorites">Add to favorites</string>
     <string name="no_schedule_for_stop">No schedule available for this stop</string>
