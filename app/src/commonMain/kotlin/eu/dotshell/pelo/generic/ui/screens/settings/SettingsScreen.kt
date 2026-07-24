@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -28,7 +29,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -178,83 +178,86 @@ fun SettingsScreen(
             )
 
             if (isAboutMenu) {
-                SettingsMenuRow(
-                    title = strings["app_version_title"],
-                    subtitle = versionName,
-                    onClick = null,
-                    showChevron = false
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                // Timetable freshness. Absent for datasets built before the pipeline
-                // started emitting dataset.json, in which case the row is simply skipped.
-                timetableDataSubtitle?.let { subtitle ->
+                SettingsGroup {
                     SettingsMenuRow(
-                        title = strings["timetable_data_title"],
-                        subtitle = subtitle,
+                        title = strings["app_version_title"],
+                        subtitle = versionName,
                         onClick = null,
                         showChevron = false
                     )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                }
+                    SettingsGroupDivider()
+                    // Timetable freshness. Absent for datasets built before the pipeline
+                    // started emitting dataset.json, in which case the row is simply skipped.
+                    timetableDataSubtitle?.let { subtitle ->
+                        SettingsMenuRow(
+                            title = strings["timetable_data_title"],
+                            subtitle = subtitle,
+                            onClick = null,
+                            showChevron = false
+                        )
+                        SettingsGroupDivider()
+                    }
 
-                if (onCheckForUpdates != null) {
-                    val updateScope = rememberCoroutineScope()
-                    var statusKey by remember { mutableStateOf<String?>(null) }
-                    var isChecking by remember { mutableStateOf(false) }
-                    // Key held as plain state; resolved to text here, in composition.
-                    val statusSubtitle = statusKey?.let { strings[it] }
-                    SettingsMenuRow(
-                        title = strings["timetable_check_updates"],
-                        subtitle = statusSubtitle,
-                        onClick = if (isChecking) null else {
-                            {
-                                isChecking = true
-                                statusKey = "timetable_checking"
-                                updateScope.launch {
-                                    statusKey = onCheckForUpdates()
-                                    isChecking = false
+                    if (onCheckForUpdates != null) {
+                        val updateScope = rememberCoroutineScope()
+                        var statusKey by remember { mutableStateOf<String?>(null) }
+                        var isChecking by remember { mutableStateOf(false) }
+                        // Key held as plain state; resolved to text here, in composition.
+                        val statusSubtitle = statusKey?.let { strings[it] }
+                        SettingsMenuRow(
+                            title = strings["timetable_check_updates"],
+                            subtitle = statusSubtitle,
+                            onClick = if (isChecking) null else {
+                                {
+                                    isChecking = true
+                                    statusKey = "timetable_checking"
+                                    updateScope.launch {
+                                        statusKey = onCheckForUpdates()
+                                        isChecking = false
+                                    }
                                 }
-                            }
-                        },
-                        showChevron = false
+                            },
+                            showChevron = false
+                        )
+                        SettingsGroupDivider()
+                    }
+                    SettingsMenuRow(
+                        title = strings["legal_title"],
+                        onClick = onLegalClick
                     )
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    SettingsGroupDivider()
+                    SettingsMenuRow(
+                        title = strings["credits_title"],
+                        onClick = onCreditsClick
+                    )
+                    SettingsGroupDivider()
+                    SettingsMenuRow(
+                        title = strings["contact_title"],
+                        onClick = onContactClick
+                    )
                 }
-                SettingsMenuRow(
-                    title = strings["legal_title"],
-                    onClick = onLegalClick
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                SettingsMenuRow(
-                    title = strings["credits_title"],
-                    onClick = onCreditsClick
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                SettingsMenuRow(
-                    title = strings["contact_title"],
-                    onClick = onContactClick
-                )
             } else {
-                SettingsMenuRow(
-                    title = strings["itinerary"],
-                    onClick = onItineraryClick
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                SettingsMenuRow(
-                    title = strings["theme_settings_title"],
-                    onClick = onThemeClick
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                SettingsMenuRow(
-                    title = strings["privacy_title"],
-                    onClick = onTelemetryClick
-                )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                SettingsMenuRow(
-                    title = strings["about_title"],
-                    onClick = onAboutClick
-                )
-
+                SettingsGroup {
+                    SettingsMenuRow(
+                        title = strings["itinerary"],
+                        onClick = onItineraryClick
+                    )
+                    SettingsGroupDivider()
+                    SettingsMenuRow(
+                        title = strings["theme_settings_title"],
+                        onClick = onThemeClick
+                    )
+                    SettingsGroupDivider()
+                    SettingsMenuRow(
+                        title = strings["privacy_title"],
+                        onClick = onTelemetryClick
+                    )
+                    SettingsGroupDivider()
+                    SettingsMenuRow(
+                        title = strings["about_title"],
+                        onClick = onAboutClick
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -276,6 +279,39 @@ fun SettingsScreen(
     }
 }
 
+/**
+ * Groups menu rows into one filled card, the way the Appearance screen groups its theme
+ * options. The card edge tells the reader where the list starts and stops, which a bare
+ * divider between rows does not once the screen scrolls.
+ */
+@Composable
+private fun SettingsGroup(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(content = content)
+    }
+}
+
+/** Hairline between two rows of a [SettingsGroup], inset so it reads as a separator, not an edge. */
+@Composable
+private fun SettingsGroupDivider() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp)
+            .height(0.5.dp)
+            .background(MaterialTheme.colorScheme.outlineVariant)
+    )
+}
+
 @Composable
 private fun SettingsMenuRow(
     title: String,
@@ -287,64 +323,59 @@ private fun SettingsMenuRow(
     val strings = StringProvider(LocalPlatformContext.current)
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    // Transparent at rest so the group card's own container shows through; only the pressed
+    // state paints, which keeps the highlight scoped to the row that was tapped.
     val pressedBackgroundColor by animateColorAsState(
-        targetValue = if (onClick != null && isPressed) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.background,
+        targetValue = if (onClick != null && isPressed) {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        } else {
+            Color.Transparent
+        },
         animationSpec = tween(durationMillis = 120),
         label = "settings_menu_press"
     )
 
-    val cardModifier = if (onClick != null) {
+    val rowModifier = if (onClick != null) {
         modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick
             )
     } else {
-        modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp)
+        modifier.fillMaxWidth()
     }
-    Card(
-        modifier = cardModifier,
-        colors = CardDefaults.cardColors(
-            containerColor = pressedBackgroundColor
-        ),
-        shape = RoundedCornerShape(12.dp)
+    Row(
+        modifier = rowModifier
+            .background(pressedBackgroundColor)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier.weight(1f)
         ) {
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
+            Text(
+                text = title,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+            if (!subtitle.isNullOrBlank()) {
                 Text(
-                    text = title,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                if (!subtitle.isNullOrBlank()) {
-                    Text(
-                        text = subtitle,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 14.sp,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-            }
-            if (showChevron && onClick != null) {
-                Icon(
-                    imageVector = Icons.Filled.ChevronRight,
-                    contentDescription = strings["next_arrow"],
-                    tint = MaterialTheme.colorScheme.onSurface
+                    text = subtitle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(top = 4.dp)
                 )
             }
+        }
+        if (showChevron && onClick != null) {
+            Icon(
+                imageVector = Icons.Filled.ChevronRight,
+                contentDescription = strings["next_arrow"],
+                tint = MaterialTheme.colorScheme.onSurface
+            )
         }
     }
 }
