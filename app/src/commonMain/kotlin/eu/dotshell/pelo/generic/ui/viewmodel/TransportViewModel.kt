@@ -11,6 +11,7 @@ import eu.dotshell.pelo.generic.data.models.realtime.vehiclepositions.SimpleVehi
 import eu.dotshell.pelo.generic.data.models.geojson.StopFeature
 import eu.dotshell.pelo.generic.data.network.transport.TransportApi
 import eu.dotshell.pelo.generic.service.TransportServiceProvider
+import eu.dotshell.pelo.generic.utils.LineColorHelper
 import eu.dotshell.pelo.generic.data.repository.TransportRepository
 import eu.dotshell.pelo.generic.data.repository.UserStopAlertsRepository
 import eu.dotshell.pelo.generic.data.repository.online.TrafficAlertsRepository
@@ -228,6 +229,9 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
                     val result = transportRepository.getAllLines()
                     result.onSuccess { lines ->
                         val strongFeatures = lines.features.orEmpty()
+                        // Index the operator colours before publishing, so live vehicles are drawn
+                        // in their own line's colour rather than the coarse per-mode fallback.
+                        LineColorHelper.registerLineColors(strongFeatures)
                         _linesState.value = TransportLinesState.Success(lines)
                         // Show the strong lines (metro/tram/RX) immediately.
                         _uiState.value = TransportLinesUiState.Success(strongFeatures)
@@ -271,6 +275,7 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
                         }
 
                         if (allFeatures.isNotEmpty()) {
+                            LineColorHelper.registerLineColors(allFeatures)
                             _linesState.value = TransportLinesState.Success(lines.copy(features = allFeatures))
                             _uiState.value = TransportLinesUiState.Success(allFeatures)
                         }
@@ -1054,6 +1059,7 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
                         return@onSuccess
                     }
 
+                    LineColorHelper.registerLineColors(loadedFeatures)
                     val merged = (currentLines + loadedFeatures)
                         .groupBy { it.properties.traceCode }
                         .map { (_, features) -> features.first() }

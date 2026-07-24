@@ -297,13 +297,20 @@ fun MapCanvas(
         }
     }
 
-    // Vehicle painters — call getPainter directly; painterResource caches internally.
+    // Vehicle painters — call getPainter directly; painterResource caches internally. Each
+    // pictogram ships a white and a near-black cut so it can contrast with any line colour.
     val busPainter: Painter =
         if (drawableProvider.hasDrawable("ic_bus_vehicle")) drawableProvider.getPainter("ic_bus_vehicle")
         else fallbackPainter
     val tramPainter: Painter =
         if (drawableProvider.hasDrawable("ic_tramway_vehicle")) drawableProvider.getPainter("ic_tramway_vehicle")
         else fallbackPainter
+    val busDarkPainter: Painter =
+        if (drawableProvider.hasDrawable("ic_bus_vehicle_dark")) drawableProvider.getPainter("ic_bus_vehicle_dark")
+        else busPainter
+    val tramDarkPainter: Painter =
+        if (drawableProvider.hasDrawable("ic_tramway_vehicle_dark")) drawableProvider.getPainter("ic_tramway_vehicle_dark")
+        else tramPainter
 
     // Direction cone for the user-location dot (resolved here, in the stable outer scope).
     val conePainter: Painter? =
@@ -553,9 +560,14 @@ fun MapCanvas(
                         if (nom != null) { onVehicleClick(nom); ClickResult.Consume } else ClickResult.Pass
                     },
                 )
+                // Vehicles are drawn in their line's own colour, which across an operator's
+                // palette ranges from near-black to pure yellow. `markerStyle` carries the
+                // variant that reads on this line's dot; the white pictogram stays the default.
                 val vehicleIconImage = switch(
-                    feature["markerType"].convertToString(),
+                    feature["markerStyle"].convertToString(),
                     case("TRAM", image(tramPainter, glyphDpSize(tramPainter, 11f))),
+                    case("TRAM_DARK", image(tramDarkPainter, glyphDpSize(tramDarkPainter, 11f))),
+                    case("BUS_DARK", image(busDarkPainter, glyphDpSize(busDarkPainter, 11f))),
                     fallback = image(busPainter, glyphDpSize(busPainter, 11f))
                 )
                 SymbolLayer(

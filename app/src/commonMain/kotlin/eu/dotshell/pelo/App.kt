@@ -436,7 +436,10 @@ private fun RootScaffold(
         }
     }
 
-    val vehiclesGeoJson = remember(activeVehiclePositions) {
+    // Keyed on linesUiState as well as the positions: vehicle dots take their colour from the
+    // operator palette registered when the lines load, so a stream that starts first has to be
+    // re-serialized once that data lands or the dots keep the per-mode fallback colour.
+    val vehiclesGeoJson = remember(activeVehiclePositions, linesUiState) {
         if (activeVehiclePositions.isEmpty()) null else toVehiclesGeoJson(activeVehiclePositions)
     }
     val vehicleIconName = remember(selectedLine?.lineName) {

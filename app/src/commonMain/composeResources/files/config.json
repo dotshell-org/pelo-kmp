@@ -76,13 +76,13 @@
         "color": "#92400e"
       },
       {
-        "match": "TB",
-        "type": "prefix",
+        "match": "^TB\\d{1,2}$",
+        "type": "regex",
         "color": "#eab308"
       },
       {
-        "match": "T",
-        "type": "prefix",
+        "match": "^T\\d{1,2}$",
+        "type": "regex",
         "color": "#A855F7"
       },
       {
@@ -106,8 +106,8 @@
         "color": "#22C55E"
       },
       {
-        "match": "F",
-        "type": "prefix",
+        "match": "^F[1-2]$",
+        "type": "regex",
         "color": "#84CC16"
       },
       {

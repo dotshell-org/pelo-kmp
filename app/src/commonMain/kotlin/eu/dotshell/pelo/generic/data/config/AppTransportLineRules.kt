@@ -116,12 +116,12 @@ class AppTransportLineRules(private val data: RulesData) : TransportLineRules {
     }
 
     override fun isLiveTrackableLine(lineName: String): Boolean {
-        val upperName = lineName.uppercase()
-        if (isStrongLine(lineName)) {
-            // Tram lines are trackable despite being strong
-            return upperName.startsWith("T") || canonicalRouteName(lineName).uppercase().startsWith("T")
-        }
-        return true
+        if (!isStrongLine(lineName)) return true
+        // Strong lines are trackable only when they run on the surface and report positions:
+        // trams and trambuses do, metro and funiculars do not. Decided on the transport type
+        // rather than a bare "T" prefix, which lumped TB11/TB12 in with the trams and would
+        // claim any bus whose name happens to start with a T.
+        return getTransportType(lineName) in SURFACE_TRACKABLE_TYPES
     }
 
     override fun getVehicleMarkerType(lineName: String): VehicleMarkerType {
@@ -212,5 +212,11 @@ class AppTransportLineRules(private val data: RulesData) : TransportLineRules {
 
     companion object {
         private val SORT_PREFIX_NUMBER_SUFFIX = Regex("^([A-Z]+)(\\d+)([A-Z]*)$")
+
+        /**
+         * Transport types (from `rules.transportTypes`) whose vehicles run on the surface and
+         * publish live positions. Metro and funicular are strong lines too but report nothing.
+         */
+        private val SURFACE_TRACKABLE_TYPES = setOf("Tramway", "Trambus")
     }
 }

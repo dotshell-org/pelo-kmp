@@ -8,6 +8,7 @@ import eu.dotshell.pelo.generic.utils.LineColorHelper
 import eu.dotshell.pelo.generic.utils.geo.StopsGeoJsonManager
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.generic.data.repository.routing.WalkingRouteRepository
+import kotlin.math.pow
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -128,6 +129,25 @@ private fun appendCoordinate(sb: StringBuilder, value: Double) {
 }
 
 /**
+ * True when white would not read on top of [hex] — WCAG relative luminance against white below
+ * 3:1, the large-text/graphics threshold. Used to flip a marker's pictogram to its dark variant.
+ * Unparseable colours are treated as dark, which keeps the white pictogram the default.
+ */
+private fun isLightColor(hex: String): Boolean {
+    val rgb = hex.removePrefix("#").takeIf { it.length == 6 || it.length == 8 } ?: return false
+    val offset = if (rgb.length == 8) 2 else 0
+    val channels = (0..2).map { i ->
+        rgb.substring(offset + i * 2, offset + i * 2 + 2).toIntOrNull(16) ?: return false
+    }
+    val linear = channels.map { channel ->
+        val c = channel / 255.0
+        if (c <= 0.03928) c / 12.92 else ((c + 0.055) / 1.055).pow(2.4)
+    }
+    val luminance = 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+    return (1.05 / (luminance + 0.05)) < 3.0
+}
+
+/**
  * Converts a [StopCollection] (transport stops, Point geometry) into a standard
  * GeoJSON FeatureCollection string for a maplibre-compose GeoJSON source.
  * Each feature carries `nom` and `desserte` properties.
@@ -174,10 +194,17 @@ fun toVehiclesGeoJson(positions: List<SimpleVehiclePosition>): String = buildJso
                     }
                 }
                 putJsonObject("properties") {
+                    val color = LineColorHelper.getColorForLineName(vehicle.lineName)
+                    val markerType = lineRules.getVehicleMarkerType(vehicle.lineName).name
                     put("lineName", vehicle.lineName)
                     vehicle.bearing?.let { put("bearing", it) }
-                    put("color", LineColorHelper.getColorForLineStringAux(vehicle.lineName))
-                    put("markerType", lineRules.getVehicleMarkerType(vehicle.lineName).name)
+                    put("color", color)
+                    put("markerType", markerType)
+                    // Operator palettes run from near-black to pure yellow, so the white
+                    // pictogram is not always readable on the dot. `markerStyle` picks the
+                    // pictogram variant that contrasts with this particular line's colour.
+                    val suffix = if (isLightColor(color)) "_DARK" else ""
+                    put("markerStyle", markerType + suffix)
                 }
             }
         }
