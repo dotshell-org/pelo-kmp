@@ -70,9 +70,11 @@ private const val EMPTY_FEATURE_COLLECTION = """{"type":"FeatureCollection","fea
 private const val STOP_RENDER_MIN_ZOOM = 12.0
 private const val BUS_RENDER_MIN_ZOOM = 16.0
 
-// Default light style whose descriptor is also bundled (composeResources/files/positron.json,
-// kept byte-identical to the remote). MapCanvas renders it from the bundle to skip the cold-start
-// descriptor fetch; the URL stays the offline-download key in config.json's mapStyles.
+// Default light style whose descriptor is bundled (composeResources/files/positron.json). The
+// bundled copy is deliberately NOT the upstream one: its neutrals are re-tinted onto the charte's
+// sand ramp, so it must be edited rather than re-synced from the remote. MapCanvas renders it from
+// the bundle to skip the cold-start descriptor fetch; the URL stays the offline-download key in
+// config.json's mapStyles (tiles are shared, only the style descriptor differs).
 private const val BUNDLED_POSITRON_STYLE_URL = "https://tiles.openfreemap.org/styles/positron"
 
 /**
