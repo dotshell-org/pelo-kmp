@@ -71,7 +71,6 @@ import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLegKi
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
 import eu.dotshell.pelo.generic.data.models.itinerary.TimeMode
 import eu.dotshell.pelo.generic.ui.theme.AccentColor
-import eu.dotshell.pelo.generic.ui.theme.Gray700
 import eu.dotshell.pelo.generic.ui.theme.PrimaryColor
 import eu.dotshell.pelo.generic.ui.theme.Sand50
 import eu.dotshell.pelo.generic.ui.theme.Sand100
@@ -321,8 +320,9 @@ private fun JourneyLegItem(
 ) {
     val drawableProvider = DrawableProvider(LocalPlatformContext.current)
     val strings = StringProvider(LocalPlatformContext.current)
-    val lineColor = remember(leg.isWalking, leg.routeName) {
-        if (leg.isWalking) Gray700 else Color(
+    val walkingLegColor = if (useLightColors) PrimaryColor else SecondaryColor
+    val lineColor = remember(leg.isWalking, leg.routeName, walkingLegColor) {
+        if (leg.isWalking) walkingLegColor else Color(
             LineColorHelper.getColorForLineString(leg.routeName ?: "")
         )
     }
@@ -368,7 +368,7 @@ private fun JourneyLegItem(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.DirectionsWalk,
                         contentDescription = null,
-                        tint = Gray700,
+                        tint = walkingLegColor,
                         modifier = Modifier.size(20.dp)
                     )
                 } else {
@@ -674,7 +674,7 @@ fun JourneyDetailsSheetContent(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowRight,
                             contentDescription = null,
-                            tint = Gray700
+                            tint = primaryTextColor
                         )
                         Text(
                             text = journey.formatArrivalTime(),

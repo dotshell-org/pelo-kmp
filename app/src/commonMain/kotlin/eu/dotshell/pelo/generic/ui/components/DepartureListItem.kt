@@ -20,7 +20,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import eu.dotshell.pelo.generic.ui.theme.Gray700
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.generic.utils.schedule.DepartureManager
 import eu.dotshell.pelo.platform.DrawableProvider
@@ -64,7 +63,7 @@ fun DepartureListItem(
                     text = lineName,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Gray700
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -96,7 +95,7 @@ fun DepartureListItem(
         Icon(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = strings["line_details_cd"].replace("%s", lineName),
-            tint = Gray700,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(24.dp)
         )
     }
