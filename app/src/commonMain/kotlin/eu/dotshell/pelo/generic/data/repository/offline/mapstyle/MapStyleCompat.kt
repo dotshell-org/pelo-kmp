@@ -5,16 +5,9 @@ import eu.dotshell.pelo.generic.data.network.mapstyle.MapStyleData
 import eu.dotshell.pelo.generic.data.network.mapstyle.MapStyleConfig
 
 /**
- * Object containing predefined map styles for compatibility
+ * Compatibility shim over [MapStyleConfig].
  */
 object MapStyleCompat {
-    val POSITRON = MapStyleData(
-        key = "positron",
-        displayName = "Clair",
-        styleUrl = "https://tiles.openfreemap.org/styles/positron",
-        category = MapStyleCategory.STANDARD
-    )
-
     /**
      * Compatibility function to replace MapStyle.getByCategory()
      */

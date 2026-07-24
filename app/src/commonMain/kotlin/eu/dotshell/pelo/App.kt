@@ -1181,7 +1181,7 @@ private fun PlanContent(
     val mapStyleConfig = remember { TransportServiceProvider.getMapStyleConfig() }
     val mapStyleRepo = remember { MapStyleRepository(context, mapStyleConfig) }
     var selectedMapStyle by remember { mutableStateOf(mapStyleRepo.getSelectedStyle()) }
-    // The merged "Standard" basemap resolves to positron (light) or dark_matter (dark) from the app theme.
+    // Standard and 3D are light/dark pairs; the half that renders follows the app theme.
     val effectiveMapStyle = MapStyleUtils.resolveForTheme(selectedMapStyle, isAppInDarkTheme(), mapStyleConfig)
     var showStyleSheet by remember { mutableStateOf(false) }
     var searchExpanded by remember { mutableStateOf(false) }

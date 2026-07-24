@@ -47,15 +47,12 @@ fun MapStyleSelectionSheet(
     val darkTheme = isAppInDarkTheme()
     val standardStyles = remember { mapStyleConfig.getStandardMapStyles() }
     val satelliteStyle = remember { mapStyleConfig.getSatelliteMapStyle() }
-    // The light/dark basemaps are merged into a single "Standard" tile that follows the app theme.
+    // One tile per basemap. Each light/dark pair is listed once, through its light half, and
+    // resolved to the half that matches the current theme.
     val allStyles = remember(darkTheme, standardStyles, satelliteStyle) {
-        val adaptiveStandard = MapStyleUtils.resolveForTheme(
-            standardStyles.first { MapStyleUtils.isAdaptiveStandardKey(it.key) },
-            darkTheme,
-            mapStyleConfig
-        )
-        listOf(adaptiveStandard) +
-            standardStyles.filterNot { MapStyleUtils.isAdaptiveStandardKey(it.key) } +
+        standardStyles
+            .filterNot { MapStyleUtils.isDarkHalf(it.key) }
+            .map { MapStyleUtils.resolveForTheme(it, darkTheme, mapStyleConfig) } +
             satelliteStyle
     }
 
@@ -82,12 +79,11 @@ fun MapStyleSelectionSheet(
                 verticalSpacing = 12.dp
             ) {
                 allStyles.forEach { style ->
-                    val enabled = !isOffline || style.key in downloadedMapStyles
-                    val isSelected = if (MapStyleUtils.isAdaptiveStandardKey(style.key)) {
-                        MapStyleUtils.isAdaptiveStandardKey(selectedMapStyle.key)
-                    } else {
-                        style.key == selectedMapStyle.key
-                    }
+                    // Both halves of a pair share one set of downloaded tiles and one identity,
+                    // so availability and selection are checked on the canonical key.
+                    val canonicalKey = MapStyleUtils.canonicalKey(style.key)
+                    val enabled = !isOffline || canonicalKey in downloadedMapStyles
+                    val isSelected = canonicalKey == MapStyleUtils.canonicalKey(selectedMapStyle.key)
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,

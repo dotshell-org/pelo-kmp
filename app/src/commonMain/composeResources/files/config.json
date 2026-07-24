@@ -33,27 +33,27 @@
     "disruptionColor": "#D32F2F"
   },
   "mapStyles": {
-    "defaultKey": "positron",
+    "defaultKey": "bright",
     "standard": [
       {
-        "key": "positron",
-        "displayName": "Clair",
-        "styleUrl": "https://tiles.openfreemap.org/styles/positron"
-      },
-      {
-        "key": "dark_matter",
-        "displayName": "Sombre",
-        "styleUrl": "https://tiles.openfreemap.org/styles/dark"
-      },
-      {
         "key": "bright",
-        "displayName": "OSM",
+        "displayName": "Standard",
         "styleUrl": "https://tiles.openfreemap.org/styles/bright"
+      },
+      {
+        "key": "bright_dark",
+        "displayName": "Standard sombre",
+        "styleUrl": "asset://bright_dark.json"
       },
       {
         "key": "liberty",
         "displayName": "3D",
         "styleUrl": "https://tiles.openfreemap.org/styles/liberty"
+      },
+      {
+        "key": "liberty_dark",
+        "displayName": "3D sombre",
+        "styleUrl": "asset://liberty_dark.json"
       }
     ],
     "satellite": {

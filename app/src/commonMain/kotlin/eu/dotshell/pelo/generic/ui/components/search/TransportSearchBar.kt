@@ -12,10 +12,10 @@ import eu.dotshell.pelo.generic.data.models.search.LineSearchResult
 import eu.dotshell.pelo.generic.data.models.search.StationSearchResult
 import eu.dotshell.pelo.generic.data.models.search.TransportSearchContent
 import eu.dotshell.pelo.generic.data.network.mapstyle.MapStyleData
-import eu.dotshell.pelo.generic.data.repository.offline.mapstyle.MapStyleCompat
 import eu.dotshell.pelo.generic.data.repository.offline.search.SearchHistoryItem
 import eu.dotshell.pelo.generic.data.repository.offline.search.SearchType
 import eu.dotshell.pelo.generic.ui.components.search.bar.SimpleSearchBar
+import eu.dotshell.pelo.generic.utils.map.MapStyleUtils
 import kotlinx.coroutines.delay
 
 @Composable
@@ -23,7 +23,7 @@ fun TransportSearchBar(
     onSearchStops: suspend (String) -> List<StationSearchResult>,
     onSearchLines: suspend (String) -> List<LineSearchResult>,
     modifier: Modifier = Modifier,
-    currentMapStyle: MapStyleData = MapStyleCompat.POSITRON,
+    currentMapStyle: MapStyleData? = null,
     content: TransportSearchContent = TransportSearchContent.STOPS_AND_LINES,
     showHistory: Boolean = true,
     startExpanded: Boolean = false,
@@ -71,8 +71,9 @@ fun TransportSearchBar(
     val resolvedDebounce = debounceMs
         ?: if (content == TransportSearchContent.STOPS_ONLY && !showHistory) 250L else 300L
 
+    // Only a dark basemap needs the outline; with no style supplied, assume a light one.
     val resolvedShowDarkOutline = showDarkOutline
-        ?: (currentMapStyle.key == "dark_matter" && !startExpanded)
+        ?: (currentMapStyle?.key?.let { MapStyleUtils.isDarkHalf(it) } == true && !startExpanded)
 
     var stationSearchResults by remember { mutableStateOf<List<StationSearchResult>>(emptyList()) }
     var lineSearchResults by remember { mutableStateOf<List<LineSearchResult>>(emptyList()) }

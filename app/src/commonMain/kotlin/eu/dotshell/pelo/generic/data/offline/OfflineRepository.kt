@@ -16,6 +16,7 @@ import kotlinx.datetime.Clock
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import eu.dotshell.pelo.generic.utils.map.MapStyleUtils
 
 /**
  * Dedicated persistent storage for offline data.
@@ -169,9 +170,9 @@ class OfflineRepository(context: PlatformContext) : ApiOfflineRepository {
         if (settings.contains(KEY_DOWNLOADED_MAP_STYLES)) {
             return settings.getStringSet(KEY_DOWNLOADED_MAP_STYLES, emptySet())
         }
-        // Migration: if old boolean was true, assume positron was downloaded
+        // Migration: if old boolean was true, assume the default basemap was downloaded
         if (settings.getBoolean(KEY_MAP_TILES_DOWNLOADED, false)) {
-            val migrated = setOf("positron")
+            val migrated = setOf(MapStyleUtils.STANDARD.lightKey)
             settings.putStringSet(KEY_DOWNLOADED_MAP_STYLES, migrated)
             return migrated
         }
@@ -184,9 +185,10 @@ class OfflineRepository(context: PlatformContext) : ApiOfflineRepository {
     }
 
     fun getSelectedMapStyles(): Set<String> {
+        val default = setOf(MapStyleUtils.STANDARD.lightKey)
         return if (settings.contains(KEY_SELECTED_MAP_STYLES)) {
-            settings.getStringSet(KEY_SELECTED_MAP_STYLES, setOf("positron"))
-        } else setOf("positron")
+            settings.getStringSet(KEY_SELECTED_MAP_STYLES, default)
+        } else default
     }
 
     fun setSelectedMapStyles(styles: Set<String>) {

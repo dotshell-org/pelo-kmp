@@ -25,13 +25,15 @@ fun MapStylePreviewTile(
     isEnabled: Boolean,
     onClick: () -> Unit
 ) {
+    // Keyed on the concrete style, not the pair, so the tile previews the half the user
+    // will actually get in the current theme.
     val drawableName = when (style.key) {
-        "positron" -> "visu_positron"
-        "dark_matter" -> "visu_dark_matter"
         "bright" -> "visu_osm_bright"
+        "bright_dark" -> "visu_osm_bright_dark"
         "liberty" -> "visu_liberty"
+        "liberty_dark" -> "visu_liberty_dark"
         "satellite" -> "visu_satellite"
-        else -> "visu_positron"
+        else -> "visu_osm_bright"
     }
     val drawableProvider = DrawableProvider(LocalPlatformContext.current)
     val strings = StringProvider(LocalPlatformContext.current)

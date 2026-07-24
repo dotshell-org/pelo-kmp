@@ -70,12 +70,18 @@ private const val EMPTY_FEATURE_COLLECTION = """{"type":"FeatureCollection","fea
 private const val STOP_RENDER_MIN_ZOOM = 12.0
 private const val BUS_RENDER_MIN_ZOOM = 16.0
 
-// Default light style whose descriptor is bundled (composeResources/files/positron.json). The
-// bundled copy is deliberately NOT the upstream one: its neutrals are re-tinted onto the charte's
-// sand ramp, so it must be edited rather than re-synced from the remote. MapCanvas renders it from
-// the bundle to skip the cold-start descriptor fetch; the URL stays the offline-download key in
-// config.json's mapStyles (tiles are shared, only the style descriptor differs).
-private const val BUNDLED_POSITRON_STYLE_URL = "https://tiles.openfreemap.org/styles/positron"
+// Remote styles whose descriptor is also bundled, so a cold start skips the descriptor fetch.
+// The URL stays authoritative in config.json — it is what the offline downloader pulls tiles
+// with — and is mapped to its bundled copy here.
+//
+// The bundled copies are NOT the upstream descriptors: hospital and school grounds are dropped
+// so that land reads as ordinary. Edit them through tools/build_map_styles.py, which also builds
+// the dark cuts (separate `asset://` styles). If an asset ever fails to load we fall back to the
+// remote URL, which renders correctly but brings those tinted zones back.
+private val BUNDLED_STYLE_DESCRIPTORS = mapOf(
+    "https://tiles.openfreemap.org/styles/bright" to "bright.json",
+    "https://tiles.openfreemap.org/styles/liberty" to "liberty.json",
+)
 
 /**
  * Cross-platform map canvas built on maplibre-compose (declarative).
@@ -319,14 +325,14 @@ fun MapCanvas(
 
     val baseStyle = remember(styleUrl, context) {
         // Styles shipped as a local descriptor render from the bundled JSON so cold start skips the
-        // style-descriptor network fetch. `asset://` styles carry the file name directly; the
-        // default `positron` keeps its http URL in config (authoritative for offline tile download,
-        // and MapLibre still serves offline-cached tiles matched by tile URL) but is mapped to its
-        // bundled descriptor here. Falls back to the network URL if the asset can't be read.
+        // style-descriptor network fetch. `asset://` styles (the dark cuts, Satellite) carry the
+        // file name directly; the remote light styles keep their http URL in config — authoritative
+        // for offline tile download, and MapLibre still serves offline-cached tiles matched by tile
+        // URL — but resolve to their bundled descriptor here. Falls back to the network URL if the
+        // asset can't be read.
         val assetName = when {
             styleUrl.startsWith("asset://") -> styleUrl.removePrefix("asset://")
-            styleUrl == BUNDLED_POSITRON_STYLE_URL -> "positron.json"
-            else -> null
+            else -> BUNDLED_STYLE_DESCRIPTORS[styleUrl]
         }
         if (assetName != null) {
             val fileSystem = FileSystem(context)
