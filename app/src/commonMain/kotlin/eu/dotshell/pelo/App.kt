@@ -1251,6 +1251,18 @@ private fun PlanContent(
                     onStopClick = { nom -> onStopSelected(nom, null, emptyList()) },
                     onLineClick = { lineName -> onLineSelected(lineName) },
                     onVehicleClick = { lineName -> onLineSelected(lineName) },
+                    // Tapping a place on the basemap routes to it, exactly as picking that
+                    // name out of the search results would — same entry point, same result.
+                    onBasemapPlaceClick = { name, latitude, longitude ->
+                        onAddressItinerarySelected(
+                            AddressSearchResult(
+                                label = name,
+                                detail = null,
+                                lat = latitude,
+                                lon = longitude,
+                            )
+                        )
+                    },
                     onMapMoved = onFabReset,
                 )
 

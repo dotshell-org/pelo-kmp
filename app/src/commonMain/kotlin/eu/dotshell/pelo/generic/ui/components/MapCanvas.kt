@@ -65,6 +65,11 @@ import org.maplibre.compose.sources.GeoJsonData
 import org.maplibre.compose.sources.rememberGeoJsonSource
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.spatialk.geojson.Position
+import kotlinx.serialization.json.JsonObject
+import org.maplibre.spatialk.geojson.Point
+import org.maplibre.spatialk.geojson.Geometry
+import org.maplibre.spatialk.geojson.Feature
+import org.maplibre.compose.sources.getBaseSource
 
 private const val EMPTY_FEATURE_COLLECTION = """{"type":"FeatureCollection","features":[]}"""
 private const val STOP_RENDER_MIN_ZOOM = 12.0
@@ -82,6 +87,29 @@ private val BUNDLED_STYLE_DESCRIPTORS = mapOf(
     "https://tiles.openfreemap.org/styles/bright" to "bright.json",
     "https://tiles.openfreemap.org/styles/liberty" to "liberty.json",
 )
+
+/** The OpenMapTiles vector source both Standard and 3D are built on. Absent from Satellite. */
+private const val BASEMAP_VECTOR_SOURCE_ID = "openmaptiles"
+
+/**
+ * Source layers holding the basemap's named features: `place` covers localities — hamlets,
+ * neighbourhoods, suburbs, towns — and `poi` covers named points such as shops and venues.
+ */
+private val BASEMAP_PLACE_SOURCE_LAYERS = listOf("place", "poi")
+
+/** A named basemap feature usable as an itinerary destination. */
+private data class NamedPlace(val name: String, val latitude: Double, val longitude: Double)
+
+/**
+ * Reads a queried basemap feature as a destination, or null when it has no name or no point
+ * geometry — an unnamed or non-point feature is nothing a user could have searched for.
+ */
+private fun Feature<Geometry, JsonObject?>.toNamedPlace(): NamedPlace? {
+    val name = properties?.get("name")?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+        ?: return null
+    val point = geometry as? Point ?: return null
+    return NamedPlace(name, point.coordinates.latitude, point.coordinates.longitude)
+}
 
 /**
  * Cross-platform map canvas built on maplibre-compose (declarative).
@@ -128,6 +156,8 @@ fun MapCanvas(
     onStopClick: (stopName: String) -> Unit = {},
     onLineClick: (lineName: String) -> Unit = {},
     onVehicleClick: (lineName: String) -> Unit = {},
+    /** A named place or POI of the vector basemap was tapped. Never fires on Satellite. */
+    onBasemapPlaceClick: (name: String, latitude: Double, longitude: Double) -> Unit = { _, _, _ -> },
     onMapMoved: () -> Unit = {},
     centerOn: Position? = null,
     focusZoom: Double? = null,
@@ -398,6 +428,41 @@ fun MapCanvas(
             }
             val userSourceData = remember(userLocationGeoJson) { GeoJsonData.JsonString(userLocationGeoJson) }
             val userSource = rememberGeoJsonSource(data = userSourceData)
+
+            // ------------------------------------------------------------------
+            // Basemap places
+            //
+            // Place and POI labels belong to the vector basemap, not to any app layer, so
+            // they carry no click handler. Binding transparent hit targets to the same
+            // source makes them tappable. Declared before every other app layer so they sit
+            // lowest: a tap that also lands on a stop, a line or a vehicle goes there first.
+            //
+            // Satellite has no vector source, so [getBaseSource] returns null and these are
+            // simply not added — the feature is Standard and 3D only.
+            // ------------------------------------------------------------------
+            val basemapSource = getBaseSource(BASEMAP_VECTOR_SOURCE_ID)
+            if (basemapSource != null) {
+                BASEMAP_PLACE_SOURCE_LAYERS.forEach { placeSourceLayer ->
+                    CircleLayer(
+                        id = "basemap-place-tap-$placeSourceLayer",
+                        source = basemapSource,
+                        sourceLayer = placeSourceLayer,
+                        color = const(Color.Transparent),
+                        // Generous enough to catch the label as well as its anchor point.
+                        radius = const(18.dp),
+                        onClick = { features ->
+                            val hit = features.firstNotNullOfOrNull { it.toNamedPlace() }
+                            if (hit != null) {
+                                onBasemapPlaceClick(hit.name, hit.latitude, hit.longitude)
+                                ClickResult.Consume
+                            } else {
+                                // Unnamed feature: let the tap fall through to the layers below.
+                                ClickResult.Pass
+                            }
+                        },
+                    )
+                }
+            }
 
             // ------------------------------------------------------------------
             // Transport lines
