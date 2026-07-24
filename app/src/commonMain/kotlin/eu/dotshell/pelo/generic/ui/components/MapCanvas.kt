@@ -104,8 +104,12 @@ private const val BASEMAP_VECTOR_SOURCE_ID = "openmaptiles"
  */
 private val BASEMAP_PLACE_SOURCE_LAYERS = listOf("place", "poi")
 
-/** How long a finger must stay still on the map before it counts as dropping a pin. */
-private const val LONG_PRESS_HOLD_MS = 2_000L
+/**
+ * How long a finger must stay still on the map before it counts as dropping a pin. Close to the
+ * platform long-press, which is what a hold on a map feels like it should cost elsewhere; the
+ * stillness requirement, not the duration, is what keeps a pan from becoming a pin.
+ */
+private const val LONG_PRESS_HOLD_MS = 600L
 
 /** A named basemap feature usable as an itinerary destination. */
 private data class NamedPlace(val name: String, val latitude: Double, val longitude: Double)
@@ -404,9 +408,9 @@ fun MapCanvas(
     }
 
     // Drop-a-pin gesture. Watched in the Initial pass and never consumed, so the map still
-    // receives every pan, pinch and tap — this only notices a finger that stays put. MapLibre's
-    // own long-click fires far earlier (~500 ms) and is deliberately not used: the gesture is
-    // meant to be a deliberate hold, not something a slow tap triggers by accident.
+    // receives every pan, pinch and tap — this only notices a finger that stays put. Detected
+    // here rather than through MapLibre's own long-click so the threshold is ours to tune and
+    // so the press is required to stay within touch slop.
     val density = LocalDensity.current
     val longPressModifier = if (interactive) {
         Modifier.pointerInput(cameraState, onMapLongPress, density) {
