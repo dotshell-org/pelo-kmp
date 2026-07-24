@@ -8,30 +8,36 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import eu.dotshell.pelo.generic.data.repository.offline.theme.ThemeMode
 
+/**
+ * Light scheme of the charte graphique: white surfaces, the sand ramp for every filled container,
+ * [AccentColor] (orange) wherever the app used to be red, and pure black for on-surface content —
+ * the charte asks for grey pictograms and secondary text to be rendered in black, so
+ * [onSurfaceVariant] is black rather than a muted grey.
+ */
 val LightColorScheme = lightColorScheme(
-    primary = Gray900,
+    primary = PrimaryColor,
     onPrimary = SecondaryColor,
-    primaryContainer = Gray100,
-    onPrimaryContainer = Gray900,
-    secondary = Gray700,
+    primaryContainer = Sand100,
+    onPrimaryContainer = PrimaryColor,
+    secondary = PrimaryColor,
     onSecondary = SecondaryColor,
-    secondaryContainer = Gray200,
-    onSecondaryContainer = Gray800,
+    secondaryContainer = Sand200,
+    onSecondaryContainer = PrimaryColor,
     tertiary = AccentColor,
     onTertiary = SecondaryColor,
     background = SecondaryColor,
-    onBackground = Gray900,
+    onBackground = PrimaryColor,
     surface = SecondaryColor,
-    onSurface = Gray900,
-    surfaceVariant = Gray100,
-    onSurfaceVariant = Gray600,
+    onSurface = PrimaryColor,
+    surfaceVariant = Sand100,
+    onSurfaceVariant = PrimaryColor,
     surfaceContainerLowest = SecondaryColor,
-    surfaceContainerLow = Gray50,
-    surfaceContainer = Gray100,
-    surfaceContainerHigh = Gray200,
-    surfaceContainerHighest = Gray300,
-    outline = Gray400,
-    outlineVariant = Gray200,
+    surfaceContainerLow = Sand50,
+    surfaceContainer = Sand100,
+    surfaceContainerHigh = Sand200,
+    surfaceContainerHighest = Sand300,
+    outline = Sand400,
+    outlineVariant = Sand200,
     error = Red600,
     onError = SecondaryColor,
     errorContainer = Red100,
@@ -115,4 +121,4 @@ fun bottomSheetContainerColor(): Color =
  */
 @Composable
 fun searchFieldContainerColor(): Color =
-    if (isAppInDarkTheme()) Color(0xFF2A2A2A) else Color(0xFFF3F4F6)
+    if (isAppInDarkTheme()) Color(0xFF2A2A2A) else Sand100

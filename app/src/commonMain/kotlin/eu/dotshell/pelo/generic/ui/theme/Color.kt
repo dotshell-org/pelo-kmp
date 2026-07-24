@@ -288,10 +288,37 @@ val Rose800 = Color(0xFF9F1239)
 val Rose900 = Color(0xFF881337)
 val Rose950 = Color(0xFF4C0519)
 
+// ---------------------------------------------------------------------------
+// Brand palette (charte graphique)
+// ---------------------------------------------------------------------------
+
+/**
+ * The Pelo accent. Replaces the former red across the whole app — buttons, selected states,
+ * search affordances, imminent-departure highlights and the navbar indicator.
+ */
+val BrandOrange = Color(0xFFB26633)
+
+/**
+ * The sand ramp that replaces the neutral grays on light surfaces (filled fields, containers,
+ * chips) and tints the light basemap. [Sand50]/[Sand100]/[Sand200]/[Sand300] are the four values
+ * given by the charte and map one-for-one onto Gray50/100/200/300 by lightness.
+ */
+val Sand50 = Color(0xFFFCFAF1)
+val Sand100 = Color(0xFFF7F1DC)
+val Sand200 = Color(0xFFE8DDBB)
+val Sand300 = Color(0xFFD7C59B)
+
+/**
+ * One step darker than the charte's ramp, derived by continuing its lightness progression
+ * (L* ≈ 71, matching the Gray400 it replaces). The charte stops at [Sand300], which is too light
+ * to read as a border on white, so outlines use this instead.
+ */
+val Sand400 = Color(0xFFC5AA6D)
+
 // Theme Colors
 val PrimaryColor = Color.Black
 val SecondaryColor = Color.White
-val AccentColor = Red500
+val AccentColor = BrandOrange
 
 // Neutral (non-bluish) dark gray used for bottom sheets in dark mode, so they read as a
 // distinct surface above the pure-black navbar and map rather than blending into them.
