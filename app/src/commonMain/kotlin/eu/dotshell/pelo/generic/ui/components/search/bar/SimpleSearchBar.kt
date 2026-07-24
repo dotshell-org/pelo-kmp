@@ -256,7 +256,7 @@ fun SimpleSearchBar(
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                         keyboardActions = KeyboardActions(onSearch = { submitFirstResult() }),
-                        placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium) },
+                        placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Search,
@@ -302,7 +302,7 @@ fun SimpleSearchBar(
                                 setExpandedState(shouldExpand)
                             }
                         },
-                        placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium) },
+                        placeholder = { Text(placeholder, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Bold) },
                         leadingIcon = {
                             Icon(
                                 imageVector = Icons.Default.Search,

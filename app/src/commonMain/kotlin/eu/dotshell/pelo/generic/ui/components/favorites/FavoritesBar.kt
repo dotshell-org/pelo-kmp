@@ -56,10 +56,11 @@ fun FavoritesBar(
     modifier: Modifier = Modifier
 ) {
     var favoriteToDelete by remember { mutableStateOf<Favorite?>(null) }
-    // Derive from the Material typography (labelLarge = 14.sp Medium) so the chips
-    // inherit the app font; a bare TextStyle(...) would fall back to the system font.
+    // Derive from the Material typography (labelLarge = 14.sp) so the chips inherit the app
+    // font; a bare TextStyle(...) would fall back to the system font. The charte sets these
+    // shortcut chips in bold.
     val chipTextStyle = MaterialTheme.typography.labelLarge.copy(
-        fontWeight = FontWeight.Medium,
+        fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onSurface
     )
 

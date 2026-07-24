@@ -132,7 +132,6 @@ fun AlertReportBottomSheet(
                     text = strings["alert_report_title"],
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface,
-                    fontWeight = FontWeight.Normal,
                     modifier = Modifier.padding(bottom = 16.dp, start = 8.dp)
                 )
 

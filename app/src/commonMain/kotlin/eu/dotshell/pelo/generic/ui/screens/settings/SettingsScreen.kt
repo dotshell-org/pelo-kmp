@@ -327,7 +327,7 @@ private fun SettingsMenuRow(
                     text = title,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium
+                    fontWeight = FontWeight.Bold
                 )
                 if (!subtitle.isNullOrBlank()) {
                     Text(

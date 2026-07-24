@@ -25,31 +25,37 @@ private fun plusJakartaSans() = FontFamily(
 )
 
 /**
- * The app-wide Material typography, rendered in Plus Jakarta Sans. This keeps every
- * Material3 default (sizes, line-heights, weights, letter-spacing) and only swaps the
- * font family on each role — Material3 has no `defaultFontFamily` param, so each of the
- * 15 styles is copied explicitly. `Font(...)` from compose-resources is @Composable, so
- * this is a function rather than a top-level val.
+ * The app-wide Material typography, rendered in Plus Jakarta Sans. This keeps the Material3
+ * defaults for sizes, line-heights and letter-spacing and only swaps the font family on each
+ * role — Material3 has no `defaultFontFamily` param, so each of the 15 styles is copied
+ * explicitly. `Font(...)` from compose-resources is @Composable, so this is a function rather
+ * than a top-level val.
+ *
+ * The charte splits the scale in two: headings are Bold, running text is Regular. The display,
+ * headline and title roles are bolded here, along with labelMedium — the role Material uses for
+ * navigation-bar labels, which the charte also shows in bold. The body roles and the remaining
+ * label roles keep their Material default weight.
  */
 @Composable
 fun appTypography(): Typography {
     val ff = plusJakartaSans()
     val base = Typography()
+    val bold = FontWeight.Bold
     return base.copy(
-        displayLarge = base.displayLarge.copy(fontFamily = ff),
-        displayMedium = base.displayMedium.copy(fontFamily = ff),
-        displaySmall = base.displaySmall.copy(fontFamily = ff),
-        headlineLarge = base.headlineLarge.copy(fontFamily = ff),
-        headlineMedium = base.headlineMedium.copy(fontFamily = ff),
-        headlineSmall = base.headlineSmall.copy(fontFamily = ff),
-        titleLarge = base.titleLarge.copy(fontFamily = ff),
-        titleMedium = base.titleMedium.copy(fontFamily = ff),
-        titleSmall = base.titleSmall.copy(fontFamily = ff),
+        displayLarge = base.displayLarge.copy(fontFamily = ff, fontWeight = bold),
+        displayMedium = base.displayMedium.copy(fontFamily = ff, fontWeight = bold),
+        displaySmall = base.displaySmall.copy(fontFamily = ff, fontWeight = bold),
+        headlineLarge = base.headlineLarge.copy(fontFamily = ff, fontWeight = bold),
+        headlineMedium = base.headlineMedium.copy(fontFamily = ff, fontWeight = bold),
+        headlineSmall = base.headlineSmall.copy(fontFamily = ff, fontWeight = bold),
+        titleLarge = base.titleLarge.copy(fontFamily = ff, fontWeight = bold),
+        titleMedium = base.titleMedium.copy(fontFamily = ff, fontWeight = bold),
+        titleSmall = base.titleSmall.copy(fontFamily = ff, fontWeight = bold),
         bodyLarge = base.bodyLarge.copy(fontFamily = ff),
         bodyMedium = base.bodyMedium.copy(fontFamily = ff),
         bodySmall = base.bodySmall.copy(fontFamily = ff),
         labelLarge = base.labelLarge.copy(fontFamily = ff),
-        labelMedium = base.labelMedium.copy(fontFamily = ff),
+        labelMedium = base.labelMedium.copy(fontFamily = ff, fontWeight = bold),
         labelSmall = base.labelSmall.copy(fontFamily = ff),
     )
 }

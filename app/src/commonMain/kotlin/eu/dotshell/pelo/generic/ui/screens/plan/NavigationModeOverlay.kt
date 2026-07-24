@@ -105,8 +105,7 @@ fun NavigationModeOverlay(
                         Text(
                             text = state.actionText,
                             color = MaterialTheme.colorScheme.onSurface,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Normal
+                            style = MaterialTheme.typography.titleLarge
                         )
                     }
                 }
@@ -159,8 +158,7 @@ fun NavigationModeOverlay(
                 Text(
                     text = state.arrivalTimeText,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Normal
+                    style = MaterialTheme.typography.titleMedium
                 )
             }
 
