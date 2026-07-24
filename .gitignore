@@ -27,6 +27,10 @@ scripts/.venv
 .kotlin
 app/build
 baselineprofile/build
+app/release/
+
+# Design hand-off documents — internal, never committed
+Guide modifications app Pelo.pdf
 
 # iOS / XcodeGen — regenerate the project with:
 #   /tmp/xcodegen-dist/xcodegen/bin/xcodegen generate --spec iosApp/project.yml
