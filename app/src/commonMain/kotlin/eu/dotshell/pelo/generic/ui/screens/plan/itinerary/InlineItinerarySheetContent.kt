@@ -68,6 +68,7 @@ import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
 import eu.dotshell.pelo.platform.randomId
+import okio.ByteString.Companion.encodeUtf8
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -493,7 +494,7 @@ fun InlineItinerarySheetContent(
                     val nonWalkingLegs = journey.legs.filter { !it.isWalking }
                     eu.dotshell.pelo.generic.data.telemetry.ItineraryOptionDetail(
                         index = idx,
-                        signature = journeySignature(journey),
+                        signature = journeySignatureId(journey),
                         durationMin = journey.durationMinutes,
                         transfers = (nonWalkingLegs.size - 1).coerceAtLeast(0),
                         lines = nonWalkingLegs.mapNotNull { it.routeName }.distinct(),
@@ -927,7 +928,7 @@ fun InlineItinerarySheetContent(
                                     eventId = randomId(),
                                     at = Clock.System.now().toString(),
                                     calcId = calcId,
-                                    chosenSignatures = listOf(journeySignature(chosenJourney))
+                                    chosenSignatures = listOf(journeySignatureId(chosenJourney))
                                 )
                             )
                         }
@@ -983,3 +984,11 @@ private fun journeySignature(journey: JourneyResult): String {
     }
     return "${journey.departureTime}->${journey.arrivalTime}#$legSig"
 }
+
+/**
+ * Short, stable id for a journey — a truncated SHA-256 of [journeySignature]. Telemetry references
+ * an option from itinerary_chosen back to itinerary_calculated by this id; the raw signature can
+ * run to several hundred chars and would trip the payload guardrail's per-string cap.
+ */
+private fun journeySignatureId(journey: JourneyResult): String =
+    journeySignature(journey).encodeUtf8().sha256().hex().take(16)
