@@ -136,6 +136,11 @@ fun InlineItinerarySheetContent(
     val jdLinesEnabled = remember { itineraryPrefsRepo.isJdLinesEnabled() }
     val rxLineEnabled = remember { itineraryPrefsRepo.isRxLineEnabled() }
 
+    // Timetable snapshot identity, read once — telemetry ships it on itinerary.calculated so a
+    // calculation can be replayed against the exact schedules it ran on. Stable for the session
+    // (dataset swaps only take effect at cold start).
+    val datasetVersion = remember { raptorRepository.activeDatasetVersion() }
+
     // Build set of blocked route names based on user preferences.
     // raptorKt's RouteFilter matches route names EXACTLY (no wildcards), so
     // the JD family must be expanded into the real line names of the network.
@@ -357,6 +362,9 @@ fun InlineItinerarySheetContent(
         try {
             val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
             val date = selectedDate ?: today
+            // Walking params actually used for the emitted journeys. Only the long-walk fallback
+            // below diverges from DEFAULT; the effective date/time are read from state at emit.
+            var effWalking = WalkingParams.DEFAULT
             journeys = calculateJourneys(
                 origin = originLocation,
                 destination = destinationLocation,
@@ -440,6 +448,7 @@ fun InlineItinerarySheetContent(
 
                 if (longWalkJourneys.isNotEmpty()) {
                     journeys = longWalkJourneys
+                    effWalking = longWalk
                     longWalkFallbackMeters =
                         longWalkJourneys.minOf { journeyWalkingMeters(it, longWalk.speedMetersPerSecond) }
                 }
@@ -497,6 +506,24 @@ fun InlineItinerarySheetContent(
                         seconds / 3600, (seconds % 3600) / 60
                     ).toInstant(TimeZone.currentSystemDefault()).toString()
                 } ?: nowIso
+                // Replay inputs: everything (beyond origin/dest) that steered this Raptor run, so
+                // the backend can regenerate the options offline with raptor-kmp.
+                val tzNow = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+                val nowSeconds = tzNow.hour * 3600 + tzNow.minute * 60 + tzNow.second
+                val isArrival = timeMode == TimeMode.ARRIVAL
+                val recomputeSpec = eu.dotshell.pelo.generic.data.telemetry.ItineraryRecomputeSpec(
+                    serviceDate = (selectedDate ?: tzNow.date).toString(),
+                    timeMode = if (isArrival) "arrival" else "departure",
+                    timeSeconds = if (isArrival) (selectedTimeSeconds ?: defaultArrivalSeconds())
+                                  else (selectedTimeSeconds ?: nowSeconds),
+                    searchWindowMin = if (isArrival) 120 else null,
+                    blockedLines = blockedRouteNames.toList(),
+                    walkSpeedMps = effWalking.speedMetersPerSecond,
+                    walkDetourFactor = effWalking.detourFactor,
+                    walkMaxAccessEgressM = effWalking.maxAccessEgressDistanceMeters,
+                    walkMaxDirectM = effWalking.maxDirectWalkDistanceMeters,
+                    datasetVersion = datasetVersion
+                )
                 if (originRef != null && destRef != null) {
                     eu.dotshell.pelo.generic.data.telemetry.TelemetryEmitter.emit(
                         eu.dotshell.pelo.generic.data.telemetry.TelemetryEvent.ItineraryCalculated(
@@ -507,7 +534,8 @@ fun InlineItinerarySheetContent(
                             dest = destRef,
                             requestedAt = nowIso,
                             departureAt = departureIso,
-                            options = options
+                            options = options,
+                            recompute = recomputeSpec
                         )
                     )
                 }
@@ -894,7 +922,19 @@ fun InlineItinerarySheetContent(
                                     eventId = randomId(),
                                     at = Clock.System.now().toString(),
                                     calcId = calcId,
-                                    optionIndex = index
+                                    optionIndex = index,
+                                    // Exact chosen path, so it stays recoverable even if a later
+                                    // dataset change would make a replay drift.
+                                    legs = chosenJourney.legs.map { leg ->
+                                        eu.dotshell.pelo.generic.data.telemetry.ChosenLeg(
+                                            line = leg.routeName,
+                                            walk = leg.isWalking,
+                                            fromStopId = leg.fromStopId,
+                                            toStopId = leg.toStopId,
+                                            depSeconds = leg.departureTime,
+                                            arrSeconds = leg.arrivalTime
+                                        )
+                                    }
                                 )
                             )
                         }

@@ -26,6 +26,9 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
@@ -69,6 +72,19 @@ class RaptorRepository private constructor(private val context: PlatformContext)
     // Cold-start promote/guard for downloaded datasets. Driven from initialize() before
     // any dataset file is read; the network-side check lives in DatasetUpdateManager.
     private val datasetLifecycle by lazy { DatasetLifecycle(fileSystem) }
+    private val datasetManifestJson = Json { ignoreUnknownKeys = true; isLenient = true }
+
+    /**
+     * Identity of the timetable snapshot currently backing Raptor — the dataset's build
+     * timestamp (`createdAt` in `dataset.json`), read from the applied download when present,
+     * else the bundle. Lets telemetry pin the exact schedules an itinerary was computed on so it
+     * can be replayed offline. Null if the manifest can't be read or parsed.
+     */
+    fun activeDatasetVersion(): String? = runCatching {
+        val manifest = datasetStore.readText(DatasetStore.SENTINEL)
+        datasetManifestJson.parseToJsonElement(manifest)
+            .jsonObject["createdAt"]?.jsonPrimitive?.contentOrNull
+    }.getOrNull()
 
     private var raptorLibrary: RaptorLibrary? = null
     private var stopsCache: List<Stop> = emptyList()
