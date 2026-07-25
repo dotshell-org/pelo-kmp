@@ -1,6 +1,8 @@
 package eu.dotshell.pelo.generic.data.telemetry
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
@@ -49,8 +51,15 @@ object TelemetryService {
             scheduler = BackgroundScheduler(appContext),
             debounceSeconds = config.closeDebounceSeconds
         )
-        ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleObserver)
+        // Set before scheduling the observer so a re-entrant initialize() is a no-op and the
+        // controller is ready before onStart/onStop can fire.
         initialized = true
-        Log.i(TAG, "TelemetryService initialized")
+        // initialize() runs on a background init coroutine (PeloApplication.onCreate), but
+        // ProcessLifecycleOwner + LifecycleRegistry.addObserver are main-thread-only. Hop to the
+        // main thread to register the foreground/background (session open/close) observer.
+        Handler(Looper.getMainLooper()).post {
+            ProcessLifecycleOwner.get().lifecycle.addObserver(lifecycleObserver)
+            Log.i(TAG, "TelemetryService initialized")
+        }
     }
 }
