@@ -3,23 +3,18 @@ package eu.dotshell.pelo.generic.data.telemetry
 import eu.dotshell.pelo.platform.Log
 import eu.dotshell.pelo.platform.createHttpClientEngine
 import io.ktor.client.HttpClient
-import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
-import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
-import okio.Buffer
-import okio.GzipSink
-import okio.buffer
 
 /**
- * Turns the [DailyReportRepository]'s pending delta into a single gzipped POST to the telemetry
+ * Turns the [DailyReportRepository]'s pending delta into a single JSON POST to the telemetry
  * endpoint. Platform-agnostic: the only platform concern (the retry attempt count) is passed in
  * by the caller, and the [Outcome] is mapped to the platform scheduler's retry policy
  * (Android: WorkManager `Result`).
@@ -125,15 +120,12 @@ object TelemetryUploader {
             repo.markSent(snapshot.eventIds, snapshot.sessionIds)
             return Outcome.GIVE_UP
         }
-        val gzipped = gzip(payload)
-
         var lastException: Exception? = null
         for (attempt in 1..3) {
             try {
                 val response = httpClient.post(config.endpointUrl) {
                     contentType(ContentType.Application.Json)
-                    header(HttpHeaders.ContentEncoding, "gzip")
-                    setBody(gzipped)
+                    setBody(payload)
                 }
                 if (response.status.isSuccess()) {
                     repo.markSent(snapshot.eventIds, snapshot.sessionIds)
@@ -153,19 +145,5 @@ object TelemetryUploader {
 
         Log.w(TAG, "All upload attempts failed. Last exception: ${lastException?.message}")
         return if (attemptCount >= MAX_ATTEMPTS) Outcome.GIVE_UP else Outcome.RETRY
-    }
-
-    /** In-memory gzip of [text] via okio (replaces java.util.zip.GZIPOutputStream). */
-    private fun gzip(text: String): ByteArray {
-        val compressed = Buffer()
-        // GzipSink(compressed) disambiguates the Sink/Source overload of okio's gzip() —
-        // Buffer is both, so `compressed.gzip()` is ambiguous.
-        val sink = GzipSink(compressed).buffer()
-        try {
-            sink.writeUtf8(text)
-        } finally {
-            sink.close()
-        }
-        return compressed.readByteArray()
     }
 }
