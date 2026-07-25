@@ -395,6 +395,7 @@
     "endpointUrl": "https://api.dotshell.eu/pelo/v1/telemetry/daily",
     "schemaVersion": 1,
     "networkCode": "lyon-tcl",
+    "flushDebounceSeconds": 3,
     "closeDebounceSeconds": 5,
     "tripSamplingSeconds": 30,
     "tripSnapRadiusMeters": 100,

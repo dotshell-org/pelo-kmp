@@ -2,20 +2,19 @@ package eu.dotshell.pelo.generic.data.telemetry
 
 import eu.dotshell.pelo.platform.BackgroundScheduler
 import kotlin.concurrent.Volatile
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 
 /**
- * Platform-agnostic session debounce orchestration for telemetry.
+ * Platform-agnostic session lifecycle bridge for telemetry.
  *
  * A platform observer (Android: `ProcessLifecycleOwner` via `TelemetryService`) forwards
  * app-wide foreground/background transitions here:
- *  - [onForeground] opens a session, cancels any pending close-triggered upload, and
- *    starts a periodic coroutine loop to flush accumulated events every 60 seconds.
- *  - [onBackground] closes the session, cancels the periodic loop, and schedules a
- *    debounced upload via [BackgroundScheduler] to flush any remaining teardown events.
+ *  - [onForeground] cancels any pending deferred upload and opens a session.
+ *  - [onBackground] closes the session and schedules a deferred upload via [BackgroundScheduler]
+ *    as a process-death-safe fallback.
+ *
+ * Near-real-time uploads while in the foreground are no longer this class's concern: each action
+ * now drives its own debounced flush from [TelemetryEmitter] (see [TelemetryFlushScheduler]), so
+ * there is no periodic polling loop here anymore.
  */
 class TelemetrySessionController(
     private val scheduler: BackgroundScheduler,
@@ -25,40 +24,18 @@ class TelemetrySessionController(
     @Volatile
     private var activeSessionId: String? = null
 
-    private var periodicUploadJob: Job? = null
-
     fun onForeground() {
         scheduler.cancelTelemetryUpload()
         activeSessionId = TelemetryEmitter.openSession()
-
-        val scope = TelemetryEmitter.scope()
-        if (scope != null) {
-            periodicUploadJob?.cancel()
-            periodicUploadJob = scope.launch {
-                while (isActive) {
-                    delay(60_000L)
-                    val optIn = TelemetryEmitter.optInManager()
-                    if (optIn != null && optIn.isOptedIn) {
-                        val repo = TelemetryEmitter.repository()
-                        if (repo != null) {
-                            val snapshot = repo.snapshotPendingForUpload()
-                            if (snapshot != null) {
-                                TelemetryUploader.uploadOnce(attemptCount = 0)
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 
     fun onBackground() {
-        periodicUploadJob?.cancel()
-        periodicUploadJob = null
-
         val sessionId = activeSessionId ?: return
         TelemetryEmitter.closeSession(sessionId)
         activeSessionId = null
+        // Fallback for events emitted right before backgrounding: the in-process debounced flush
+        // may not complete before the OS suspends us, so schedule a deferred, process-death-safe
+        // upload too. Overlap with the in-process flush is de-duplicated by the uploader.
         scheduler.scheduleTelemetryUpload(debounceSeconds.coerceAtLeast(0))
     }
 }

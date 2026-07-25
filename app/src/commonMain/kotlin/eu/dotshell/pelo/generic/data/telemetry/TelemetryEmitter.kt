@@ -15,7 +15,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 
 /**
  * Process-wide entry point for telemetry, shared across platforms.
@@ -50,7 +49,8 @@ object TelemetryEmitter {
         val repository: DailyReportRepository,
         val config: TelemetryConfigData,
         val scope: CoroutineScope,
-        val localHistory: LocalHistoryStorage
+        val localHistory: LocalHistoryStorage,
+        val flushScheduler: TelemetryFlushScheduler
     )
 
     fun initialize(context: PlatformContext, config: TelemetryConfigData) {
@@ -84,7 +84,11 @@ object TelemetryEmitter {
             repository = repository,
             config = config,
             scope = scope,
-            localHistory = localHistory
+            localHistory = localHistory,
+            flushScheduler = TelemetryFlushScheduler(
+                scope = scope,
+                debounceMs = config.flushDebounceSeconds.coerceAtLeast(0) * 1_000L
+            )
         )
 
         // Bootstrap repository state from disk (if any) for the current daily id.
@@ -96,20 +100,17 @@ object TelemetryEmitter {
             if (currentState != null) {
                 val snapshot = repository.snapshotPendingForUpload()
                 if (snapshot != null) {
-                    val lastMod = try {
-                        Instant.parse(currentState.lastModifiedAt)
-                    } catch (e: Exception) {
-                        null
-                    }
-                    if (lastMod != null) {
-                        val durationSinceLastMod = Clock.System.now() - lastMod
-                        if (durationSinceLastMod.inWholeMinutes >= 5) {
-                            Log.i(TAG, "Unsent telemetry found (last modified ${durationSinceLastMod.inWholeMinutes} minutes ago). Triggering upload...")
-                            launch {
-                                val outcome = TelemetryUploader.uploadOnce(attemptCount = 0)
-                                Log.i(TAG, "Startup telemetry upload finished with outcome: $outcome")
-                            }
-                        }
+                    // Anything still pending at startup (app killed mid-flush, or a whole session
+                    // spent offline) ships immediately — same immediacy as the per-action flush.
+                    // No age threshold anymore: with near-real-time flushing, leftover pending
+                    // data is rare and should go out now, not wait to be "old enough".
+                    Log.i(TAG, "Unsent telemetry found at startup — triggering upload...")
+                    launch {
+                        val outcome = TelemetryUploader.uploadOnce(
+                            attemptCount = 0,
+                            trigger = TelemetryUploader.TRIGGER_STARTUP
+                        )
+                        Log.i(TAG, "Startup telemetry upload finished with outcome: $outcome")
                     }
                 }
             }
@@ -139,6 +140,8 @@ object TelemetryEmitter {
         c.scope.launch {
             ensureDailyIdFresh(c)
             c.repository.appendEvent(event)
+            // Ship the action within seconds; a burst coalesces into one upload.
+            c.flushScheduler.requestFlush()
         }
     }
 
@@ -171,6 +174,9 @@ object TelemetryEmitter {
         c.scope.launch {
             ensureDailyIdFresh(c)
             c.repository.closeSession(sessionId, closedAt)
+            // Ship the freshly-closed session promptly (foreground / process still alive). The
+            // background scheduler remains the fallback if the process is suspended first.
+            c.flushScheduler.requestFlush()
         }
     }
 

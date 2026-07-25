@@ -9,7 +9,6 @@ import platform.UIKit.UIBackgroundTaskInvalid
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import eu.dotshell.pelo.generic.data.telemetry.TelemetryUploader
 
@@ -41,7 +40,10 @@ actual class BackgroundScheduler actual constructor(context: PlatformContext) {
             val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
             scope.launch {
                 try {
-                    delay(delaySeconds * 1000L)
+                    // Upload right away — the OS caps this assertion at roughly 30s, so we must
+                    // NOT sleep for [delaySeconds] (often 60s) first, or we get killed before
+                    // sending. The submitted BGAppRefreshTaskRequest above covers the truly
+                    // deferred case; this assertion is the best-effort immediate attempt.
                     Log.i(TAG, "Executing immediate background upload task assertion...")
                     val outcome = TelemetryUploader.uploadOnce(0)
                     Log.i(TAG, "Immediate background upload completed with outcome: $outcome")

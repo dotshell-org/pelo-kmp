@@ -227,6 +227,12 @@ data class TelemetryConfigData(
     val endpointUrl: String,
     val schemaVersion: Int = 1,
     val networkCode: String,
+    // How long after an action we wait before shipping it. A short window coalesces a burst
+    // of actions (e.g. itinerary_calculated + itinerary_chosen) into a single upload while
+    // still sending an isolated action within a few seconds.
+    val flushDebounceSeconds: Long = 3,
+    // Fallback delay for the deferred (background / process-death-safe) upload scheduled when
+    // the app goes to background. The in-process debounced flush handles the foreground case.
     val closeDebounceSeconds: Long = 60,
     val tripSamplingSeconds: Long = 30,
     val tripSnapRadiusMeters: Int = 100,

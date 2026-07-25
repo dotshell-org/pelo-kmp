@@ -10,6 +10,8 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.contentType
 import io.ktor.http.isSuccess
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.datetime.Clock
 import kotlinx.serialization.json.Json
 import okio.Buffer
@@ -30,7 +32,12 @@ object TelemetryUploader {
 
     private const val TAG = "TelemetryUploader"
     private const val MAX_ATTEMPTS = 5
-    private const val TRIGGER_SESSION_CLOSED = "session_closed"
+
+    // Why this upload fired, recorded on the wire so the backend can tell near-real-time
+    // action flushes apart from the background/close fallback and the startup catch-up.
+    const val TRIGGER_ACTIVITY = "activity"            // per-action debounced flush (foreground)
+    const val TRIGGER_STARTUP = "startup"              // leftover pending shipped at app launch
+    const val TRIGGER_SESSION_CLOSED = "session_closed" // background / session-close fallback
 
     /** Result of a single attempt; the platform layer maps this to its own retry mechanism. */
     enum class Outcome { SUCCESS, RETRY, GIVE_UP }
@@ -39,6 +46,12 @@ object TelemetryUploader {
         ignoreUnknownKeys = true
         encodeDefaults = true
     }
+
+    // Serializes overlapping upload attempts (the per-action debounced flush, the background
+    // scheduler, the startup catch-up, WorkManager). Because snapshot → send → markSent runs
+    // under this lock, a second caller acquires it only after the first has marked its events
+    // sent, so it snapshots the now-empty delta and no event is sent twice.
+    private val uploadMutex = Mutex()
 
     // Singleton across upload attempts and lifecycle restarts (mirrors the old OkHttp lazy client).
     private val httpClient by lazy { HttpClient(createHttpClientEngine()) }
@@ -49,7 +62,14 @@ object TelemetryUploader {
      * [Outcome.RETRY]. "Nothing to do" cases (not initialized, opted out, empty delta) yield
      * [Outcome.SUCCESS].
      */
-    suspend fun uploadOnce(attemptCount: Int): Outcome {
+    suspend fun uploadOnce(
+        attemptCount: Int,
+        trigger: String = TRIGGER_SESSION_CLOSED
+    ): Outcome = uploadMutex.withLock {
+        uploadOnceLocked(attemptCount, trigger)
+    }
+
+    private suspend fun uploadOnceLocked(attemptCount: Int, trigger: String): Outcome {
         val repo = TelemetryEmitter.repository() ?: return Outcome.SUCCESS
         val config = TelemetryEmitter.config() ?: return Outcome.SUCCESS
         val optIn = TelemetryEmitter.optInManager()
@@ -87,7 +107,7 @@ object TelemetryUploader {
             appVersion = snapshot.appVersion,
             schemaVersion = snapshot.schemaVersion,
             sentAt = Clock.System.now().toString(),
-            trigger = TRIGGER_SESSION_CLOSED,
+            trigger = trigger,
             day = snapshot.day,
             sessions = snapshot.sessions,
             profile = profile,
