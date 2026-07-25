@@ -491,14 +491,9 @@ fun InlineItinerarySheetContent(
                 // origin/dest is the only endpoint hint that leaves the device.
                 val nowIso = Clock.System.now().toString()
                 val depSecondsAtCalc = selectedTimeSeconds
-                val optionDetails = journeys.mapIndexed { idx, journey ->
-                    val nonWalkingLegs = journey.legs.filter { !it.isWalking }
+                val optionDetails = journeys.map { journey ->
                     eu.dotshell.pelo.generic.data.telemetry.ItineraryOptionDetail(
-                        index = idx,
                         signature = journeySignatureId(journey),
-                        durationMin = journey.durationMinutes,
-                        transfers = (nonWalkingLegs.size - 1).coerceAtLeast(0),
-                        lines = nonWalkingLegs.mapNotNull { it.routeName }.distinct(),
                         legs = journey.legs.map { leg ->
                             eu.dotshell.pelo.generic.data.telemetry.ItineraryLeg(
                                 line = leg.routeName,

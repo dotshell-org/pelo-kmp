@@ -173,20 +173,21 @@ data class PlaceRef(
 }
 
 /**
- * One proposed itinerary, as a compact leg skeleton — enough to identify the exact path without
- * the bulk of every intermediate stop. Stored on every [TelemetryEvent.ItineraryCalculated]
- * (most searches are never "chosen", so the option list is captured at calculation time). The
- * intermediate stops passed on each leg and their scheduled times are recovered downstream from
- * the timetable (line + boarding stop + departure time + service_date + dataset_version).
+ * One proposed itinerary as a compact leg skeleton (line + boarding/alighting stop + times).
+ * Stored on every [TelemetryEvent.ItineraryCalculated] (most searches are never "chosen", so the
+ * options are captured at calculation time).
+ *
+ * This is the minimal *lossless* representation: the exact boarded/alighted stops must be kept
+ * because for a free-text (geohash) endpoint a later Raptor replay would only be approximate.
+ * Everything derivable is dropped — duration, transfer count, line list and display rank all fall
+ * out of the legs (or the list order); intermediate stops and their times are recovered from the
+ * timetable (line + boarding stop + departure time + service_date + dataset_version).
  */
 @Serializable
 data class ItineraryOptionDetail(
-    val index: Int,                                         // position as displayed
-    // Stable content id (departure/arrival + legs). How itinerary_chosen refers back to an option.
+    // Stable content id; how itinerary_chosen refers back to an option. Built from stop *ids*
+    // while the legs below carry stop *names*, so it is not derivable from them — kept explicit.
     val signature: String,
-    @SerialName("duration_min") val durationMin: Int,
-    val transfers: Int,
-    val lines: List<String>,                               // summary line list (the "résumé")
     val legs: List<ItineraryLeg>
 )
 
