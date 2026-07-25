@@ -482,12 +482,13 @@ fun InlineItinerarySheetContent(
             if (journeys.isEmpty()) {
                 errorText = "Aucun itineraire trouve"
             } else {
-                // Telemetry: emit itinerary.calculated with the FULL detail of every option shown
-                // (legs + every intermediate stop and its scheduled time). Most searches are never
-                // "chosen", so the detail is captured here; itinerary_chosen only references the
-                // picked option by signature. Walk legs to/from a coordinate endpoint omit their
-                // stop name (it can be the raw address) — the geohash on origin/dest is the only
-                // endpoint hint that leaves the device.
+                // Telemetry: emit itinerary.calculated with a compact leg skeleton per option
+                // (line + boarding/alighting stop + times). Intermediate stops are omitted — they
+                // are recomputable from the timetable (dataset_version + service_date). Most
+                // searches are never "chosen", so options are captured here; itinerary_chosen only
+                // references the picked option by signature. Walk legs to/from a coordinate
+                // endpoint omit their stop name (it can be the raw address) — the geohash on
+                // origin/dest is the only endpoint hint that leaves the device.
                 val nowIso = Clock.System.now().toString()
                 val depSecondsAtCalc = selectedTimeSeconds
                 val optionDetails = journeys.mapIndexed { idx, journey ->
@@ -505,13 +506,7 @@ fun InlineItinerarySheetContent(
                                 fromStop = if (leg.fromStopId == "-1") null else leg.fromStopName,
                                 toStop = if (leg.toStopId == "-1") null else leg.toStopName,
                                 depSeconds = leg.departureTime,
-                                arrSeconds = leg.arrivalTime,
-                                stops = if (leg.isWalking) emptyList() else leg.intermediateStops.map { s ->
-                                    eu.dotshell.pelo.generic.data.telemetry.LegStop(
-                                        name = s.stopName,
-                                        arrSeconds = s.arrivalTime
-                                    )
-                                }
+                                arrSeconds = leg.arrivalTime
                             )
                         }
                     )

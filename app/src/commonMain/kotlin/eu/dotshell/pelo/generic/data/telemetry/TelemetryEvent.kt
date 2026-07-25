@@ -173,14 +173,11 @@ data class PlaceRef(
 }
 
 /**
- * One of the options proposed by the routing engine for a given itinerary calculation.
- * Captured at calculation time to enable downstream analysis of user preferences
- * (fastest vs. fewest transfers, etc.).
- */
-/**
- * One proposed itinerary with its full detail, as shown to the user. Stored on every
- * [TelemetryEvent.ItineraryCalculated] — the common case is a search that is never "chosen", so
- * the detail must be captured at calculation time, not deferred to the (rare) choice.
+ * One proposed itinerary, as a compact leg skeleton — enough to identify the exact path without
+ * the bulk of every intermediate stop. Stored on every [TelemetryEvent.ItineraryCalculated]
+ * (most searches are never "chosen", so the option list is captured at calculation time). The
+ * intermediate stops passed on each leg and their scheduled times are recovered downstream from
+ * the timetable (line + boarding stop + departure time + service_date + dataset_version).
  */
 @Serializable
 data class ItineraryOptionDetail(
@@ -194,9 +191,10 @@ data class ItineraryOptionDetail(
 )
 
 /**
- * One leg of an itinerary. Transit legs carry every intermediate stop passed and its scheduled
- * arrival time. Stop names on a walk leg to/from a coordinate endpoint are omitted — they can be
- * the raw address label; the scrubbed geohash on the parent event stays the only endpoint hint.
+ * One leg of an itinerary: which line, boarded and alighted where and when. Intermediate stops
+ * are intentionally omitted (recomputable from the timetable). Stop names on a walk leg to/from a
+ * coordinate endpoint are omitted too — they can be the raw address label; the scrubbed geohash
+ * on the parent event stays the only endpoint hint.
  */
 @Serializable
 data class ItineraryLeg(
@@ -205,13 +203,5 @@ data class ItineraryLeg(
     @SerialName("from_stop") val fromStop: String? = null, // stop name; null for a coordinate endpoint
     @SerialName("to_stop") val toStop: String? = null,
     @SerialName("dep_seconds") val depSeconds: Int,        // seconds since local midnight
-    @SerialName("arr_seconds") val arrSeconds: Int,
-    val stops: List<LegStop> = emptyList()                 // intermediate stops passed (transit legs)
-)
-
-/** An intermediate stop passed on a transit leg, with its scheduled arrival time. */
-@Serializable
-data class LegStop(
-    val name: String,
     @SerialName("arr_seconds") val arrSeconds: Int
 )
