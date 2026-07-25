@@ -362,9 +362,6 @@ fun InlineItinerarySheetContent(
         try {
             val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
             val date = selectedDate ?: today
-            // Walking params actually used for the emitted journeys. Only the long-walk fallback
-            // below diverges from DEFAULT; the effective date/time are read from state at emit.
-            var effWalking = WalkingParams.DEFAULT
             journeys = calculateJourneys(
                 origin = originLocation,
                 destination = destinationLocation,
@@ -448,7 +445,6 @@ fun InlineItinerarySheetContent(
 
                 if (longWalkJourneys.isNotEmpty()) {
                     journeys = longWalkJourneys
-                    effWalking = longWalk
                     longWalkFallbackMeters =
                         longWalkJourneys.minOf { journeyWalkingMeters(it, longWalk.speedMetersPerSecond) }
                 }
@@ -485,18 +481,38 @@ fun InlineItinerarySheetContent(
             if (journeys.isEmpty()) {
                 errorText = "Aucun itineraire trouve"
             } else {
-                // Telemetry: emit itinerary.calculated with the proposed options. We cap the
-                // payload at 3 options to mirror how the UI displays them and keep the
-                // message size small. Walking-only legs are excluded from the line list.
+                // Telemetry: emit itinerary.calculated with the FULL detail of every option shown
+                // (legs + every intermediate stop and its scheduled time). Most searches are never
+                // "chosen", so the detail is captured here; itinerary_chosen only references the
+                // picked option by signature. Walk legs to/from a coordinate endpoint omit their
+                // stop name (it can be the raw address) — the geohash on origin/dest is the only
+                // endpoint hint that leaves the device.
                 val nowIso = Clock.System.now().toString()
                 val depSecondsAtCalc = selectedTimeSeconds
-                val options = journeys.take(3).mapIndexed { idx, journey ->
+                val optionDetails = journeys.mapIndexed { idx, journey ->
                     val nonWalkingLegs = journey.legs.filter { !it.isWalking }
-                    eu.dotshell.pelo.generic.data.telemetry.ItineraryOption(
+                    eu.dotshell.pelo.generic.data.telemetry.ItineraryOptionDetail(
                         index = idx,
+                        signature = journeySignature(journey),
                         durationMin = journey.durationMinutes,
                         transfers = (nonWalkingLegs.size - 1).coerceAtLeast(0),
-                        lines = nonWalkingLegs.mapNotNull { it.routeName }.distinct()
+                        lines = nonWalkingLegs.mapNotNull { it.routeName }.distinct(),
+                        legs = journey.legs.map { leg ->
+                            eu.dotshell.pelo.generic.data.telemetry.ItineraryLeg(
+                                line = leg.routeName,
+                                walk = leg.isWalking,
+                                fromStop = if (leg.fromStopId == "-1") null else leg.fromStopName,
+                                toStop = if (leg.toStopId == "-1") null else leg.toStopName,
+                                depSeconds = leg.departureTime,
+                                arrSeconds = leg.arrivalTime,
+                                stops = if (leg.isWalking) emptyList() else leg.intermediateStops.map { s ->
+                                    eu.dotshell.pelo.generic.data.telemetry.LegStop(
+                                        name = s.stopName,
+                                        arrSeconds = s.arrivalTime
+                                    )
+                                }
+                            )
+                        }
                     )
                 }
                 val departureIso = depSecondsAtCalc?.let { seconds ->
@@ -506,24 +522,9 @@ fun InlineItinerarySheetContent(
                         seconds / 3600, (seconds % 3600) / 60
                     ).toInstant(TimeZone.currentSystemDefault()).toString()
                 } ?: nowIso
-                // Replay inputs: everything (beyond origin/dest) that steered this Raptor run, so
-                // the backend can regenerate the options offline with raptor-kmp.
-                val tzNow = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
-                val nowSeconds = tzNow.hour * 3600 + tzNow.minute * 60 + tzNow.second
-                val isArrival = timeMode == TimeMode.ARRIVAL
-                val recomputeSpec = eu.dotshell.pelo.generic.data.telemetry.ItineraryRecomputeSpec(
-                    serviceDate = (selectedDate ?: tzNow.date).toString(),
-                    timeMode = if (isArrival) "arrival" else "departure",
-                    timeSeconds = if (isArrival) (selectedTimeSeconds ?: defaultArrivalSeconds())
-                                  else (selectedTimeSeconds ?: nowSeconds),
-                    searchWindowMin = if (isArrival) 120 else null,
-                    blockedLines = blockedRouteNames.toList(),
-                    walkSpeedMps = effWalking.speedMetersPerSecond,
-                    walkDetourFactor = effWalking.detourFactor,
-                    walkMaxAccessEgressM = effWalking.maxAccessEgressDistanceMeters,
-                    walkMaxDirectM = effWalking.maxDirectWalkDistanceMeters,
-                    datasetVersion = datasetVersion
-                )
+                val serviceDate = (selectedDate
+                    ?: Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date).toString()
+                val timeModeStr = if (timeMode == TimeMode.ARRIVAL) "arrival" else "departure"
                 if (originRef != null && destRef != null) {
                     eu.dotshell.pelo.generic.data.telemetry.TelemetryEmitter.emit(
                         eu.dotshell.pelo.generic.data.telemetry.TelemetryEvent.ItineraryCalculated(
@@ -534,8 +535,10 @@ fun InlineItinerarySheetContent(
                             dest = destRef,
                             requestedAt = nowIso,
                             departureAt = departureIso,
-                            options = options,
-                            recompute = recomputeSpec
+                            timeMode = timeModeStr,
+                            serviceDate = serviceDate,
+                            datasetVersion = datasetVersion,
+                            options = optionDetails
                         )
                     )
                 }
@@ -914,27 +917,17 @@ fun InlineItinerarySheetContent(
                     journey = chosenJourney,
                     isExpanded = true,
                     onStartNavigation = {
-                        val combined = journeysAvoidingAlerts.map { it.journey } + journeys
-                        val index = combined.indexOf(chosenJourney).takeIf { it >= 0 } ?: -1
                         lastCalcId?.let { calcId ->
+                            // Reference the picked option by its stable signature — it matches an
+                            // option in the itinerary_calculated event for this calc_id, so no need
+                            // to copy its content. (A rare alert-avoidance variant not among the
+                            // calculated options would be an unmatched signature.)
                             eu.dotshell.pelo.generic.data.telemetry.TelemetryEmitter.emit(
                                 eu.dotshell.pelo.generic.data.telemetry.TelemetryEvent.ItineraryChosen(
                                     eventId = randomId(),
                                     at = Clock.System.now().toString(),
                                     calcId = calcId,
-                                    optionIndex = index,
-                                    // Exact chosen path, so it stays recoverable even if a later
-                                    // dataset change would make a replay drift.
-                                    legs = chosenJourney.legs.map { leg ->
-                                        eu.dotshell.pelo.generic.data.telemetry.ChosenLeg(
-                                            line = leg.routeName,
-                                            walk = leg.isWalking,
-                                            fromStopId = leg.fromStopId,
-                                            toStopId = leg.toStopId,
-                                            depSeconds = leg.departureTime,
-                                            arrSeconds = leg.arrivalTime
-                                        )
-                                    }
+                                    chosenSignatures = listOf(journeySignature(chosenJourney))
                                 )
                             )
                         }
