@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MyLocation
@@ -43,6 +45,8 @@ fun NavigationModeOverlay(
     state: NavigationModeUiState,
     showRecenterButton: Boolean,
     onRecenter: () -> Unit,
+    isVoiceEnabled: Boolean,
+    onToggleVoice: () -> Unit,
     /** Height of the navigation sheet's peek area, so the recentre button clears it. */
     sheetPeekHeight: Dp,
     modifier: Modifier = Modifier
@@ -52,6 +56,8 @@ fun NavigationModeOverlay(
     Box(modifier) {
         NavigationInstructionCard(
             state = state,
+            isVoiceEnabled = isVoiceEnabled,
+            onToggleVoice = onToggleVoice,
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
@@ -87,6 +93,8 @@ fun NavigationModeOverlay(
 @Composable
 private fun NavigationInstructionCard(
     state: NavigationModeUiState,
+    isVoiceEnabled: Boolean,
+    onToggleVoice: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val strings = StringProvider(LocalPlatformContext.current)
@@ -139,6 +147,21 @@ private fun NavigationInstructionCard(
                 )
                 NavigationStatusLine(state)
             }
+
+            Icon(
+                imageVector = if (isVoiceEnabled) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
+                contentDescription = strings[if (isVoiceEnabled) "nav_voice_on" else "nav_voice_off"],
+                tint = if (isVoiceEnabled) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                },
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .clickable(onClick = onToggleVoice)
+                    .padding(8.dp)
+            )
         }
 
         state.upcomingLeg?.takeIf { !state.isArrived }?.let { upcoming ->

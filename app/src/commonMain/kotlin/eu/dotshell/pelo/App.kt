@@ -169,8 +169,10 @@ import eu.dotshell.pelo.generic.service.NavigationModeController
 import eu.dotshell.pelo.generic.service.NavigationModePlatform
 import eu.dotshell.pelo.generic.service.NavigationNotificationBridge
 import eu.dotshell.pelo.generic.service.NavigationSession
+import eu.dotshell.pelo.generic.service.NavigationVoicePreference
 import eu.dotshell.pelo.generic.ui.screens.plan.NavigationModeOverlay
 import eu.dotshell.pelo.generic.ui.screens.plan.NavigationSheetContent
+import eu.dotshell.pelo.generic.ui.screens.plan.NavigationVoiceGuidance
 import eu.dotshell.pelo.generic.ui.screens.plan.NavigationSheetPeekContentHeight
 import eu.dotshell.pelo.generic.ui.screens.plan.SheetDragHandleHeight
 import eu.dotshell.pelo.generic.ui.screens.plan.buildNavigationModeUiState
@@ -345,6 +347,9 @@ private fun RootScaffold(
     // Set while the journey trace is being resolved, so "Start" reads as busy instead of dead.
     var isStartingNavigation by remember { mutableStateOf(false) }
     var navigationBlockedMessage by remember { mutableStateOf(false) }
+    var isVoiceGuidanceEnabled by remember(context) {
+        mutableStateOf(NavigationVoicePreference.isEnabled(context))
+    }
     DisposableEffect(navigationController) {
         onDispose { navigationController.dispose() }
     }
@@ -1248,6 +1253,15 @@ private fun RootScaffold(
             )
         }
 
+        if (isNavigating) {
+            val voiceState = remember(navigationSession) {
+                buildNavigationModeUiState(navigationSession)
+            }
+            if (voiceState != null) {
+                NavigationVoiceGuidance(state = voiceState, isEnabled = isVoiceGuidanceEnabled)
+            }
+        }
+
         // Navigation overlay. Rendered for the whole of navigation mode, fix or no fix: gating it
         // on a known position hid every control at exactly the moment the tab bar, search bar,
         // sheet and map gestures were already suppressed, which left no way out of the mode.
@@ -1274,6 +1288,11 @@ private fun RootScaffold(
                     state = overlayState,
                     showRecenterButton = !isFollowingUser,
                     onRecenter = { isFollowingUser = true },
+                    isVoiceEnabled = isVoiceGuidanceEnabled,
+                    onToggleVoice = {
+                        isVoiceGuidanceEnabled = !isVoiceGuidanceEnabled
+                        NavigationVoicePreference.setEnabled(context, isVoiceGuidanceEnabled)
+                    },
                     sheetPeekHeight = navigationPeekHeight,
                     modifier = Modifier.fillMaxSize()
                 )

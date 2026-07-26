@@ -268,4 +268,6 @@
     <string name="duration_hours_minutes">%1$dh%2$s</string>
     <string name="distance_meters">%1$d m</string>
     <string name="distance_kilometers">%1$s km</string>
+    <string name="nav_voice_on">Guidage vocal activé</string>
+    <string name="nav_voice_off">Guidage vocal coupé</string>
 </resources>
