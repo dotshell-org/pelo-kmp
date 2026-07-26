@@ -540,7 +540,52 @@ Pas de Live Activity, pas de tâche en arrière‑plan, pas de notification pers
 
 ---
 
-## 9. Ordre de remédiation proposé
+## 9. État de la remédiation
+
+Corrigé sur la branche `fix/navigation` (4 commits). Statut par constat :
+
+| Lot | Constats | État |
+|---|---|---|
+| Débloquer | NAV-01, NAV-03, NAV-04, NAV-05, NAV-06 | ✅ corrigé |
+| Fiabiliser le guidage | NAV-07 → NAV-15, NAV-50 | ✅ corrigé |
+| UI / accessibilité / i18n | NAV-16 → NAV-27, NAV-39 → NAV-42 | ✅ corrigé |
+| Expérience | NAV-28 → NAV-31, NAV-34, NAV-35, NAV-36, NAV-37 | ✅ corrigé |
+| iOS | NAV-43 → NAV-46 | ✅ corrigé |
+| Dette | NAV-48, NAV-49, NAV-51, NAV-52, NAV-53, NAV-54 | ✅ corrigé |
+| Fonctionnalités | NAV-32, NAV-33, NAV-38, NAV-47 | ⏸ hors périmètre de correction |
+
+### Ce qui reste ouvert, et pourquoi
+
+Ces quatre points ne sont pas des correctifs mais des fonctionnalités à part entière. Les traiter
+au chausse-pied dans une passe de correction aurait produit du travail à moitié fait :
+
+- **NAV-32 — guidage vocal et haptique.** Demande un `expect`/`actual` TTS (AVSpeechSynthesizer /
+  Android TextToSpeech), une politique de déclenchement (à quelle distance, à quelle fréquence,
+  quoi ne pas répéter), une gestion du focus audio, et un réglage utilisateur. Les instructions
+  sont désormais des données typées (`NavigationInstruction`), donc la couche vocale a un point
+  d'accroche propre.
+- **NAV-33 — temps réel dans le guidage.** Le mode s'appuie toujours sur l'horaire planifié. Y
+  injecter les retards suppose de rattacher un trajet planifié à un véhicule suivi, ce que
+  l'application ne fait nulle part aujourd'hui.
+- **NAV-38 — détection hors-itinéraire et recalcul.** La *détection* est faite : `isOffRoute`
+  remonte jusqu'à l'overlay, qui l'affiche. Le *recalcul* (relancer RAPTOR depuis la position
+  courante, proposer le nouveau trajet, basculer la session) reste à faire.
+- **NAV-47 — Live Activity iOS.** Nécessite une extension d'application, un `ActivityAttributes`
+  et un pont Swift ↔ Kotlin. Le suivi en arrière-plan lui-même fonctionne maintenant (NAV-45).
+
+### Vérification
+
+`./gradlew :app:testDebugUnitTest :app:assembleDebug :app:compileKotlinIosSimulatorArm64` passe —
+120 tests, 0 échec, dont 26 nouveaux sur le moteur de guidage, l'état de l'UI et la géométrie.
+
+**Aucune vérification sur appareil n'a été faite.** Les correctifs sont raisonnés depuis le code et
+couverts par des tests unitaires ; le comportement à valider en priorité sur téléphone est
+NAV-01 (le service de premier plan doit rester actif après le démarrage), NAV-07 (progression en
+métro sans GPS) et les insets de l'overlay sur un appareil à encoche.
+
+---
+
+## 10. Ordre de remédiation (appliqué)
 
 ### Lot 1 — Débloquer (corrige les régressions visibles)
 
@@ -584,6 +629,6 @@ Pas de Live Activity, pas de tâche en arrière‑plan, pas de notification pers
 
 ---
 
-## Note de méthode
+## 11. Note de méthode (audit initial)
 
 Cet audit est **statique**. Les enchaînements critiques (notamment NAV-01 et NAV-03) ont été tracés ligne à ligne mais **n'ont pas été vérifiés sur appareil**. Avant de corriger, il est utile de confirmer NAV-01 en instrumentant `onNavigationModeChanged` (log de la valeur reçue) et en observant que le service démarre puis s'arrête dans la seconde.
