@@ -191,6 +191,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.maplibre.spatialk.geojson.Position
 import eu.dotshell.pelo.generic.data.repository.geocoding.GeocodingRepository
+import eu.dotshell.pelo.generic.data.models.realtime.alerts.official.TrafficAlert
+import eu.dotshell.pelo.generic.utils.navigation.selectNavigationAlert
 import io.raptor.Location
 
 @Composable
@@ -354,6 +356,8 @@ private fun RootScaffold(
     var isRerouting by remember { mutableStateOf(false) }
     var rerouteDismissed by remember { mutableStateOf(false) }
     var rerouteFailed by remember { mutableStateOf(false) }
+    var shownNavigationAlert by remember { mutableStateOf<TrafficAlert?>(null) }
+    val trafficAlerts by viewModel.trafficAlerts.collectAsState(initial = emptyList())
     // Dismissing the prompt silences it for this departure only: coming back onto the route and
     // leaving it again is a new situation, and worth asking about again.
     LaunchedEffect(navigationSession.progress.isOffRoute) {
@@ -1259,6 +1263,20 @@ private fun RootScaffold(
             )
         }
 
+        shownNavigationAlert?.let { alert ->
+            val alertStrings = StringProvider(LocalPlatformContext.current)
+            AlertDialog(
+                onDismissRequest = { shownNavigationAlert = null },
+                title = { Text(alert.title) },
+                text = { Text(alert.message) },
+                confirmButton = {
+                    TextButton(onClick = { shownNavigationAlert = null }) {
+                        Text(alertStrings["close"])
+                    }
+                }
+            )
+        }
+
         if (rerouteFailed) {
             val rerouteStrings = StringProvider(LocalPlatformContext.current)
             AlertDialog(
@@ -1309,6 +1327,20 @@ private fun RootScaffold(
             if (overlayState != null) {
                 // Mirror the instruction into the ongoing notification, so a backgrounded session
                 // says what to do next instead of repeating a fixed sentence.
+                // Keyed on the alert feed as well as the session: the feed refreshes in the
+                // background, and a disruption declared mid-journey is exactly the one worth
+                // hearing about.
+                val navigationAlert = remember(
+                    navigationSession.progress.legIndex,
+                    navigationSession.journey,
+                    trafficAlerts,
+                ) {
+                    selectNavigationAlert(
+                        journey = navigationSession.journey,
+                        fromLegIndex = navigationSession.progress.legIndex,
+                        alertsForLine = viewModel::getAlertsForLine,
+                    )
+                }
                 val instructionText = overlayState.instruction.displayText()
                 LaunchedEffect(instructionText) {
                     NavigationNotificationBridge.setInstruction(instructionText)
@@ -1364,6 +1396,8 @@ private fun RootScaffold(
                         }
                     },
                     onDismissReroute = { rerouteDismissed = true },
+                    alert = navigationAlert,
+                    onAlertClick = { shownNavigationAlert = navigationAlert },
                     sheetPeekHeight = navigationPeekHeight,
                     modifier = Modifier.fillMaxSize()
                 )

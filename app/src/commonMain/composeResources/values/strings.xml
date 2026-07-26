@@ -275,4 +275,5 @@
     <string name="nav_reroute_running">Recalcul…</string>
     <string name="nav_reroute_dismiss">Ignorer</string>
     <string name="nav_reroute_failed">Aucun trajet trouvé depuis votre position.</string>
+    <string name="nav_alert_on_line">Ligne %1$s : %2$s</string>
 </resources>

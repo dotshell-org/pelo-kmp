@@ -40,6 +40,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import eu.dotshell.pelo.generic.data.models.realtime.alerts.official.AlertSeverity
+import eu.dotshell.pelo.generic.data.models.realtime.alerts.official.TrafficAlert
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
 
@@ -53,6 +55,8 @@ fun NavigationModeOverlay(
     isRerouting: Boolean,
     onReroute: () -> Unit,
     onDismissReroute: () -> Unit,
+    alert: TrafficAlert?,
+    onAlertClick: () -> Unit,
     /** Height of the navigation sheet's peek area, so the recentre button clears it. */
     sheetPeekHeight: Dp,
     modifier: Modifier = Modifier
@@ -67,6 +71,8 @@ fun NavigationModeOverlay(
             isRerouting = isRerouting,
             onReroute = onReroute,
             onDismissReroute = onDismissReroute,
+            alert = alert,
+            onAlertClick = onAlertClick,
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
@@ -107,6 +113,8 @@ private fun NavigationInstructionCard(
     isRerouting: Boolean,
     onReroute: () -> Unit,
     onDismissReroute: () -> Unit,
+    alert: TrafficAlert?,
+    onAlertClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val strings = StringProvider(LocalPlatformContext.current)
@@ -194,6 +202,8 @@ private fun NavigationInstructionCard(
             }
         }
 
+        // One banner at a time, and leaving the route outranks a disruption on a line ahead: the
+        // first is about what to do now, the second about what to expect later.
         if (state.canReroute) {
             Spacer(Modifier.height(8.dp))
             RerouteBanner(
@@ -201,7 +211,46 @@ private fun NavigationInstructionCard(
                 onReroute = onReroute,
                 onDismiss = onDismissReroute,
             )
+        } else if (alert != null && !state.isArrived) {
+            Spacer(Modifier.height(8.dp))
+            AlertBanner(alert = alert, onClick = onAlertClick)
         }
+    }
+}
+
+/** A disruption on a line still to come. Tapping opens the operator's full wording. */
+@Composable
+private fun AlertBanner(alert: TrafficAlert, onClick: () -> Unit) {
+    val strings = StringProvider(LocalPlatformContext.current)
+    val severity = AlertSeverity.fromSeverityType(alert.severityType, alert.severityLevel)
+    val shape = RoundedCornerShape(16.dp)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(4.dp, shape)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.surface)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        // The severity colour comes from the alert feed itself, so it matches how the same alert
+        // is coloured everywhere else in the app.
+        Box(
+            modifier = Modifier
+                .size(10.dp)
+                .clip(CircleShape)
+                .background(Color(severity.color))
+        )
+        Text(
+            text = strings.format("nav_alert_on_line", alert.lineName, alert.title),
+            color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodyMedium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
