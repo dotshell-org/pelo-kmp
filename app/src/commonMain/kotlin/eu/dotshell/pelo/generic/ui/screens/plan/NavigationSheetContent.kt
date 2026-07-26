@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -18,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -46,8 +48,11 @@ import eu.dotshell.pelo.platform.StringProvider
 /** Amber used for the "report an alert" affordance, matching the map FAB. */
 private val AlertAmber = Color(0xFFFACC15)
 
-/** Height of the always-visible part of the navigation sheet, excluding the drag handle. */
-val NavigationSheetPeekContentHeight: Dp = 88.dp
+/**
+ * Height of the always-visible part of the navigation sheet, excluding the drag handle and the
+ * gesture inset (the summary carries that itself).
+ */
+val NavigationSheetPeekContentHeight: Dp = 104.dp
 
 /**
  * Vertical space `BottomSheetDefaults.DragHandle` occupies (4dp bar, 22dp padding either side).
@@ -86,8 +91,6 @@ fun NavigationSheetContent(
             onReportAlert = onReportAlert,
         )
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceContainerHigh)
-
         JourneyDetailsSheetContent(
             journey = journey,
             isExpanded = true,
@@ -96,7 +99,10 @@ fun NavigationSheetContent(
                 .fillMaxWidth()
                 // The summary already claims the top of the sheet; the breakdown gets the rest,
                 // and scrolls within it.
-                .heightIn(max = (maxHeight - NavigationSheetPeekContentHeight).coerceAtLeast(160.dp)),
+                .heightIn(
+                    max = (maxHeight - NavigationSheetPeekContentHeight - SheetDragHandleHeight)
+                        .coerceAtLeast(160.dp)
+                ),
             useLightColors = !isAppInDarkTheme(),
             scrollAllContent = true,
             getZoneForStopName = getZoneForStopName,
@@ -138,8 +144,9 @@ private fun NavigationSheetSummary(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.navigationBars)
                 .heightIn(min = NavigationSheetPeekContentHeight)
-                .padding(horizontal = 20.dp),
+                .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -153,8 +160,11 @@ private fun NavigationSheetSummary(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            // The gesture inset belongs to the peek, not to the breakdown below it: leaving it out
+            // let the top of the detail show through under the summary when collapsed.
+            .windowInsetsPadding(WindowInsets.navigationBars)
             .heightIn(min = NavigationSheetPeekContentHeight)
-            .padding(horizontal = 20.dp, vertical = 8.dp),
+            .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {

@@ -829,13 +829,11 @@ private fun RootScaffold(
     val screenHeightDp = with(density) { windowInfo.containerSize.height.toDp() }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    // Navigation only has to clear its instruction card, not a full search header.
-    val topMargin = when {
-        isNavigating -> 190.dp
-        itineraryActive -> 290.dp
-        else -> 320.dp
-    }
+    val topMargin = if (itineraryActive) 290.dp else 320.dp
     val maxSheetHeight = minOf(700.dp, screenHeightDp - topInset - topMargin).coerceAtLeast(130.dp)
+    // Navigation's sheet is not a peek-and-glance panel: expanded it takes the whole screen bar
+    // the status bar, covering the instruction card and everything else.
+    val navigationSheetMaxHeight = (screenHeightDp - topInset).coerceAtLeast(240.dp)
     // Drag handle + summary row + gesture inset: what stays on screen with the sheet collapsed.
     val navigationPeekHeight = SheetDragHandleHeight + NavigationSheetPeekContentHeight + bottomInset
 
@@ -916,8 +914,40 @@ private fun RootScaffold(
                         },
                         navigationSession = navigationSession,
                         isNavigationFollowing = isNavigationFollowing,
+                        navigationOverlay = {
+                            // Rendered for the whole of navigation mode, fix or no fix: gating it
+                            // on a known position hid every control at exactly the moment the tab
+                            // bar, search bar, sheet and map gestures were already suppressed,
+                            // which left no way out of the mode.
+                            val overlayState = remember(navigationSession) {
+                                buildNavigationModeUiState(navigationSession)
+                            }
+                            if (isNavigating && overlayState != null) {
+                                // Mirror the instruction into the ongoing notification, so a
+                                // backgrounded session says what to do next instead of repeating a
+                                // fixed sentence.
+                                val instructionText = overlayState.instruction.displayText()
+                                LaunchedEffect(instructionText) {
+                                    NavigationNotificationBridge.setInstruction(instructionText)
+                                }
+                                DisposableEffect(Unit) {
+                                    onDispose { NavigationNotificationBridge.setInstruction(null) }
+                                }
+                                NavigationModeOverlay(
+                                    state = overlayState,
+                                    showRecenterButton = !isFollowingUser,
+                                    onRecenter = { isFollowingUser = true },
+                                    sheetPeekHeight = navigationPeekHeight,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        },
                         sheetContent = {
-                            Box(Modifier.heightIn(max = maxSheetHeight)) {
+                            Box(
+                                Modifier.heightIn(
+                                    max = if (isNavigating) navigationSheetMaxHeight else maxSheetHeight
+                                )
+                            ) {
                                 val sc = allSchedules
                                 val ln = selectedLine
                                 val st = selectedStation
@@ -944,7 +974,7 @@ private fun RootScaffold(
                                                     .orEmpty()
                                                 showAlertReport = true
                                             },
-                                            maxHeight = maxSheetHeight,
+                                            maxHeight = navigationSheetMaxHeight,
                                             getZoneForStopName = viewModel::getZoneForStopName,
                                         )
 
@@ -1246,36 +1276,6 @@ private fun RootScaffold(
             )
         }
 
-        // Navigation overlay. Rendered for the whole of navigation mode, fix or no fix: gating it
-        // on a known position hid every control at exactly the moment the tab bar, search bar,
-        // sheet and map gestures were already suppressed, which left no way out of the mode.
-        if (isNavigating) {
-            val overlayState = remember(navigationSession) {
-                buildNavigationModeUiState(navigationSession)
-            }
-            if (overlayState != null) {
-                // Mirror the instruction into the ongoing notification, so a backgrounded session
-                // says what to do next instead of repeating a fixed sentence.
-                val instructionText = overlayState.instruction.displayText()
-                LaunchedEffect(instructionText) {
-                    NavigationNotificationBridge.setInstruction(instructionText)
-                }
-                DisposableEffect(Unit) {
-                    onDispose { NavigationNotificationBridge.setInstruction(null) }
-                }
-                NavigationModeOverlay(
-                    state = overlayState,
-                    // Hidden while the breakdown is open: the overlay floats above the scaffold,
-                    // so an expanded sheet would otherwise have a button sitting on top of it.
-                    showRecenterButton = !isFollowingUser &&
-                        bottomSheetState.currentValue != SheetValue.Expanded,
-                    onRecenter = { isFollowingUser = true },
-                    sheetPeekHeight = navigationPeekHeight,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        }
-
         // Back collapses the journey breakdown first, then leaves navigation. The journey and the
         // itinerary sheet survive it, so re-starting is one tap away.
         BackHandler(enabled = isNavigating) {
@@ -1340,6 +1340,12 @@ private fun PlanContent(
     sheetContent: @Composable () -> Unit,
     navigationSession: NavigationSession,
     isNavigationFollowing: Boolean,
+    /**
+     * Navigation's instruction card and recentre button. Rendered inside the scaffold body,
+     * above the map: the bottom sheet is drawn over the body, so expanding it to full height
+     * covers this the way it covers everything else.
+     */
+    navigationOverlay: @Composable () -> Unit = {},
     cameraState: CameraState,
 ) {
     val context = LocalPlatformContext.current
@@ -1477,6 +1483,8 @@ private fun PlanContent(
                     droppedPin = droppedPin,
                     onMapMoved = onFabReset,
                 )
+
+                navigationOverlay()
 
                 if (!showAlertReport && !navigationSession.isActive) {
                     Column(
