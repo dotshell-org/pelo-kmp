@@ -1,25 +1,29 @@
 package eu.dotshell.pelo.generic.utils.location
 
 import eu.dotshell.pelo.platform.PlatformContext
+import platform.CoreLocation.CLLocationManager
+import platform.CoreLocation.kCLAuthorizationStatusAuthorizedAlways
+import platform.CoreLocation.kCLAuthorizationStatusAuthorizedWhenInUse
 
 /**
- * iOS implementation - requests Always authorization for navigation mode
- * to enable background location updates.
+ * iOS implementation. Authorization is process-wide, so a single CLLocationManager is enough to
+ * prompt for it and to read it back — the running location stream keeps its own manager and
+ * configures its own accuracy (see LocationProvider.setNavigationMode).
  */
 actual object LocationPermissionManager {
-    
-    private var locationProvider: LocationProvider? = null
-    
+
+    private val authorizationManager: CLLocationManager by lazy { CLLocationManager() }
+
     actual fun requestNavigationPermissions(context: PlatformContext) {
-        if (locationProvider == null) {
-            locationProvider = LocationProvider(context)
-        }
-        locationProvider?.requestAlwaysAuthorization()
+        authorizationManager.requestAlwaysAuthorization()
     }
-    
-    actual fun hasBackgroundLocationPermission(context: PlatformContext): Boolean {
-        // On iOS, we can't easily check the authorization status without more bindings
-        // For now, assume we have permission if we requested it
-        return true
+
+    actual fun hasForegroundLocationPermission(context: PlatformContext): Boolean {
+        val status = authorizationManager.authorizationStatus
+        return status == kCLAuthorizationStatusAuthorizedWhenInUse ||
+            status == kCLAuthorizationStatusAuthorizedAlways
     }
+
+    actual fun hasBackgroundLocationPermission(context: PlatformContext): Boolean =
+        authorizationManager.authorizationStatus == kCLAuthorizationStatusAuthorizedAlways
 }

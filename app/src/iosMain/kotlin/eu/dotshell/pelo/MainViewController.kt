@@ -12,6 +12,7 @@ import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.Log
 import eu.dotshell.pelo.platform.ProvideAppLocale
 import eu.dotshell.pelo.platform.PlatformContext
+import platform.UIKit.UIApplication
 import platform.UIKit.UIViewController
 
 /**
@@ -50,8 +51,14 @@ fun MainViewController(): UIViewController {
             ProvideAppLocale(LanguageManager.current.tag) {
             App(
                 onNavigationModeChanged = { active ->
+                    // The counterpart of Android's FLAG_KEEP_SCREEN_ON. Without it the phone
+                    // locked itself mid-journey after the usual idle timeout, which is exactly
+                    // when guidance is being read.
+                    UIApplication.sharedApplication.idleTimerDisabled = active
                     if (active) {
-                        // Request always authorization for navigation to enable background updates
+                        // Always authorization is what lets fixes keep arriving in the background;
+                        // the accuracy and background-update switches live on the running stream
+                        // (LocationProvider.setNavigationMode), not here.
                         LocationPermissionManager.requestNavigationPermissions(IosPlatformContext)
                     }
                 }
