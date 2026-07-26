@@ -1320,12 +1320,12 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         endStopId: String,
         leg: JourneyLeg
     ): List<Feature> {
-        val sectionedLines = mutableListOf<Feature>()
+        val sectionedLines = mutableListOf<Pair<Feature, Double>>()
 
         val stopsState = stopsUiState.value
         if (stopsState !is TransportStopsUiState.Success) {
             Log.e("TransportViewModel", "Stops not loaded yet")
-            return sectionedLines
+            return emptyList()
         }
 
         val stops = stopsState.stops
@@ -1355,7 +1355,7 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
                 Log.i("TransportViewModel", "Sample GTFS stop IDs: ${sampleStops.joinToString { "${it.properties.id} (${it.properties.nom})" }}")
                 Log.i("TransportViewModel", "Sample GID stop IDs: ${sampleStops.joinToString { "${it.id} (${it.properties.nom})" }}")
             }
-            return sectionedLines
+            return emptyList()
         }
 
         Log.i("TransportViewModel", "Found stops: ${finalStartStop.properties.nom} (GTFS: ${finalStartStop.properties.id}, GID: ${finalStartStop.id}) -> ${finalEndStop.properties.nom} (GTFS: ${finalEndStop.properties.id}, GID: ${finalEndStop.id})")
@@ -1370,28 +1370,23 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
                 val startCoord = listOf(finalStartStop.geometry.coordinates[0], finalStartStop.geometry.coordinates[1])
                 val endCoord = listOf(finalEndStop.geometry.coordinates[0], finalEndStop.geometry.coordinates[1])
 
-                fun findClosestPointIndex(targetCoord: List<Double>): Int {
-                    var minDistance = Double.MAX_VALUE
-                    var bestIndex = -1
-
-                    for (i in firstLine.indices) {
-                        val coord = firstLine[i]
-                        val distance = kotlin.math.sqrt(
-                            (coord[0] - targetCoord[0]) * (coord[0] - targetCoord[0]) +
-                                    (coord[1] - targetCoord[1]) * (coord[1] - targetCoord[1])
-                        )
-
-                        if (distance < minDistance) {
-                            minDistance = distance
-                            bestIndex = i
-                        }
-                    }
-
-                    return bestIndex
+                // A line name resolves to several traces (directions, variants, partial services)
+                // and only some serve this leg's stops. Matching without a distance bound accepted
+                // any of them and sliced between two meaningless indices, which is what put
+                // fragments of unrelated traces on the map. A variant that does not come near both
+                // stops is skipped; if none qualifies, the caller falls back to a straight line,
+                // which is wrong but coherent.
+                val startMatch = nearestVertexOnLine(firstLine, startCoord) ?: continue
+                val endMatch = nearestVertexOnLine(firstLine, endCoord) ?: continue
+                if (startMatch.distanceMeters > MAX_STOP_TO_LINE_METERS ||
+                    endMatch.distanceMeters > MAX_STOP_TO_LINE_METERS
+                ) {
+                    continue
                 }
+                val variantFitMeters = maxOf(startMatch.distanceMeters, endMatch.distanceMeters)
 
-                var startIndex = findClosestPointIndex(startCoord)
-                var endIndex = findClosestPointIndex(endCoord)
+                var startIndex = startMatch.index
+                var endIndex = endMatch.index
 
                 if (startIndex != -1 && endIndex != -1) {
                     val initialLength = kotlin.math.abs(endIndex - startIndex)
@@ -1446,12 +1441,12 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
                                 coordinates = listOf(sectionCoordinates)
                             )
                         )
-                        sectionedLines.add(sectionedLine)
+                        sectionedLines.add(sectionedLine to variantFitMeters)
                     }
                 }
             }
         }
-        return sectionedLines
+        return sectionedLines.sortedBy { it.second }.map { it.first }
     }
 
     override suspend fun resolveStopIdsByName(stopName: String, maxIds: Int): List<Int> =

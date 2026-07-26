@@ -91,3 +91,50 @@ data class StopDeparturePreview(
     val directionName: String,
     val nextDeparture: String
 )
+
+/**
+ * Where a stop sits on a line's polyline: the index of the nearest vertex, and how far away it is
+ * in metres.
+ *
+ * The distance is the point. A line name can resolve to several traces — directions, variants,
+ * partial services — and only some of them serve a given stop. Accepting the nearest vertex at any
+ * distance means an unrelated variant still yields an index, and slicing between two such indices
+ * produces an arbitrary chunk of a trace that goes somewhere else entirely.
+ *
+ * Coordinates are GeoJSON order, [lon, lat].
+ */
+fun nearestVertexOnLine(
+    linePoints: List<List<Double>>,
+    stopCoordinate: List<Double>,
+): LineVertexMatch? {
+    if (linePoints.isEmpty() || stopCoordinate.size < 2) return null
+
+    var bestIndex = -1
+    var bestSquaredMeters = Double.MAX_VALUE
+    for (index in linePoints.indices) {
+        val point = linePoints[index]
+        if (point.size < 2) continue
+        val squared = eu.dotshell.pelo.generic.utils.geo.GeometryUtils.squaredMeters(
+            lat1 = stopCoordinate[1],
+            lon1 = stopCoordinate[0],
+            lat2 = point[1],
+            lon2 = point[0],
+        )
+        if (squared < bestSquaredMeters) {
+            bestSquaredMeters = squared
+            bestIndex = index
+        }
+    }
+    if (bestIndex == -1) return null
+    return LineVertexMatch(index = bestIndex, distanceMeters = kotlin.math.sqrt(bestSquaredMeters))
+}
+
+data class LineVertexMatch(val index: Int, val distanceMeters: Double)
+
+/**
+ * How far a stop may sit from a line's polyline and still be considered served by it.
+ *
+ * Generous on purpose: platforms sit off the centreline, and some traces are coarsely sampled.
+ * Beyond this the variant simply does not go there.
+ */
+const val MAX_STOP_TO_LINE_METERS = 200.0
