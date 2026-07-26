@@ -511,10 +511,14 @@ private fun RootScaffold(
             if (isGlobalLiveEnabled) viewModel.stopGlobalLive()
         }
     }
+    // Walking dashes are drawn against the basemap, so they follow the theme rather than the
+    // palette: black on the light map, white on the dark one.
+    val walkingPathColor = if (isAppInDarkTheme()) "#FFFFFF" else "#000000"
     val itineraryGeoJson by produceState<String?>(
         initialValue = null,
         key1 = activeJourneys,
-        key2 = selectedJourney
+        key2 = selectedJourney,
+        key3 = walkingPathColor
     ) {
         if (activeJourneys.isEmpty()) {
             value = null
@@ -522,11 +526,17 @@ private fun RootScaffold(
         }
         // Instant first paint: cached street walk paths where available, straight lines otherwise
         value = withContext(Dispatchers.Default) {
-            toItinerariesGeoJson(activeJourneys, selectedJourney, viewModel, fetchWalkingPaths = false)
+            toItinerariesGeoJson(
+                activeJourneys, selectedJourney, viewModel,
+                fetchWalkingPaths = false, walkingColor = walkingPathColor,
+            )
         }
         // Background refinement: fetch the missing street paths, then update only on change
         val refined = withContext(Dispatchers.Default) {
-            toItinerariesGeoJson(activeJourneys, selectedJourney, viewModel, fetchWalkingPaths = true)
+            toItinerariesGeoJson(
+                activeJourneys, selectedJourney, viewModel,
+                fetchWalkingPaths = true, walkingColor = walkingPathColor,
+            )
         }
         if (refined != value) {
             value = refined

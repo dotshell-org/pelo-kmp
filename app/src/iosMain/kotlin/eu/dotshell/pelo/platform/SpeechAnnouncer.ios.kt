@@ -11,6 +11,8 @@ import platform.AVFAudio.AVSpeechSynthesisVoice
 import platform.AVFAudio.AVSpeechSynthesizer
 import platform.AVFAudio.AVSpeechUtterance
 import platform.AVFAudio.setActive
+import platform.Foundation.NSLocale
+import platform.Foundation.preferredLanguages
 
 /**
  * iOS actual backed by [AVSpeechSynthesizer].
@@ -24,6 +26,8 @@ actual class SpeechAnnouncer actual constructor(context: PlatformContext) {
 
     private val synthesizer = AVSpeechSynthesizer()
     private var isDisposed = false
+    /** Enumerating the installed voices is not free; the language rarely changes mid-journey. */
+    private var cachedVoice: Pair<String, AVSpeechSynthesisVoice?>? = null
 
     actual fun speak(text: String) {
         if (isDisposed || text.isBlank()) return
@@ -36,10 +40,10 @@ actual class SpeechAnnouncer actual constructor(context: PlatformContext) {
         }
 
         val utterance = AVSpeechUtterance(string = text)
-        // Follows the app's locale rather than the device's, so a French app speaks French even on
-        // an English phone — the instructions themselves are resolved the same way.
-        utterance.voice = AVSpeechSynthesisVoice.voiceWithLanguage(LanguageManager.current.tag)
-            ?: AVSpeechSynthesisVoice.voiceWithLanguage("fr-FR")
+        // Left null when no voice matches, so the system picks its own default. Forcing a
+        // particular voice as a fallback is what made English instructions come out in a French
+        // accent.
+        voiceFor(speechLanguage())?.let { utterance.voice = it }
         synthesizer.speakUtterance(utterance)
     }
 
@@ -58,6 +62,39 @@ actual class SpeechAnnouncer actual constructor(context: PlatformContext) {
             synthesizer.stopSpeakingAtBoundary(AVSpeechBoundary.AVSpeechBoundaryImmediate)
         }
         deactivateSession()
+    }
+
+    /**
+     * The language the instructions are actually written in.
+     *
+     * The app ships French and English, French being the default resource set, and the in-app
+     * language may be "follow the system". Resolving it the same way Compose Resources does is
+     * what keeps the voice and the text in the same language — reading the raw preference tag
+     * gave an empty string under "system", which matched no voice at all.
+     */
+    private fun speechLanguage(): String {
+        val explicit = LanguageManager.current.tag
+        if (explicit.isNotBlank()) return explicit
+        val preferred = NSLocale.preferredLanguages.firstOrNull() as? String ?: return "fr"
+        return if (preferred.substringBefore('-').lowercase() == "en") "en" else "fr"
+    }
+
+    /**
+     * A voice for [languageCode], matched on the base language.
+     *
+     * `voiceWithLanguage` wants a full BCP-47 tag: asking it for "en" returns nothing on most
+     * devices, which is why an exact-tag lookup alone is not enough.
+     */
+    private fun voiceFor(languageCode: String): AVSpeechSynthesisVoice? {
+        cachedVoice?.let { (tag, voice) -> if (tag == languageCode) return voice }
+
+        val exact = AVSpeechSynthesisVoice.voiceWithLanguage(languageCode)
+        val resolved = exact ?: AVSpeechSynthesisVoice.speechVoices()
+            .filterIsInstance<AVSpeechSynthesisVoice>()
+            .firstOrNull { it.language.substringBefore('-').equals(languageCode, ignoreCase = true) }
+
+        cachedVoice = languageCode to resolved
+        return resolved
     }
 
     private fun activateSession() {

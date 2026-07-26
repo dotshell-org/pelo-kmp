@@ -364,7 +364,12 @@ suspend fun toItinerariesGeoJson(
     journeys: List<JourneyResult>,
     selectedJourney: JourneyResult?,
     viewModel: TransportViewModel,
-    fetchWalkingPaths: Boolean = true
+    fetchWalkingPaths: Boolean = true,
+    /**
+     * Colour of the walking dashes, as a hex string. Passed in rather than fixed here because it
+     * has to follow the theme: black reads on the light basemap, white on the dark one.
+     */
+    walkingColor: String = "#000000",
 ): String {
     val journeysToDraw = selectedJourney?.let { listOf(it) } ?: journeys
     val lineNames = journeysToDraw.flatMap { journey ->
@@ -408,8 +413,7 @@ suspend fun toItinerariesGeoJson(
             for ((journeyIndex, journey) in journeysToDraw.withIndex()) {
                 for ((legIndex, leg) in journey.legs.withIndex()) {
                     val lineColor = if (leg.isWalking) {
-                        // Walking legs are drawn in black, like every other neutral map pictogram.
-                        "#000000"
+                        walkingColor
                     } else {
                         LineColorHelper.getColorForLineStringAux(leg.routeName ?: "")
                     }
