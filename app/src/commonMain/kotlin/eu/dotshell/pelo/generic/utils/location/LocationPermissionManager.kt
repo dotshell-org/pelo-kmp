@@ -3,21 +3,22 @@ package eu.dotshell.pelo.generic.utils.location
 import eu.dotshell.pelo.platform.PlatformContext
 
 /**
- * Cross-platform interface for managing location permissions.
- * On iOS, this handles requesting Always authorization for navigation mode.
- * On Android, permissions are handled by the foreground service.
+ * Cross-platform view of the location authorization the app currently holds.
  */
 expect object LocationPermissionManager {
-    
+
     /**
-     * Request elevated location permissions if needed for navigation.
-     * On iOS, this requests Always authorization.
-     * On Android, this is a no-op as permissions are managed by the foreground service.
+     * Ask for whatever elevated authorization navigation needs. iOS requests Always (for
+     * background updates); on Android the runtime prompt is owned by the host Activity.
      */
     fun requestNavigationPermissions(context: PlatformContext)
-    
+
     /**
-     * Check if the app has sufficient permissions for background location updates.
+     * Can the app read the device position at all right now? Checked before entering navigation
+     * mode — starting guidance without it strands the traveller on a map that never moves.
      */
+    fun hasForegroundLocationPermission(context: PlatformContext): Boolean
+
+    /** Can the app keep receiving fixes while backgrounded? */
     fun hasBackgroundLocationPermission(context: PlatformContext): Boolean
 }

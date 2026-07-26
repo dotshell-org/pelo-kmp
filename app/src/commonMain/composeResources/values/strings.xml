@@ -236,4 +236,36 @@
     <string name="zone_label">Zone %s</string>
     <string name="itinerary_long_walk_fallback">Aucun trajet direct à cette heure — au plus proche, puis %s à pied.</string>
     <string name="decimal_separator">,</string>
+    <!-- Navigation mode -->
+    <string name="nav_acquiring_signal">Recherche du signal GPS…</string>
+    <string name="nav_in_progress">Trajet en cours</string>
+    <string name="nav_walk_to">Rejoignez %1$s</string>
+    <string name="nav_walk_to_distance">Rejoignez %1$s — %2$s</string>
+    <string name="nav_board_at">Dans %1$s, montez à %2$s</string>
+    <string name="nav_ride_next_stop">Au prochain arrêt, descendez à %1$s</string>
+    <string name="nav_ride_next_stop_change">Au prochain arrêt, changez de ligne à %1$s</string>
+    <string name="nav_ride_stops_one">Dans 1 arrêt, descendez à %1$s</string>
+    <string name="nav_ride_stops_other">Dans %2$d arrêts, descendez à %1$s</string>
+    <string name="nav_ride_stops_change_one">Dans 1 arrêt, changez de ligne à %1$s</string>
+    <string name="nav_ride_stops_change_other">Dans %2$d arrêts, changez de ligne à %1$s</string>
+    <string name="nav_arrived">Vous êtes arrivé</string>
+    <string name="nav_direction">Direction %1$s</string>
+    <string name="nav_arrival_at">Arrivée %1$s</string>
+    <string name="nav_off_route">Vous semblez éloigné du trajet prévu</string>
+    <string name="nav_dead_reckoning">Signal perdu — guidage sur les horaires</string>
+    <string name="nav_stop_navigation">Arrêter la navigation</string>
+    <string name="nav_stop_confirm_title">Arrêter la navigation ?</string>
+    <string name="nav_stop_confirm_message">Le guidage s\'arrêtera et votre itinéraire restera affiché.</string>
+    <string name="nav_stop_confirm_action">Arrêter</string>
+    <string name="nav_finish">Terminer</string>
+    <string name="nav_recenter">Recentrer sur ma position</string>
+    <string name="nav_line_badge">Ligne %1$s</string>
+    <string name="nav_walk_badge">Marche à pied</string>
+    <string name="nav_starting">Préparation de la navigation…</string>
+    <string name="nav_needs_location">Activez la localisation pour démarrer la navigation.</string>
+    <string name="duration_less_than_a_minute">moins d\'1 min</string>
+    <string name="duration_minutes">%1$d min</string>
+    <string name="duration_hours_minutes">%1$dh%2$s</string>
+    <string name="distance_meters">%1$d m</string>
+    <string name="distance_kilometers">%1$s km</string>
 </resources>

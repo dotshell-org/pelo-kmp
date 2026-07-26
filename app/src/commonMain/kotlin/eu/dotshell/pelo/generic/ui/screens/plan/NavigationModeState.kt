@@ -2,101 +2,169 @@ package eu.dotshell.pelo.generic.ui.screens.plan
 
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLeg
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
-import eu.dotshell.pelo.generic.utils.geo.GeometryUtils
-import eu.dotshell.pelo.generic.utils.location.GeoPoint
+import eu.dotshell.pelo.generic.service.NavigationSession
 
 private const val DAY_SECONDS = 24 * 3600
-private const val LONG_TRANSFER_THRESHOLD_SECONDS = 10 * 60
+
+/**
+ * What the guidance is telling the traveller to do, as data rather than prose. Keeping the
+ * wording out of here is what lets the overlay translate it — the previous version hard-coded
+ * French sentences into the state, so an English device got a half-translated screen.
+ */
+sealed interface NavigationInstruction {
+
+    /** Walk to [stopName]; [distanceMeters] is null until a fix says how far it is. */
+    data class WalkTo(val stopName: String, val distanceMeters: Int?) : NavigationInstruction
+
+    /** Wait at [stopName] for a departure [secondsUntilDeparture] away. */
+    data class BoardAt(val stopName: String, val secondsUntilDeparture: Int) : NavigationInstruction
+
+    /** Stay aboard until [stopName], [remainingStops] stops away. */
+    data class RideTo(
+        val stopName: String,
+        val remainingStops: Int,
+        val changesLine: Boolean,
+    ) : NavigationInstruction
+
+    data object Arrived : NavigationInstruction
+
+    /** Navigation is running but no fix has arrived yet. */
+    data object AcquiringSignal : NavigationInstruction
+
+    /** The journey has no leg we can describe (empty or malformed). */
+    data object InProgress : NavigationInstruction
+}
 
 data class NavigationModeUiState(
     val currentLeg: JourneyLeg?,
-    val nextLeg: JourneyLeg?,
-    val upcomingLeg: JourneyLeg?,
+    /** The leg whose line badge is shown — the ride in progress, or the one being walked to. */
     val displayedLeg: JourneyLeg?,
+    /** The line being left behind, when a change is imminent. */
+    val previousLeg: JourneyLeg?,
+    /** The ride after [displayedLeg], previewed in the "up next" strip. */
+    val upcomingLeg: JourneyLeg?,
     val shouldChangeLine: Boolean,
-    val actionText: String,
-    val directionText: String,
-    val remainingTimeText: String,
+    val instruction: NavigationInstruction,
+    /** Headsign of [displayedLeg]; null when the dataset does not provide one. */
+    val direction: String?,
+    val remainingSeconds: Int,
     val arrivalTimeText: String,
-    val isFinished: Boolean
+    /** 0f at departure, 1f at arrival — drives the progress bar. */
+    val progressFraction: Float,
+    val isArrived: Boolean,
+    val isOffRoute: Boolean,
+    /** Guidance is running on the timetable because no fresh fix is available. */
+    val isDeadReckoning: Boolean,
 )
 
-fun buildNavigationModeUiState(
-    journey: JourneyResult,
-    nowSeconds: Int,
-    userLocation: GeoPoint?
-): NavigationModeUiState {
-    val (currentLeg, nextLeg) = getCurrentAndNextNavigationLeg(journey, nowSeconds, userLocation)
-    val remainingSeconds = computeRemainingJourneySeconds(journey, nowSeconds)
-
-    if (currentLeg == null) {
-        return NavigationModeUiState(
-            currentLeg = null,
-            nextLeg = null,
-            upcomingLeg = null,
-            displayedLeg = null,
-            shouldChangeLine = false,
-            actionText = "Trajet en cours",
-            directionText = "",
-            remainingTimeText = formatRemainingTime(journey.departureTime, journey.arrivalTime, nowSeconds),
-            arrivalTimeText = journey.formatArrivalTime(),
-            isFinished = remainingSeconds <= 0
-        )
-    }
-
+/**
+ * Derive everything the overlay renders from the live [session]. Pure — no clock read, no
+ * resource lookup — so it is directly unit-testable.
+ */
+fun buildNavigationModeUiState(session: NavigationSession): NavigationModeUiState? {
+    val journey = session.journey ?: return null
+    val progress = session.progress
+    val now = session.nowSeconds
     val reference = journey.departureTime
-    val nowNormalized = normalizeTimeAroundReference(nowSeconds, reference)
-    val legDepartureNormalized = normalizeTimeAroundReference(currentLeg.departureTime, reference)
-    val isWaitingForVehicle = nowNormalized < legDepartureNormalized
-    val hasCorrespondence = nextLeg != null
-    val transferWaitSeconds = if (nextLeg != null) {
-        computeTransferWaitSeconds(currentLeg, nextLeg, reference)
-    } else {
-        0
-    }
-    val shouldSplitTransferInstructions = transferWaitSeconds > LONG_TRANSFER_THRESHOLD_SECONDS
-    val shouldChangeLine = !isWaitingForVehicle &&
-            hasCorrespondence &&
-            !shouldSplitTransferInstructions &&
-            isAtCurrentLegTransferStop(journey, currentLeg, userLocation)
-    val displayedLeg = if (shouldChangeLine && nextLeg != null) nextLeg else currentLeg
-    val upcomingOffset = if (shouldChangeLine) 2 else 1
-    val upcomingLeg = findUpcomingNonWalkingLeg(journey, currentLeg, upcomingOffset)
-    val remainingStops = computeRemainingStopsOnLeg(currentLeg, userLocation)
 
-    val actionText = if (isWaitingForVehicle) {
-        val remainingBeforeDeparture = formatDurationUntil(nowNormalized, legDepartureNormalized)
-        "Dans $remainingBeforeDeparture, monter a ${currentLeg.fromStopName}"
+    val remainingSeconds = computeRemainingJourneySeconds(journey, now)
+    val arrivalText = journey.formatArrivalTime()
+    val fraction = computeProgressFraction(journey, now)
+
+    val currentLeg = journey.legs.getOrNull(progress.legIndex)
+
+    // The ride the badge normally shows: the one under way, or — mid-walk — the one being walked
+    // to, so the traveller sees which line they are heading for instead of a blank badge.
+    val ridingIndex = if (currentLeg != null && !currentLeg.isWalking) {
+        progress.legIndex
     } else {
-        val targetStopName = currentLeg.toStopName.ifBlank { "l'arret suivant" }
-        val actionVerb = if (shouldChangeLine) {
-            "changer de ligne a $targetStopName"
-        } else {
-            "descendre a $targetStopName"
-        }
-        if (remainingStops <= 0) {
-            "Au prochain arret, $actionVerb"
-        } else {
-            val stopWord = if (remainingStops == 1) "arret" else "arrets"
-            "Dans $remainingStops $stopWord, $actionVerb"
+        journey.legs.indexOfFirstFrom(progress.legIndex + 1) { !it.isWalking }
+    }
+    val ridingLeg = journey.legs.getOrNull(ridingIndex)
+    val nextRideIndex = if (ridingIndex < 0) {
+        -1
+    } else {
+        journey.legs.indexOfFirstFrom(ridingIndex + 1) { !it.isWalking }
+    }
+    val nextRideLeg = journey.legs.getOrNull(nextRideIndex)
+
+    // Pulling into the stop where the line changes: promote the incoming line to the main badge
+    // and keep the outgoing one above it, so the card reads "leave this, take that".
+    val isChangingLine = currentLeg != null &&
+            !currentLeg.isWalking &&
+            progress.isAtLegTerminus &&
+            nextRideLeg != null
+
+    val displayedLeg = if (isChangingLine) nextRideLeg else ridingLeg
+    val previousLeg = if (isChangingLine) ridingLeg else null
+    val upcomingIndex = if (isChangingLine) {
+        journey.legs.indexOfFirstFrom(nextRideIndex + 1) { !it.isWalking }
+    } else {
+        nextRideIndex
+    }
+    val upcomingLeg = journey.legs.getOrNull(upcomingIndex)
+
+    val instruction = when {
+        progress.isArrived -> NavigationInstruction.Arrived
+        currentLeg == null -> NavigationInstruction.InProgress
+        currentLeg.isWalking -> NavigationInstruction.WalkTo(
+            stopName = currentLeg.toStopName,
+            distanceMeters = progress.distanceToNextMeters,
+        )
+        else -> {
+            val departure = normalizeTimeAroundReference(currentLeg.departureTime, reference)
+            val nowNormalized = normalizeTimeAroundReference(now, reference)
+            if (nowNormalized < departure && progress.stopIndex == 0) {
+                NavigationInstruction.BoardAt(
+                    stopName = currentLeg.fromStopName,
+                    secondsUntilDeparture = departure - nowNormalized,
+                )
+            } else {
+                NavigationInstruction.RideTo(
+                    stopName = currentLeg.toStopName,
+                    remainingStops = progress.remainingStopsOnLeg,
+                    changesLine = isChangingLine,
+                )
+            }
         }
     }
 
-    val direction = displayedLeg.direction?.takeIf { it.isNotBlank() } ?: "?"
     return NavigationModeUiState(
         currentLeg = currentLeg,
-        nextLeg = nextLeg,
-        upcomingLeg = upcomingLeg,
         displayedLeg = displayedLeg,
-        shouldChangeLine = shouldChangeLine,
-        actionText = actionText,
-        directionText = "Direction $direction",
-        remainingTimeText = formatRemainingTime(journey.departureTime, journey.arrivalTime, nowSeconds),
-        arrivalTimeText = journey.formatArrivalTime(),
-        isFinished = remainingSeconds <= 0
+        previousLeg = previousLeg,
+        upcomingLeg = upcomingLeg,
+        shouldChangeLine = isChangingLine && previousLeg != null && displayedLeg != null,
+        instruction = if (!session.hasFreshFix && session.location == null && !progress.isArrived) {
+            NavigationInstruction.AcquiringSignal
+        } else {
+            instruction
+        },
+        direction = displayedLeg?.direction?.takeIf { it.isNotBlank() },
+        remainingSeconds = remainingSeconds,
+        arrivalTimeText = arrivalText,
+        progressFraction = fraction,
+        isArrived = progress.isArrived,
+        isOffRoute = progress.isOffRoute,
+        isDeadReckoning = progress.isDeadReckoning,
     )
 }
 
+/**
+ * Index-based rather than value-based lookup: a journey can hold two structurally equal legs
+ * (a there-and-back loop), and `indexOf` would collapse them onto the first one.
+ */
+private inline fun List<JourneyLeg>.indexOfFirstFrom(
+    startIndex: Int,
+    predicate: (JourneyLeg) -> Boolean,
+): Int {
+    for (index in startIndex.coerceAtLeast(0) until size) {
+        if (predicate(this[index])) return index
+    }
+    return -1
+}
+
+/** Seconds from [nowSeconds] to arrival, wrap-safe across midnight. Never negative. */
 fun computeRemainingJourneySeconds(journey: JourneyResult, nowSeconds: Int): Int {
     val reference = journey.departureTime
     val nowNormalized = normalizeTimeAroundReference(nowSeconds, reference)
@@ -104,218 +172,24 @@ fun computeRemainingJourneySeconds(journey: JourneyResult, nowSeconds: Int): Int
     return (arrivalNormalized - nowNormalized).coerceAtLeast(0)
 }
 
+private fun computeProgressFraction(journey: JourneyResult, nowSeconds: Int): Float {
+    val reference = journey.departureTime
+    val nowNormalized = normalizeTimeAroundReference(nowSeconds, reference)
+    val arrivalNormalized = normalizeTimeAroundReference(journey.arrivalTime, reference)
+    val total = arrivalNormalized - reference
+    if (total <= 0) return 0f
+    val elapsed = nowNormalized - reference
+    return (elapsed.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+}
+
+/**
+ * Pull [timeSeconds] into the same service day as [referenceSeconds]. GTFS times run past
+ * midnight ("25:30" is 01:30) while the wall clock wraps at it, so the two are only comparable
+ * once both sit on the same side of the seam.
+ */
 private fun normalizeTimeAroundReference(timeSeconds: Int, referenceSeconds: Int): Int {
     var normalized = timeSeconds
     while (normalized < referenceSeconds - DAY_SECONDS / 2) normalized += DAY_SECONDS
     while (normalized > referenceSeconds + DAY_SECONDS / 2) normalized -= DAY_SECONDS
     return normalized
-}
-
-private fun getCurrentAndNextNavigationLeg(
-    journey: JourneyResult,
-    nowSeconds: Int,
-    userLocation: GeoPoint?
-): Pair<JourneyLeg?, JourneyLeg?> {
-    val nonWalkingLegs = journey.legs.filterNot { it.isWalking }
-    if (nonWalkingLegs.isEmpty()) return null to null
-
-    val reference = journey.departureTime
-    val now = normalizeTimeAroundReference(nowSeconds, reference)
-    val normalizedLegs = nonWalkingLegs.map { leg ->
-        val dep = normalizeTimeAroundReference(leg.departureTime, reference)
-        val arr = normalizeTimeAroundReference(leg.arrivalTime, reference)
-        dep to arr
-    }
-
-    var currentIndex = normalizedLegs.indexOfFirst { (dep, arr) -> now in dep..arr }
-    if (currentIndex == -1) {
-        currentIndex = normalizedLegs.indexOfFirst { (dep, _) -> now < dep }
-    }
-    if (currentIndex == -1) {
-        currentIndex = nonWalkingLegs.lastIndex
-    }
-
-    val nearestStop = findNearestJourneyStopCandidate(journey, userLocation)
-    if (nearestStop != null) {
-        val maxLegIndexByLocation =
-            if (nearestStop.isLegEnd && nearestStop.legIndex < nonWalkingLegs.lastIndex) {
-                nearestStop.legIndex + 1
-            } else {
-                nearestStop.legIndex
-            }
-        currentIndex = currentIndex.coerceAtMost(maxLegIndexByLocation)
-    }
-
-    val currentLeg = nonWalkingLegs.getOrNull(currentIndex)
-    val nextLeg = nonWalkingLegs.drop(currentIndex + 1).firstOrNull()
-    return currentLeg to nextLeg
-}
-
-private fun formatRemainingTime(
-    departureTimeSeconds: Int,
-    arrivalTimeSeconds: Int,
-    nowSeconds: Int
-): String {
-    val fullTripSeconds = if (arrivalTimeSeconds >= departureTimeSeconds) {
-        arrivalTimeSeconds - departureTimeSeconds
-    } else {
-        arrivalTimeSeconds + DAY_SECONDS - departureTimeSeconds
-    }
-
-    val elapsedSinceDeparture = if (nowSeconds >= departureTimeSeconds) {
-        nowSeconds - departureTimeSeconds
-    } else {
-        nowSeconds + DAY_SECONDS - departureTimeSeconds
-    }
-
-    val remainingSeconds = if (elapsedSinceDeparture in 0..fullTripSeconds) {
-        fullTripSeconds - elapsedSinceDeparture
-    } else {
-        fullTripSeconds
-    }
-
-    val remainingMinutes = (remainingSeconds / 60).coerceAtLeast(0)
-    return if (remainingMinutes < 60) {
-        "$remainingMinutes min"
-    } else {
-        "${remainingMinutes / 60}h${(remainingMinutes % 60).toString().padStart(2, '0')}"
-    }
-}
-
-private fun formatDurationUntil(
-    nowNormalizedSeconds: Int,
-    targetNormalizedSeconds: Int
-): String {
-    val remainingSeconds = (targetNormalizedSeconds - nowNormalizedSeconds).coerceAtLeast(0)
-    if (remainingSeconds < 60) return "moins d'1 min"
-
-    val remainingMinutes = remainingSeconds / 60
-    return if (remainingMinutes < 60) {
-        "$remainingMinutes min"
-    } else {
-        "${remainingMinutes / 60}h${(remainingMinutes % 60).toString().padStart(2, '0')}"
-    }
-}
-
-private fun computeTransferWaitSeconds(
-    currentLeg: JourneyLeg,
-    nextLeg: JourneyLeg,
-    journeyReferenceSeconds: Int
-): Int {
-    val currentArrivalNormalized =
-        normalizeTimeAroundReference(currentLeg.arrivalTime, journeyReferenceSeconds)
-    var nextDepartureNormalized =
-        normalizeTimeAroundReference(nextLeg.departureTime, journeyReferenceSeconds)
-    while (nextDepartureNormalized < currentArrivalNormalized) {
-        nextDepartureNormalized += DAY_SECONDS
-    }
-    return (nextDepartureNormalized - currentArrivalNormalized).coerceAtLeast(0)
-}
-
-private data class LegStopPosition(
-    val index: Int,
-    val lat: Double,
-    val lon: Double
-)
-
-private data class JourneyStopCandidate(
-    val legIndex: Int,
-    val isLegEnd: Boolean,
-    val lat: Double,
-    val lon: Double
-)
-
-private fun findNearestJourneyStopCandidate(
-    journey: JourneyResult,
-    userLocation: GeoPoint?
-): JourneyStopCandidate? {
-    if (userLocation == null) return null
-
-    val candidates = mutableListOf<JourneyStopCandidate>()
-    journey.legs.filterNot { it.isWalking }.forEachIndexed { legIndex, leg ->
-        if (isValidJourneyCoordinate(leg.fromLat, leg.fromLon)) {
-            candidates += JourneyStopCandidate(legIndex, false, leg.fromLat, leg.fromLon)
-        }
-        leg.intermediateStops.forEach { stop ->
-            if (isValidJourneyCoordinate(stop.lat, stop.lon)) {
-                candidates += JourneyStopCandidate(legIndex, false, stop.lat, stop.lon)
-            }
-        }
-        if (isValidJourneyCoordinate(leg.toLat, leg.toLon)) {
-            candidates += JourneyStopCandidate(legIndex, true, leg.toLat, leg.toLon)
-        }
-    }
-    if (candidates.isEmpty()) return null
-
-    return candidates.minByOrNull { stop ->
-        GeometryUtils.squaredDistance(
-            lat1 = userLocation.latitude,
-            lon1 = userLocation.longitude,
-            lat2 = stop.lat,
-            lon2 = stop.lon
-        )
-    }
-}
-
-private fun isSameJourneyLeg(first: JourneyLeg, second: JourneyLeg): Boolean {
-    return first.fromStopId == second.fromStopId &&
-            first.toStopId == second.toStopId &&
-            first.departureTime == second.departureTime &&
-            first.arrivalTime == second.arrivalTime &&
-            first.routeName == second.routeName
-}
-
-private fun isAtCurrentLegTransferStop(
-    journey: JourneyResult,
-    currentLeg: JourneyLeg,
-    userLocation: GeoPoint?
-): Boolean {
-    val nearestStop = findNearestJourneyStopCandidate(journey, userLocation) ?: return false
-    val nonWalkingLegs = journey.legs.filterNot { it.isWalking }
-    val currentLegIndex = nonWalkingLegs.indexOfFirst { leg -> isSameJourneyLeg(leg, currentLeg) }
-    if (currentLegIndex == -1 || currentLegIndex >= nonWalkingLegs.lastIndex) return false
-    return nearestStop.legIndex == currentLegIndex && nearestStop.isLegEnd
-}
-
-private fun computeRemainingStopsOnLeg(
-    leg: JourneyLeg,
-    userLocation: GeoPoint?
-): Int {
-    val stops = ArrayList<LegStopPosition>(leg.intermediateStops.size + 2)
-    stops += LegStopPosition(index = 0, lat = leg.fromLat, lon = leg.fromLon)
-    leg.intermediateStops.forEachIndexed { stopIndex, stop ->
-        stops += LegStopPosition(index = stopIndex + 1, lat = stop.lat, lon = stop.lon)
-    }
-    val terminusIndex = stops.size
-    stops += LegStopPosition(index = terminusIndex, lat = leg.toLat, lon = leg.toLon)
-
-    val nearestStopIndex = userLocation?.let { location ->
-        stops
-            .filter { isValidJourneyCoordinate(it.lat, it.lon) }
-            .minByOrNull { stop ->
-                GeometryUtils.squaredDistance(
-                    lat1 = location.latitude,
-                    lon1 = location.longitude,
-                    lat2 = stop.lat,
-                    lon2 = stop.lon
-                )
-            }?.index
-    } ?: 0
-
-    return (terminusIndex - nearestStopIndex).coerceAtLeast(0)
-}
-
-private fun findUpcomingNonWalkingLeg(
-    journey: JourneyResult,
-    currentLeg: JourneyLeg,
-    offsetFromCurrent: Int
-): JourneyLeg? {
-    val nonWalkingLegs = journey.legs.filterNot { it.isWalking }
-    val currentIndex = nonWalkingLegs.indexOfFirst { leg -> isSameJourneyLeg(leg, currentLeg) }
-    if (currentIndex == -1) return null
-    return nonWalkingLegs.getOrNull(currentIndex + offsetFromCurrent)
-}
-
-private fun isValidJourneyCoordinate(lat: Double, lon: Double): Boolean {
-    return lat in -90.0..90.0 && lon in -180.0..180.0 && (lat != 0.0 || lon != 0.0)
 }

@@ -125,6 +125,7 @@ fun InlineItinerarySheetContent(
     onJourneysChanged: (List<JourneyResult>) -> Unit = {},
     onSelectedJourneyChanged: (JourneyResult?) -> Unit = {},
     onStartNavigation: (JourneyResult) -> Unit = {},
+    isStartingNavigation: Boolean = false,
     onClose: () -> Unit,
     onRequestExpandSheet: () -> Unit = {}
 ) {
@@ -907,6 +908,7 @@ fun InlineItinerarySheetContent(
                 JourneyDetailsSheetContent(
                     journey = chosenJourney,
                     isExpanded = true,
+                    isStartingNavigation = isStartingNavigation,
                     onStartNavigation = {
                         lastCalcId?.let { calcId ->
                             // Reference the picked option by its stable signature — it matches an

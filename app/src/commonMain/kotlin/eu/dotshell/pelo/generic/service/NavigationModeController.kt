@@ -2,13 +2,13 @@ package eu.dotshell.pelo.generic.service
 
 import eu.dotshell.pelo.generic.data.cache.TransportCacheImpl
 import eu.dotshell.pelo.generic.data.config.AppConfigLoader
-import eu.dotshell.pelo.generic.data.models.navigation.NavigationKeyStopType
-import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLeg
+import eu.dotshell.pelo.generic.data.models.navigation.NavigationProgress
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
 import eu.dotshell.pelo.generic.data.telemetry.TelemetryEmitter
 import eu.dotshell.pelo.generic.data.telemetry.TripDetector
 import eu.dotshell.pelo.generic.utils.geo.GeometryUtils
 import eu.dotshell.pelo.generic.utils.location.GeoPoint
+import eu.dotshell.pelo.generic.utils.navigation.NavigationProgressTracker
 import eu.dotshell.pelo.platform.Log
 import eu.dotshell.pelo.platform.PlatformContext
 import eu.dotshell.pelo.platform.ioDispatcher
@@ -16,127 +16,172 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
-data class NavigationModeUiState(
+/**
+ * The live navigation session: what is being navigated, where the traveller is on it, and which
+ * way the route runs from here. Everything the screen shows is derived from this by
+ * `buildNavigationModeUiState` — this type deliberately carries no presentation strings.
+ */
+data class NavigationSession(
     val isActive: Boolean = false,
     val journey: JourneyResult? = null,
-    val currentLegIndex: Int = 0,
-    val nextStopName: String? = null,
-    val nextRouteName: String? = null,
-    val nextStopType: NavigationKeyStopType? = null,
-    val distanceToNextMeters: Int? = null,
-    val remainingMinutes: Int = 0,
-    val instruction: String = "",
-    val isComplete: Boolean = false,
-    val bearing: Double? = null
+    val progress: NavigationProgress = NavigationProgress(),
+    /** Route heading in degrees from north, smoothed; null until the route direction is known. */
+    val bearing: Double? = null,
+    /** Most recent fix, however old. Null when none has ever arrived. */
+    val location: GeoPoint? = null,
+    /** A fix arrived recently enough to be trusted for guidance. */
+    val hasFreshFix: Boolean = false,
+    /** Seconds since midnight, refreshed once a second so countdowns actually count down. */
+    val nowSeconds: Int = 0,
 )
 
 class NavigationModeController(
-    private val context: PlatformContext
+    private val context: PlatformContext,
+    private val timeSource: TimeSource = TimeSource.Monotonic,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + ioDispatcher)
-    private val _uiState = MutableStateFlow(NavigationModeUiState())
+    private val _session = MutableStateFlow(NavigationSession())
 
-    val uiState: StateFlow<NavigationModeUiState> = _uiState
+    val session: StateFlow<NavigationSession> = _session
 
     private var tripDetector: TripDetector? = null
     private var tripDetectorInitJob: Job? = null
-    private var waypoints: List<NavigationWaypoint> = emptyList()
+    private var tickerJob: Job? = null
+
+    private var tracker: NavigationProgressTracker? = null
     private var tracePoints: List<GeoPoint> = emptyList()
-    private var targetWaypointIndex: Int = 0
+    private var lastLocation: GeoPoint? = null
+    private var lastFixAt: TimeMark? = null
+    private var smoothedBearing: Double? = null
 
     fun start(journey: JourneyResult, tracePoints: List<GeoPoint> = emptyList()) {
-        waypoints = journey.toNavigationWaypoints()
-        this.tracePoints = if (tracePoints.isNotEmpty()) {
-            tracePoints
-        } else {
-            waypoints.map { GeoPoint(it.lat, it.lon) }
-        }
-        targetWaypointIndex = 0
+        this.tracePoints = tracePoints.ifEmpty { journey.fallbackTrace() }
+        tracker = NavigationProgressTracker(journey)
+        lastLocation = null
+        lastFixAt = null
+        smoothedBearing = null
+
         NavigationModeStateStore.setNavigationActive(context, true)
-        _uiState.value = buildState(
+        _session.value = NavigationSession(
+            isActive = true,
             journey = journey,
-            location = null,
-            isComplete = waypoints.isEmpty()
+            progress = tracker?.current() ?: NavigationProgress(),
+            nowSeconds = GeometryUtils.currentTimeInSeconds(),
         )
+        startTicker()
         initializeCommonTripDetector()
     }
 
     fun stop() {
+        tickerJob?.cancel()
+        tickerJob = null
         NavigationModeStateStore.setNavigationActive(context, false)
         finalizeTripDetector()
-        waypoints = emptyList()
+        tracker = null
         tracePoints = emptyList()
-        targetWaypointIndex = 0
-        _uiState.value = NavigationModeUiState()
+        lastLocation = null
+        lastFixAt = null
+        smoothedBearing = null
+        _session.value = NavigationSession()
     }
 
     fun dispose() {
+        tickerJob?.cancel()
+        tickerJob = null
+        // Leaving composition is not "the user finished their trip", but the in-memory session is
+        // gone either way: leaving the flag set would strand the foreground service with nothing
+        // able to switch it off.
+        NavigationModeStateStore.setNavigationActive(context, false)
         finalizeTripDetector()
         scope.cancel()
     }
 
+    /**
+     * Record a fix. It is not folded into the session here: the ticker is the single writer, so
+     * fixes arriving on the UI thread cannot interleave with it inside the progress tracker.
+     * At one refresh a second the extra latency is invisible next to the camera animation.
+     */
     fun onLocationFix(location: GeoPoint) {
-        val activeJourney = _uiState.value.journey ?: return
         tripDetector?.onLocationFix(location.latitude, location.longitude)
-        updateTargetWaypoint(location)
-        _uiState.value = buildState(
-            journey = activeJourney,
-            location = location,
-            isComplete = targetWaypointIndex >= waypoints.size
-        )
+        if (!_session.value.isActive) return
+        lastLocation = location
+        lastFixAt = timeSource.markNow()
     }
 
-    private fun updateTargetWaypoint(location: GeoPoint) {
-        while (targetWaypointIndex < waypoints.size) {
-            val target = waypoints[targetWaypointIndex]
-            val distance = target.distanceMetersTo(location) ?: break
-            if (distance > ARRIVAL_RADIUS_METERS) break
-            targetWaypointIndex += 1
-        }
-    }
+    /**
+     * Recompute the session from the latest fix and the clock. Driven by the ticker alone, once a
+     * second, so the countdown counts and a lost signal degrades to timetable guidance.
+     */
+    private fun refresh() {
+        val current = _session.value
+        val journey = current.journey ?: return
+        val tracker = tracker ?: return
 
-    private fun buildState(
-        journey: JourneyResult,
-        location: GeoPoint?,
-        isComplete: Boolean
-    ): NavigationModeUiState {
-        val target = waypoints.getOrNull(targetWaypointIndex)
-        val distance = if (location != null) target?.distanceMetersTo(location)?.roundToInt() else null
-        val currentLegIndex = target?.legIndex
-            ?: waypoints.lastOrNull()?.legIndex
-            ?: 0
+        val now = GeometryUtils.currentTimeInSeconds()
+        val fixAge = lastFixAt?.elapsedNow()
+        val isFresh = fixAge != null && fixAge.inWholeMilliseconds <= FIX_FRESHNESS_MS
+        val usableLocation = lastLocation?.takeIf { isFresh }
 
-        // Calculate bearing based on the closest segment of the trace points
-        val bearing = if (location != null && tracePoints.isNotEmpty()) {
-            val segment = GeometryUtils.findNavigationAxisSegment(location, tracePoints)
-            if (segment != null) {
-                GeometryUtils.computeBearingDegrees(segment.first, segment.second)
-            } else {
-                null
-            }
-        } else {
-            null
-        }
+        val progress = tracker.update(usableLocation, now)
 
-        return NavigationModeUiState(
-            isActive = true,
+        _session.value = current.copy(
             journey = journey,
-            currentLegIndex = currentLegIndex,
-            nextStopName = target?.stopName,
-            nextRouteName = target?.routeName,
-            nextStopType = target?.type,
-            distanceToNextMeters = distance,
-            remainingMinutes = remainingMinutesUntil(journey.arrivalTime),
-            instruction = instructionFor(target, isComplete),
-            isComplete = isComplete,
-            bearing = bearing
+            progress = progress,
+            bearing = updateBearing(usableLocation),
+            location = lastLocation,
+            hasFreshFix = isFresh,
+            nowSeconds = now,
         )
     }
+
+    private fun startTicker() {
+        tickerJob?.cancel()
+        tickerJob = scope.launch {
+            while (isActive) {
+                delay(TICK_INTERVAL_MS)
+                if (!_session.value.isActive) break
+                refresh()
+            }
+        }
+    }
+
+    /**
+     * Follow the route's heading, damped. Two things would otherwise make the map lurch: crossing
+     * a segment boundary changes the raw heading in one step, and a heading that crosses the
+     * 360°/0° seam interpolates the long way round unless it is walked through the short arc.
+     */
+    private fun updateBearing(location: GeoPoint?): Double? {
+        if (location == null || tracePoints.size < 2) return smoothedBearing
+        val segment = GeometryUtils.findNavigationAxisSegment(location, tracePoints)
+            ?: return smoothedBearing
+        val target = GeometryUtils.computeBearingDegrees(segment.first, segment.second)
+
+        val previous = smoothedBearing
+        smoothedBearing = if (previous == null) {
+            target
+        } else {
+            val delta = GeometryUtils.shortestAngleDelta(previous, target)
+            (previous + delta * BEARING_SMOOTHING).mod(360.0)
+        }
+        return smoothedBearing
+    }
+
+    /** Straight lines between the journey's stops — a usable heading source when no shape loaded. */
+    private fun JourneyResult.fallbackTrace(): List<GeoPoint> = legs.flatMap { leg ->
+        buildList {
+            add(GeoPoint(leg.fromLat, leg.fromLon))
+            leg.intermediateStops.forEach { add(GeoPoint(it.lat, it.lon)) }
+            add(GeoPoint(leg.toLat, leg.toLon))
+        }
+    }.filterNot { it.latitude == 0.0 && it.longitude == 0.0 }
 
     private fun initializeCommonTripDetector() {
         if (NavigationModePlatform.handlesTripTelemetry) return
@@ -171,112 +216,11 @@ class NavigationModeController(
         }
     }
 
-    private fun JourneyResult.toNavigationWaypoints(): List<NavigationWaypoint> {
-        val result = mutableListOf<NavigationWaypoint>()
-        legs.forEachIndexed { index, leg ->
-            if (result.isEmpty()) {
-                result.add(leg.fromWaypoint(index, NavigationKeyStopType.START))
-            }
-            leg.intermediateStops.forEach { stop ->
-                result.add(
-                    NavigationWaypoint(
-                        stopId = stop.stopName,
-                        stopName = stop.stopName,
-                        lat = stop.lat,
-                        lon = stop.lon,
-                        deadlineSeconds = stop.arrivalTime,
-                        type = NavigationKeyStopType.TRANSFER,
-                        legIndex = index,
-                        routeName = leg.routeName.takeUnless { leg.isWalking }
-                    )
-                )
-            }
-            val type = if (index == legs.lastIndex) {
-                NavigationKeyStopType.TERMINUS
-            } else {
-                NavigationKeyStopType.TRANSFER
-            }
-            result.add(leg.toWaypoint(index, type))
-        }
-        return result.filterNot { it.lat == 0.0 && it.lon == 0.0 }
-            .dedupeConsecutive()
-    }
-
-    private fun JourneyLeg.fromWaypoint(index: Int, type: NavigationKeyStopType) =
-        NavigationWaypoint(
-            stopId = fromStopId,
-            stopName = fromStopName,
-            lat = fromLat,
-            lon = fromLon,
-            deadlineSeconds = departureTime,
-            type = type,
-            legIndex = index,
-            routeName = routeName.takeUnless { isWalking }
-        )
-
-    private fun JourneyLeg.toWaypoint(index: Int, type: NavigationKeyStopType) =
-        NavigationWaypoint(
-            stopId = toStopId,
-            stopName = toStopName,
-            lat = toLat,
-            lon = toLon,
-            deadlineSeconds = arrivalTime,
-            type = type,
-            legIndex = index,
-            routeName = routeName.takeUnless { isWalking }
-        )
-
-    private fun List<NavigationWaypoint>.dedupeConsecutive(): List<NavigationWaypoint> {
-        val deduped = mutableListOf<NavigationWaypoint>()
-        forEach { waypoint ->
-            val previous = deduped.lastOrNull()
-            if (previous?.stopName != waypoint.stopName || previous.deadlineSeconds != waypoint.deadlineSeconds) {
-                deduped.add(waypoint)
-            }
-        }
-        return deduped
-    }
-
-    private fun instructionFor(target: NavigationWaypoint?, isComplete: Boolean): String {
-        if (isComplete) return "Vous êtes arrivé"
-        return when (target?.type) {
-            NavigationKeyStopType.START -> "Rejoignez ${target.stopName}"
-            NavigationKeyStopType.TRANSFER -> "Prochain arrêt : ${target.stopName}"
-            NavigationKeyStopType.TERMINUS -> "Destination : ${target.stopName}"
-            null -> "Navigation en cours"
-        }
-    }
-
-    private fun remainingMinutesUntil(arrivalSeconds: Int): Int {
-        val now = GeometryUtils.currentTimeInSeconds()
-        val normalizedArrival = if (arrivalSeconds < now) arrivalSeconds + SECONDS_PER_DAY else arrivalSeconds
-        return ((normalizedArrival - now).coerceAtLeast(0) + 59) / 60
-    }
-
-    private data class NavigationWaypoint(
-        val stopId: String,
-        val stopName: String,
-        val lat: Double,
-        val lon: Double,
-        val deadlineSeconds: Int,
-        val type: NavigationKeyStopType,
-        val legIndex: Int,
-        val routeName: String?
-    ) {
-        fun distanceMetersTo(location: GeoPoint): Double? {
-            if (lat == 0.0 && lon == 0.0) return null
-            return GeometryUtils.distanceMeters(
-                lat1 = location.latitude,
-                lon1 = location.longitude,
-                lat2 = lat,
-                lon2 = lon
-            )
-        }
-    }
-
     private companion object {
         const val TAG = "NavigationMode"
-        const val ARRIVAL_RADIUS_METERS = 70
-        const val SECONDS_PER_DAY = 86_400
+        const val TICK_INTERVAL_MS = 1_000L
+        /** Past this age a fix stops driving guidance and the timetable takes over. */
+        const val FIX_FRESHNESS_MS = 30_000L
+        const val BEARING_SMOOTHING = 0.35
     }
 }

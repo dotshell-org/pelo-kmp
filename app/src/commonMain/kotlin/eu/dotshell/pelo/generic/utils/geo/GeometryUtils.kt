@@ -51,17 +51,63 @@ object GeometryUtils {
         return earthRadius * c
     }
 
+    /**
+     * Squared distance in degrees². Only valid to compare points that share a bearing, because
+     * a degree of longitude is shorter than a degree of latitude everywhere but the equator —
+     * at Lyon's latitude it is worth ~0.70 of one, so east–west gaps come out ~43% too large.
+     * Prefer [squaredMeters] for anything that ranks candidates lying in different directions.
+     */
     fun squaredDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
         val dLat = lat1 - lat2
         val dLon = lon1 - lon2
         return dLat * dLat + dLon * dLon
     }
 
+    /**
+     * Squared distance in metres², on an equirectangular projection anchored at [lat1]. Cheap
+     * enough for nearest-neighbour scans (no trigonometry per candidate if the caller hoists
+     * [metersPerDegreeLongitude]) and, unlike [squaredDistance], directionally unbiased.
+     */
+    fun squaredMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val dy = (lat1 - lat2) * METERS_PER_DEGREE_LATITUDE
+        val dx = (lon1 - lon2) * metersPerDegreeLongitude(lat1)
+        return (dx * dx) + (dy * dy)
+    }
+
+    /** Length of one degree of longitude at [latitude], in metres. */
+    fun metersPerDegreeLongitude(latitude: Double): Double =
+        METERS_PER_DEGREE_LATITUDE * cos(latitude.toRadians())
+
+    /**
+     * Signed smallest rotation from [from] to [to], in ]-180, 180]. Used to keep a heading
+     * continuous across the 360°/0° seam: interpolating 350° → 10° the naive way spins the
+     * map almost a full turn the wrong way.
+     */
+    fun shortestAngleDelta(from: Double, to: Double): Double {
+        var delta = (to - from) % 360.0
+        if (delta > 180.0) delta -= 360.0
+        if (delta <= -180.0) delta += 360.0
+        return delta
+    }
+
+    /**
+     * The path segment the user is travelling along, as (projected position, look-ahead point).
+     *
+     * [maxSnapMeters] caps how far off the path a fix may be and still snap to it; beyond that
+     * there is no meaningful "along the route" direction to report and the result is null rather
+     * than an arbitrary far-away segment.
+     */
     fun findNavigationAxisSegment(
         userLocation: GeoPoint,
-        pathPoints: List<GeoPoint>
+        pathPoints: List<GeoPoint>,
+        maxSnapMeters: Double = DEFAULT_PATH_SNAP_METERS
     ): Pair<GeoPoint, GeoPoint>? {
         if (pathPoints.size < 2) return null
+
+        // Work in metres on a local planar frame so the projection is not skewed by the
+        // latitude-dependent length of a degree of longitude.
+        val lonScale = metersPerDegreeLongitude(userLocation.latitude)
+        val latScale = METERS_PER_DEGREE_LATITUDE
 
         var bestDistanceSq = Double.MAX_VALUE
         var bestProjectedPoint: GeoPoint? = null
@@ -70,19 +116,19 @@ object GeometryUtils {
         for (index in 0 until pathPoints.lastIndex) {
             val start = pathPoints[index]
             val end = pathPoints[index + 1]
-            val dx = end.longitude - start.longitude
-            val dy = end.latitude - start.latitude
+            val dx = (end.longitude - start.longitude) * lonScale
+            val dy = (end.latitude - start.latitude) * latScale
             val lengthSq = (dx * dx) + (dy * dy)
-            if (lengthSq <= 1e-14) continue
+            if (lengthSq <= 1e-6) continue
 
-            val ux = userLocation.longitude - start.longitude
-            val uy = userLocation.latitude - start.latitude
+            val ux = (userLocation.longitude - start.longitude) * lonScale
+            val uy = (userLocation.latitude - start.latitude) * latScale
             val t = ((ux * dx) + (uy * dy)) / lengthSq
             val clampedT = t.coerceIn(0.0, 1.0)
-            val projLon = start.longitude + (clampedT * dx)
-            val projLat = start.latitude + (clampedT * dy)
+            val projLon = start.longitude + (clampedT * (end.longitude - start.longitude))
+            val projLat = start.latitude + (clampedT * (end.latitude - start.latitude))
 
-            val distanceSq = squaredDistance(
+            val distanceSq = squaredMeters(
                 lat1 = userLocation.latitude,
                 lon1 = userLocation.longitude,
                 lat2 = projLat,
@@ -100,6 +146,7 @@ object GeometryUtils {
             }
         }
 
+        if (bestDistanceSq > maxSnapMeters * maxSnapMeters) return null
         val from = bestProjectedPoint ?: return null
         val to = bestNextPoint ?: return null
         if (from.latitude == to.latitude && from.longitude == to.longitude) return null
@@ -115,7 +162,7 @@ object GeometryUtils {
             if (coordinates.size >= 2) {
                 val lon = coordinates[0]
                 val lat = coordinates[1]
-                val distance = squaredDistance(
+                val distance = squaredMeters(
                     lat1 = userLocation.latitude,
                     lon1 = userLocation.longitude,
                     lat2 = lat,
@@ -130,4 +177,7 @@ object GeometryUtils {
 
         return nearestName
     }
+
+    private const val METERS_PER_DEGREE_LATITUDE = 111_320.0
+    private const val DEFAULT_PATH_SNAP_METERS = 250.0
 }

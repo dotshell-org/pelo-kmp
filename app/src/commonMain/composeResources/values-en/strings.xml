@@ -236,4 +236,36 @@
     <string name="zone_label">Zone %s</string>
     <string name="itinerary_long_walk_fallback">No direct route right now — closest option, then %s on foot.</string>
     <string name="decimal_separator">.</string>
+    <!-- Navigation mode -->
+    <string name="nav_acquiring_signal">Searching for GPS signal…</string>
+    <string name="nav_in_progress">Journey under way</string>
+    <string name="nav_walk_to">Walk to %1$s</string>
+    <string name="nav_walk_to_distance">Walk to %1$s — %2$s</string>
+    <string name="nav_board_at">In %1$s, board at %2$s</string>
+    <string name="nav_ride_next_stop">Next stop, get off at %1$s</string>
+    <string name="nav_ride_next_stop_change">Next stop, change lines at %1$s</string>
+    <string name="nav_ride_stops_one">1 stop to go, get off at %1$s</string>
+    <string name="nav_ride_stops_other">%2$d stops to go, get off at %1$s</string>
+    <string name="nav_ride_stops_change_one">1 stop to go, change lines at %1$s</string>
+    <string name="nav_ride_stops_change_other">%2$d stops to go, change lines at %1$s</string>
+    <string name="nav_arrived">You have arrived</string>
+    <string name="nav_direction">Towards %1$s</string>
+    <string name="nav_arrival_at">Arriving %1$s</string>
+    <string name="nav_off_route">You seem to be away from the planned route</string>
+    <string name="nav_dead_reckoning">Signal lost — guiding from the timetable</string>
+    <string name="nav_stop_navigation">Stop navigation</string>
+    <string name="nav_stop_confirm_title">Stop navigation?</string>
+    <string name="nav_stop_confirm_message">Guidance will stop and your route will stay on screen.</string>
+    <string name="nav_stop_confirm_action">Stop</string>
+    <string name="nav_finish">Finish</string>
+    <string name="nav_recenter">Recentre on my position</string>
+    <string name="nav_line_badge">Line %1$s</string>
+    <string name="nav_walk_badge">Walking</string>
+    <string name="nav_starting">Preparing navigation…</string>
+    <string name="nav_needs_location">Turn on location to start navigation.</string>
+    <string name="duration_less_than_a_minute">under 1 min</string>
+    <string name="duration_minutes">%1$d min</string>
+    <string name="duration_hours_minutes">%1$dh%2$s</string>
+    <string name="distance_meters">%1$d m</string>
+    <string name="distance_kilometers">%1$s km</string>
 </resources>

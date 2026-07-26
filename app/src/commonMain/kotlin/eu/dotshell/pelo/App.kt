@@ -39,9 +39,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.BottomSheetScaffoldState
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
@@ -160,11 +162,16 @@ import eu.dotshell.pelo.generic.utils.location.GeoPoint
 import eu.dotshell.pelo.generic.utils.location.LocationPermissionSignal
 import eu.dotshell.pelo.generic.utils.location.LocationProvider
 import eu.dotshell.pelo.generic.utils.location.HeadingProvider
+import eu.dotshell.pelo.generic.service.NavigationLocationBus
 import eu.dotshell.pelo.generic.service.NavigationModeController
-import eu.dotshell.pelo.generic.service.NavigationModeUiState
+import eu.dotshell.pelo.generic.service.NavigationModePlatform
+import eu.dotshell.pelo.generic.service.NavigationNotificationBridge
+import eu.dotshell.pelo.generic.service.NavigationSession
 import eu.dotshell.pelo.generic.ui.screens.plan.NavigationModeOverlay
 import eu.dotshell.pelo.generic.ui.screens.plan.buildNavigationModeUiState
+import eu.dotshell.pelo.generic.ui.screens.plan.displayText
 import eu.dotshell.pelo.generic.utils.geo.GeometryUtils
+import eu.dotshell.pelo.generic.utils.location.LocationPermissionManager
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.BackHandler
 import eu.dotshell.pelo.platform.LocalPlatformContext
@@ -324,18 +331,46 @@ private fun RootScaffold(
         )
     )
     val navigationController = remember(context) { NavigationModeController(context) }
-    val navigationState by navigationController.uiState.collectAsState()
+    val navigationSession by navigationController.session.collectAsState()
+    val isNavigating = navigationSession.isActive
+    // True while the camera tracks the traveller. Panning the map drops out of it; the recentre
+    // button puts it back. Navigation used to lock the map instead, which left no way to look
+    // ahead at the route.
+    var isFollowingUser by remember { mutableStateOf(true) }
+    // Set while the journey trace is being resolved, so "Start" reads as busy instead of dead.
+    var isStartingNavigation by remember { mutableStateOf(false) }
+    var navigationBlockedMessage by remember { mutableStateOf(false) }
     DisposableEffect(navigationController) {
         onDispose { navigationController.dispose() }
     }
+    // iOS needs the accuracy and background-updates switch flipped on the live stream; on Android
+    // the foreground service covers it and this is a no-op.
+    DisposableEffect(locationProvider, isNavigating) {
+        locationProvider.setNavigationMode(isNavigating)
+        onDispose { }
+    }
+    val onLocationFix: (GeoPoint) -> Unit = { p ->
+        userLocation = Position(latitude = p.latitude, longitude = p.longitude)
+        navigationController.onLocationFix(p)
+    }
+    // Fixes from the platform's own background stream (Android's navigation foreground service).
+    // Collected unconditionally: it is the only source still delivering once the app leaves the
+    // screen, which is where the session used to go stale.
+    LaunchedEffect(navigationController) {
+        NavigationLocationBus.fixes.collect(onLocationFix)
+    }
     // Re-subscribe to location whenever the permission is (re)granted — e.g. right after the user
     // accepts the runtime prompt — so a fix is picked up without restarting the app.
+    // Navigation wants roughly a fix a second so the camera tracks instead of lurching — unless
+    // the platform already runs its own navigation-grade stream, in which case a second
+    // high-accuracy one alongside it would just be double the battery for the same data.
     val locationPermissionGranted by LocationPermissionSignal.granted.collectAsState()
-    DisposableEffect(locationProvider, locationPermissionGranted) {
-        locationProvider.startUpdates { p ->
-            userLocation = Position(latitude = p.latitude, longitude = p.longitude)
-            navigationController.onLocationFix(GeoPoint(latitude = p.latitude, longitude = p.longitude))
-        }
+    val wantsFastFixes = isNavigating && !NavigationModePlatform.ownsLocationStream
+    DisposableEffect(locationProvider, locationPermissionGranted, wantsFastFixes) {
+        locationProvider.startUpdates(
+            intervalMillis = if (wantsFastFixes) 1_000L else 5_000L,
+            onLocation = onLocationFix,
+        )
         onDispose {
             locationProvider.stopUpdates()
         }
@@ -568,7 +603,15 @@ private fun RootScaffold(
     LaunchedEffect(selectedStation?.nom, selectedLine?.lineName) {
         if (selectedStation != null || selectedLine != null) isCenteredOnUser = false
     }
+    val stopNavigation = {
+        navigationController.stop()
+        onNavigationModeChanged(false)
+        isFollowingUser = true
+    }
     val closeItinerary = {
+        // Tearing down the itinerary while guidance runs would pull the route out from under it —
+        // and, through onNavigationModeChanged(false), shut the foreground service down too.
+        if (isNavigating) stopNavigation()
         itineraryActive = false
         itinerarySearchTarget = null
         itineraryArrival = null
@@ -577,7 +620,6 @@ private fun RootScaffold(
         itineraryNearby = emptyList()
         activeJourneys = emptyList()
         selectedJourney = null
-        onNavigationModeChanged(false)
     }
     fun showStation(name: String, stopId: Int? = null, searchLines: List<String> = emptyList()) {
         closeItinerary()
@@ -731,8 +773,8 @@ private fun RootScaffold(
         }
     }
 
-    LaunchedEffect(navigationState.isActive) {
-        if (!navigationState.isActive) {
+    LaunchedEffect(isNavigating) {
+        if (!isNavigating) {
             cameraState.animateTo(
                 CameraPosition(
                     target = cameraState.position.target,
@@ -746,13 +788,16 @@ private fun RootScaffold(
 
     val bottomSheetState = rememberStandardBottomSheetState(initialValue = SheetValue.Hidden, skipHiddenState = false)
     val bsScaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = bottomSheetState)
-    val hasSheet = !navigationState.isActive && (itineraryActive || selectedStation != null || selectedLine != null || allSchedules != null)
-    val sheetContentKey = "${navigationState.isActive}|$itineraryActive|${selectedStation?.nom}|${selectedLine?.lineName}|${allSchedules?.lineName}"
+    val hasSheet = !isNavigating && (itineraryActive || selectedStation != null || selectedLine != null || allSchedules != null)
+    val sheetContentKey = "$isNavigating|$itineraryActive|${selectedStation?.nom}|${selectedLine?.lineName}|${allSchedules?.lineName}"
     LaunchedEffect(sheetContentKey) {
         if (hasSheet) bottomSheetState.expand() else bottomSheetState.hide()
     }
-    LaunchedEffect(bottomSheetState.currentValue) {
-        if (bottomSheetState.currentValue == SheetValue.Hidden) {
+    // A hidden sheet normally means "the user dismissed the itinerary". Entering navigation also
+    // hides it — without this guard that read as a dismissal and tore the journey down one frame
+    // after guidance started, taking the route line and the foreground service with it.
+    LaunchedEffect(bottomSheetState.currentValue, isNavigating) {
+        if (bottomSheetState.currentValue == SheetValue.Hidden && !isNavigating) {
             closeSheet()
             if (itineraryActive) {
                 closeItinerary()
@@ -773,13 +818,16 @@ private fun RootScaffold(
                 if (selectedTab == Destination.SETTINGS) {
                     SettingsTab(viewModel, Modifier.fillMaxSize()) { selectedTab = Destination.PLAN }
                 } else {
-                    val focusCenter = remember(isCenteredOnUser, userLocation, manualFocusCenter, navigationState.isActive) {
-                        if (navigationState.isActive && userLocation != null) return@remember userLocation
+                    // While navigating, the camera only chases the traveller as long as they have
+                    // not taken the map somewhere themselves.
+                    val isNavigationFollowing = isNavigating && isFollowingUser
+                    val focusCenter = remember(isCenteredOnUser, userLocation, manualFocusCenter, isNavigationFollowing) {
+                        if (isNavigationFollowing && userLocation != null) return@remember userLocation
                         if (isCenteredOnUser && userLocation != null) return@remember userLocation
                         manualFocusCenter
                     }
-                    val focusZoom = remember(isCenteredOnUser, manualFocusZoom, navigationState.isActive) {
-                        if (navigationState.isActive) return@remember 18.5
+                    val focusZoom = remember(isCenteredOnUser, manualFocusZoom, isNavigationFollowing) {
+                        if (isNavigationFollowing) return@remember 18.0
                         if (isCenteredOnUser) return@remember 18.0
                         manualFocusZoom
                     }
@@ -790,7 +838,7 @@ private fun RootScaffold(
                         userLocation = userLocation,
                         heading = heading,
                         userFavorites = userFavorites,
-                        showTopBar = !itineraryActive && !navigationState.isActive,
+                        showTopBar = !itineraryActive && !isNavigating,
                         vehiclesGeoJson = vehiclesGeoJson,
                         vehicleIconName = vehicleIconName,
                         focusCenter = focusCenter,
@@ -828,11 +876,15 @@ private fun RootScaffold(
                             isCenteredOnUser = false
                             manualFocusCenter = null
                             manualFocusZoom = null
+                            // Panning during navigation hands the camera to the traveller; the
+                            // recentre button in the overlay hands it back.
+                            if (isNavigating) isFollowingUser = false
                         },
                         showAlertReport = showAlertReport,
                         bsScaffoldState = bsScaffoldState,
                         sheetPeekHeight = if (hasSheet) 130.dp else 0.dp,
-                        navigationState = navigationState,
+                        navigationSession = navigationSession,
+                        isNavigationFollowing = isNavigationFollowing,
                         sheetContent = {
                             Box(Modifier.heightIn(max = maxSheetHeight)) {
                                 val sc = allSchedules
@@ -848,11 +900,33 @@ private fun RootScaffold(
                                         onDepartureFallbackSelected = { itineraryDeparture = it },
                                         onJourneysChanged = { activeJourneys = it },
                                         onSelectedJourneyChanged = { selectedJourney = it },
+                                        isStartingNavigation = isStartingNavigation,
                                         onStartNavigation = { journey ->
-                                            scope.launch {
-                                                val tracePoints = calculateJourneyTrace(journey, viewModel)
-                                                navigationController.start(journey, tracePoints)
-                                                onNavigationModeChanged(true)
+                                            // Guard the whole thing: the trace fetch is network-bound,
+                                            // so without this a slow link turns into repeat taps and
+                                            // several sessions racing each other.
+                                            if (!isStartingNavigation && !isNavigating) {
+                                                if (!LocationPermissionManager
+                                                        .hasForegroundLocationPermission(context)
+                                                ) {
+                                                    LocationPermissionManager
+                                                        .requestNavigationPermissions(context)
+                                                    navigationBlockedMessage = true
+                                                } else {
+                                                    isStartingNavigation = true
+                                                    scope.launch {
+                                                        // Sectioning line geometry is heavy and not
+                                                        // suspending — off the main thread it goes.
+                                                        val tracePoints = withContext(Dispatchers.Default) {
+                                                            runCatching { calculateJourneyTrace(journey, viewModel) }
+                                                                .getOrDefault(emptyList())
+                                                        }
+                                                        navigationController.start(journey, tracePoints)
+                                                        isFollowingUser = true
+                                                        onNavigationModeChanged(true)
+                                                        isStartingNavigation = false
+                                                    }
+                                                }
                                             }
                                         },
                                         onClose = closeItinerary,
@@ -917,7 +991,7 @@ private fun RootScaffold(
                 }
             }
 
-            if (!navigationState.isActive) {
+            if (!isNavigating) {
                 NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                     val tabStrings = StringProvider(LocalPlatformContext.current)
                     Destination.entries.forEach { destination ->
@@ -955,7 +1029,7 @@ private fun RootScaffold(
             }
         }
 
-        if (itineraryActive && selectedTab != Destination.SETTINGS && !navigationState.isActive) {
+        if (itineraryActive && selectedTab != Destination.SETTINGS && !isNavigating) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -1078,21 +1152,14 @@ private fun RootScaffold(
         }
 
         if (showAlertReport) {
-            val userPos = userLocation
-            val nearestStopCandidate = filteredStopsCollection?.features?.minByOrNull { stop ->
-                val coords = stop.geometry.coordinates
-                if (userPos != null && coords.size >= 2) {
-                    val dx = coords[0].toDouble() - userPos.longitude
-                    val dy = coords[1].toDouble() - userPos.latitude
-                    dx * dx + dy * dy
-                } else Double.MAX_VALUE
-            }?.let { stop ->
-                eu.dotshell.pelo.generic.data.models.search.StationSearchResult(
-                    stopName = stop.properties.nom,
-                    stopId = stop.properties.id,
-                    lines = viewModel.parseLineCodesFromDesserte(stop.properties.desserte)
-                )
-            }
+            val nearestStopCandidate = nearestStopTo(userLocation, filteredStopsCollection?.features)
+                ?.let { stop ->
+                    eu.dotshell.pelo.generic.data.models.search.StationSearchResult(
+                        stopName = stop.properties.nom,
+                        stopId = stop.properties.id,
+                        lines = viewModel.parseLineCodesFromDesserte(stop.properties.desserte)
+                    )
+                }
 
             val initialStop = alertReportInitialStopName?.let { name ->
                 eu.dotshell.pelo.generic.data.models.search.StationSearchResult(
@@ -1109,43 +1176,80 @@ private fun RootScaffold(
             )
         }
 
-        // Navigation mode overlay - displayed when navigation is active
-        if (navigationState.isActive) {
-            val loc = userLocation
-            val activeJourney = navigationState.journey
-            if (loc != null && activeJourney != null) {
-                val overlayState = buildNavigationModeUiState(
-                    journey = activeJourney,
-                    nowSeconds = GeometryUtils.currentTimeInSeconds(),
-                    userLocation = GeoPoint(latitude = loc.latitude, longitude = loc.longitude)
-                )
+        if (navigationBlockedMessage) {
+            val blockedStrings = StringProvider(LocalPlatformContext.current)
+            AlertDialog(
+                onDismissRequest = { navigationBlockedMessage = false },
+                text = { Text(blockedStrings["nav_needs_location"]) },
+                confirmButton = {
+                    TextButton(onClick = { navigationBlockedMessage = false }) {
+                        Text(blockedStrings["close"])
+                    }
+                }
+            )
+        }
+
+        // Navigation overlay. Rendered for the whole of navigation mode, fix or no fix: gating it
+        // on a known position hid every control at exactly the moment the tab bar, search bar,
+        // sheet and map gestures were already suppressed, which left no way out of the mode.
+        if (isNavigating) {
+            val overlayState = remember(navigationSession) {
+                buildNavigationModeUiState(navigationSession)
+            }
+            if (overlayState != null) {
+                // Mirror the instruction into the ongoing notification, so a backgrounded session
+                // says what to do next instead of repeating a fixed sentence.
+                val instructionText = overlayState.instruction.displayText()
+                LaunchedEffect(instructionText) {
+                    NavigationNotificationBridge.setInstruction(instructionText)
+                }
+                DisposableEffect(Unit) {
+                    onDispose { NavigationNotificationBridge.setInstruction(null) }
+                }
                 NavigationModeOverlay(
                     state = overlayState,
-                    onClose = {
-                        navigationController.stop()
-                        onNavigationModeChanged(false)
-                    },
+                    isFollowingUser = isFollowingUser,
+                    onRecenter = { isFollowingUser = true },
+                    onStop = stopNavigation,
                     onReportAlert = {
-                        val nearestStop = filteredStopsCollection?.features?.minByOrNull { stop ->
-                            val coords = stop.geometry.coordinates
-                            val userPos = userLocation
-                            if (userPos != null && coords.size >= 2) {
-                                val dx = coords[0].toDouble() - userPos.longitude
-                                val dy = coords[1].toDouble() - userPos.latitude
-                                dx * dx + dy * dy
-                            } else Double.MAX_VALUE
-                        }
-                        if (nearestStop != null) {
-                            alertReportInitialStopName = nearestStop.properties.nom
-                            alertReportInitialLines = viewModel.parseLineCodesFromDesserte(nearestStop.properties.desserte)
-                            showAlertReport = true
-                        }
+                        val nearestStop = nearestStopTo(userLocation, filteredStopsCollection?.features)
+                        alertReportInitialStopName = nearestStop?.properties?.nom
+                        alertReportInitialLines = nearestStop
+                            ?.let { viewModel.parseLineCodesFromDesserte(it.properties.desserte) }
+                            .orEmpty()
+                        // Opened either way: with no stop resolved the sheet simply starts on its
+                        // own picker, which beats a button that silently does nothing.
+                        showAlertReport = true
                     },
                     modifier = Modifier.fillMaxSize()
                 )
             }
         }
+
+        // Back is the other way out of navigation mode. The journey and the itinerary sheet
+        // survive it, so re-starting is one tap away.
+        BackHandler(enabled = isNavigating) { stopNavigation() }
     }
+}
+
+/**
+ * Nearest stop to [position], ranked in metres. Null when there is nothing to measure from:
+ * scoring every candidate as infinitely far away otherwise returns whichever stop happens to sit
+ * first in the list and presents it to the user as the one they are standing at.
+ */
+private fun nearestStopTo(position: Position?, stops: List<StopFeature>?): StopFeature? {
+    if (position == null || stops.isNullOrEmpty()) return null
+    return stops
+        .filter { it.geometry.coordinates.size >= 2 }
+        .minByOrNull { stop ->
+            val coords = stop.geometry.coordinates
+            GeometryUtils.squaredMeters(
+                lat1 = position.latitude,
+                lon1 = position.longitude,
+                lat2 = coords[1],
+                lon2 = coords[0],
+            )
+        }
 }
 
 @Composable
@@ -1178,7 +1282,8 @@ private fun PlanContent(
     bsScaffoldState: BottomSheetScaffoldState,
     sheetPeekHeight: Dp,
     sheetContent: @Composable () -> Unit,
-    navigationState: NavigationModeUiState,
+    navigationSession: NavigationSession,
+    isNavigationFollowing: Boolean,
     cameraState: CameraState,
 ) {
     val context = LocalPlatformContext.current
@@ -1271,7 +1376,13 @@ private fun PlanContent(
                     centerOn = focusCenter,
                     focusZoom = focusZoom,
                     cameraState = cameraState,
-                    bearing = if (navigationState.isActive) navigationState.bearing else (if (isCenteredOnUser) 0.0 else null),
+                    bearing = when {
+                        // Only steer the camera while it is actually following; forcing a heading
+                        // on a map the traveller panned away would fight them for control.
+                        isNavigationFollowing -> navigationSession.bearing
+                        isCenteredOnUser -> 0.0
+                        else -> null
+                    },
                     lines = mapLines?.let { FeatureCollection(features = it) },
                     stops = filteredStopsCollection,
                     userLocation = userLocation,
@@ -1280,8 +1391,17 @@ private fun PlanContent(
                     vehicleIconName = vehicleIconName,
                     selectedLineName = selectedLineName,
                     itineraryGeoJson = itineraryGeoJson,
-                    interactive = !navigationState.isActive,
-                    tilt = if (navigationState.isActive) 55.0 else (if (isCenteredOnUser) 0.0 else null),
+                    // The map stays gesture-driven throughout navigation. Locking it out meant
+                    // no way to look ahead at the route, check an exit, or zoom out to get
+                    // oriented — the overlay's recentre button is what returns to following.
+                    interactive = true,
+                    tilt = when {
+                        // Enough perspective to read the road ahead without the near-ground-level
+                        // 55° pitch, which on a multi-kilometre transit leg showed one block.
+                        isNavigationFollowing -> 45.0
+                        isCenteredOnUser -> 0.0
+                        else -> null
+                    },
                     onStopClick = { nom -> onStopSelected(nom, null, emptyList()) },
                     onLineClick = { lineName -> onLineSelected(lineName) },
                     onVehicleClick = { lineName -> onLineSelected(lineName) },
@@ -1302,7 +1422,7 @@ private fun PlanContent(
                     onMapMoved = onFabReset,
                 )
 
-                if (!showAlertReport && !navigationState.isActive) {
+                if (!showAlertReport && !navigationSession.isActive) {
                     Column(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)

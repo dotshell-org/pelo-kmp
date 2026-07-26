@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.outlined.Navigation
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -529,6 +530,8 @@ fun JourneyDetailsSheetContent(
     journey: JourneyResult,
     isExpanded: Boolean,
     onStartNavigation: () -> Unit = {},
+    /** Resolving the journey trace is network-bound; the button reports it rather than sit inert. */
+    isStartingNavigation: Boolean = false,
     modifier: Modifier = Modifier,
     useLightColors: Boolean = false,
     scrollAllContent: Boolean = false,
@@ -636,7 +639,7 @@ fun JourneyDetailsSheetContent(
                             color = PrimaryColor,
                             shape = RoundedCornerShape(24.dp)
                         )
-                        .clickable { onStartNavigation() }
+                        .clickable(enabled = !isStartingNavigation) { onStartNavigation() }
                         .padding(horizontal = 14.dp, vertical = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -644,14 +647,22 @@ fun JourneyDetailsSheetContent(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Navigation,
-                            contentDescription = null,
-                            tint = SecondaryColor,
-                            modifier = Modifier.size(18.dp)
-                        )
+                        if (isStartingNavigation) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = SecondaryColor
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Outlined.Navigation,
+                                contentDescription = null,
+                                tint = SecondaryColor,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                         Text(
-                            text = strings["start"],
+                            text = if (isStartingNavigation) strings["nav_starting"] else strings["start"],
                             color = SecondaryColor,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp

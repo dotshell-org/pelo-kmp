@@ -36,4 +36,18 @@ class StringProvider(@Suppress("unused") private val context: PlatformContext) {
     @Composable
     operator fun get(name: String): String =
         stringResource(Res.allStringResources.getValue(name))
+
+    /** Same lookup as [get], filling the resource's positional placeholders with [args]. */
+    @Composable
+    fun format(name: String, vararg args: Any): String =
+        stringResource(Res.allStringResources.getValue(name), *args)
+
+    /**
+     * Picks between a singular and a plural key by [count]. Compose's plural resources are not
+     * exposed through the by-name registry this provider is built on, and fr/en both need only
+     * the one/other split.
+     */
+    @Composable
+    fun plural(singularName: String, pluralName: String, count: Int, vararg args: Any): String =
+        format(if (count == 1) singularName else pluralName, *args)
 }
