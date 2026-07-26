@@ -552,31 +552,43 @@ Corrigé sur la branche `fix/navigation` (4 commits). Statut par constat :
 | Expérience | NAV-28 → NAV-31, NAV-34, NAV-35, NAV-36, NAV-37 | ✅ corrigé |
 | iOS | NAV-43 → NAV-46 | ✅ corrigé |
 | Dette | NAV-48, NAV-49, NAV-51, NAV-52, NAV-53, NAV-54 | ✅ corrigé |
-| Fonctionnalités | NAV-32, NAV-33, NAV-38, NAV-47 | ⏸ hors périmètre de correction |
+| Fonctionnalités | NAV-32, NAV-38, NAV-47 | ✅ livré dans un second temps |
+| Fonctionnalités | NAV-33 | ⚠️ re-cadré — voir ci-dessous |
 
-### Ce qui reste ouvert, et pourquoi
+### Les quatre points initialement hors périmètre
 
-Ces quatre points ne sont pas des correctifs mais des fonctionnalités à part entière. Les traiter
-au chausse-pied dans une passe de correction aurait produit du travail à moitié fait :
+Traités après coup, chacun dans son propre commit :
 
-- **NAV-32 — guidage vocal et haptique.** Demande un `expect`/`actual` TTS (AVSpeechSynthesizer /
-  Android TextToSpeech), une politique de déclenchement (à quelle distance, à quelle fréquence,
-  quoi ne pas répéter), une gestion du focus audio, et un réglage utilisateur. Les instructions
-  sont désormais des données typées (`NavigationInstruction`), donc la couche vocale a un point
-  d'accroche propre.
-- **NAV-33 — temps réel dans le guidage.** Le mode s'appuie toujours sur l'horaire planifié. Y
-  injecter les retards suppose de rattacher un trajet planifié à un véhicule suivi, ce que
-  l'application ne fait nulle part aujourd'hui.
-- **NAV-38 — détection hors-itinéraire et recalcul.** La *détection* est faite : `isOffRoute`
-  remonte jusqu'à l'overlay, qui l'affiche. Le *recalcul* (relancer RAPTOR depuis la position
-  courante, proposer le nouveau trajet, basculer la session) reste à faire.
-- **NAV-47 — Live Activity iOS.** Nécessite une extension d'application, un `ActivityAttributes`
-  et un pont Swift ↔ Kotlin. Le suivi en arrière-plan lui-même fonctionne maintenant (NAV-45).
+- **NAV-32 — guidage vocal.** `SpeechAnnouncer` en `expect`/`actual` (TextToSpeech / AVSpeechSynthesizer),
+  avec focus audio en ducking. La politique d'annonce (`navigationVoiceCueFor`) est une fonction pure
+  et testée : chaque annonce est réduite à une identité et n'est prononcée qu'une fois, ce qui évite
+  que la voix ne se répète à chaque tick d'une seconde. Bouton muet sur la carte d'instruction.
+- **NAV-38 — recalcul hors-itinéraire.** Replanification depuis la position courante vers la même
+  destination, **proposée et non imposée** : un recalcul en transport peut remplacer toutes les lignes
+  du trajet, et sortir de l'itinéraire n'est pas toujours une erreur. Déclenché sur une durée
+  (25 s d'écart continu), pas sur un fix isolé.
+- **NAV-47 — Live Activity iOS.** Extension WidgetKit `PeloLiveActivity`, pont via une interface
+  Kotlin implémentée en Swift (ActivityKit n'a pas de surface Objective-C, donc rien à lier pour
+  cinterop). Sous iOS 16.1 le handler n'est jamais installé et les appels du code partagé sont
+  silencieux.
+
+**NAV-33 n'a pas été livré tel que décrit, parce que les données ne le permettent pas.** Le flux SIRI
+consommé est du *VehicleMonitoring* seul : positions, caps, destinations — aucun horaire attendu ni
+observé. Et `JourneyLeg` ne porte pas de référence de course, donc un tronçon planifié ne peut pas
+être rattaché à un véhicule suivi. **Afficher des retards est impossible en l'état.** Ce qui a été
+livré à la place : les alertes de perturbation officielles sur les lignes encore devant, filtrées
+pour exclure l'informatif. Obtenir de vrais retards demanderait une autre source (SIRI
+StopMonitoring, ou un GTFS-RT TripUpdates) et un identifiant de course sur les tronçons.
 
 ### Vérification
 
 `./gradlew :app:testDebugUnitTest :app:assembleDebug :app:compileKotlinIosSimulatorArm64` passe —
-120 tests, 0 échec, dont 26 nouveaux sur le moteur de guidage, l'état de l'UI et la géométrie.
+142 tests, 0 échec, dont 48 nouveaux sur le moteur de guidage, l'état de l'UI, la géométrie, la
+politique d'annonce vocale et la sélection d'alertes.
+
+Le Swift de la Live Activity est typechecké contre le SDK iOS 16.1 et contre le framework
+`ComposeApp` réel (donc les signatures du pont Kotlin ↔ Swift sont vérifiées). La cible d'extension
+elle-même n'a été validée qu'à l'exécution, sur appareil.
 
 **Aucune vérification sur appareil n'a été faite.** Les correctifs sont raisonnés depuis le code et
 couverts par des tests unitaires ; le comportement à valider en priorité sur téléphone est
