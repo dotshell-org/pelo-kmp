@@ -180,22 +180,6 @@ class NavigationModeStateTest {
     }
 
     @Test
-    fun `progress fraction spans departure to arrival`() {
-        val progress = NavigationProgress(legIndex = 1, stopIndex = 1, stopCount = 3)
-        assertEquals(0f, buildNavigationModeUiState(sessionAt(8 * 3600, progress))!!.progressFraction, 0.001f)
-        assertEquals(
-            0.5f,
-            buildNavigationModeUiState(sessionAt(8 * 3600 + 15 * 60, progress))!!.progressFraction,
-            0.001f,
-        )
-        assertEquals(
-            1f,
-            buildNavigationModeUiState(sessionAt(8 * 3600 + 45 * 60, progress))!!.progressFraction,
-            0.001f,
-        )
-    }
-
-    @Test
     fun `a session without a journey has no state`() {
         assertNull(buildNavigationModeUiState(NavigationSession()))
     }

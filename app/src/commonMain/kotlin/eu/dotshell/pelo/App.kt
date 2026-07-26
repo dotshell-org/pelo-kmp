@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
@@ -68,6 +69,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.CompositionLocalProvider
@@ -168,6 +170,9 @@ import eu.dotshell.pelo.generic.service.NavigationModePlatform
 import eu.dotshell.pelo.generic.service.NavigationNotificationBridge
 import eu.dotshell.pelo.generic.service.NavigationSession
 import eu.dotshell.pelo.generic.ui.screens.plan.NavigationModeOverlay
+import eu.dotshell.pelo.generic.ui.screens.plan.NavigationSheetContent
+import eu.dotshell.pelo.generic.ui.screens.plan.NavigationSheetPeekContentHeight
+import eu.dotshell.pelo.generic.ui.screens.plan.SheetDragHandleHeight
 import eu.dotshell.pelo.generic.ui.screens.plan.buildNavigationModeUiState
 import eu.dotshell.pelo.generic.ui.screens.plan.displayText
 import eu.dotshell.pelo.generic.utils.geo.GeometryUtils
@@ -786,12 +791,26 @@ private fun RootScaffold(
         }
     }
 
-    val bottomSheetState = rememberStandardBottomSheetState(initialValue = SheetValue.Hidden, skipHiddenState = false)
+    // Read through a snapshot so the guard below sees the live value: the callback is captured
+    // once, when the sheet state is created.
+    val isNavigatingNow = rememberUpdatedState(isNavigating)
+    val bottomSheetState = rememberStandardBottomSheetState(
+        initialValue = SheetValue.Hidden,
+        skipHiddenState = false,
+        // Navigation's summary is the sheet's peek area, so dismissing it would take the stop
+        // button and the countdown off screen with it.
+        confirmValueChange = { target -> !(isNavigatingNow.value && target == SheetValue.Hidden) },
+    )
     val bsScaffoldState = rememberBottomSheetScaffoldState(bottomSheetState = bottomSheetState)
-    val hasSheet = !isNavigating && (itineraryActive || selectedStation != null || selectedLine != null || allSchedules != null)
+    val hasSheet = isNavigating || itineraryActive || selectedStation != null || selectedLine != null || allSchedules != null
     val sheetContentKey = "$isNavigating|$itineraryActive|${selectedStation?.nom}|${selectedLine?.lineName}|${allSchedules?.lineName}"
     LaunchedEffect(sheetContentKey) {
-        if (hasSheet) bottomSheetState.expand() else bottomSheetState.hide()
+        when {
+            // Navigation opens collapsed: the map is the point, the breakdown is on demand.
+            isNavigating -> bottomSheetState.partialExpand()
+            hasSheet -> bottomSheetState.expand()
+            else -> bottomSheetState.hide()
+        }
     }
     // A hidden sheet normally means "the user dismissed the itinerary". Entering navigation also
     // hides it — without this guard that read as a dismissal and tore the journey down one frame
@@ -809,8 +828,16 @@ private fun RootScaffold(
     val windowInfo = LocalWindowInfo.current
     val screenHeightDp = with(density) { windowInfo.containerSize.height.toDp() }
     val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    val topMargin = if (itineraryActive) 290.dp else 320.dp
+    val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    // Navigation only has to clear its instruction card, not a full search header.
+    val topMargin = when {
+        isNavigating -> 190.dp
+        itineraryActive -> 290.dp
+        else -> 320.dp
+    }
     val maxSheetHeight = minOf(700.dp, screenHeightDp - topInset - topMargin).coerceAtLeast(130.dp)
+    // Drag handle + summary row + gesture inset: what stays on screen with the sheet collapsed.
+    val navigationPeekHeight = SheetDragHandleHeight + NavigationSheetPeekContentHeight + bottomInset
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -882,7 +909,11 @@ private fun RootScaffold(
                         },
                         showAlertReport = showAlertReport,
                         bsScaffoldState = bsScaffoldState,
-                        sheetPeekHeight = if (hasSheet) 130.dp else 0.dp,
+                        sheetPeekHeight = when {
+                            isNavigating -> navigationPeekHeight
+                            hasSheet -> 130.dp
+                            else -> 0.dp
+                        },
                         navigationSession = navigationSession,
                         isNavigationFollowing = isNavigationFollowing,
                         sheetContent = {
@@ -890,7 +921,33 @@ private fun RootScaffold(
                                 val sc = allSchedules
                                 val ln = selectedLine
                                 val st = selectedStation
+                                val navigationJourney = navigationSession.journey
+                                val navigationUiState = remember(navigationSession) {
+                                    buildNavigationModeUiState(navigationSession)
+                                }
                                 when {
+                                    // Navigation owns the sheet outright: collapsed it is the
+                                    // journey summary, pulled up it is the full breakdown.
+                                    isNavigating && navigationJourney != null && navigationUiState != null ->
+                                        NavigationSheetContent(
+                                            state = navigationUiState,
+                                            journey = navigationJourney,
+                                            onStop = stopNavigation,
+                                            onReportAlert = {
+                                                val nearestStop = nearestStopTo(
+                                                    userLocation,
+                                                    filteredStopsCollection?.features,
+                                                )
+                                                alertReportInitialStopName = nearestStop?.properties?.nom
+                                                alertReportInitialLines = nearestStop
+                                                    ?.let { viewModel.parseLineCodesFromDesserte(it.properties.desserte) }
+                                                    .orEmpty()
+                                                showAlertReport = true
+                                            },
+                                            maxHeight = maxSheetHeight,
+                                            getZoneForStopName = viewModel::getZoneForStopName,
+                                        )
+
                                     itineraryActive -> InlineItinerarySheetContent(
                                         viewModel = viewModel,
                                         departureStop = itineraryDeparture,
@@ -1208,27 +1265,26 @@ private fun RootScaffold(
                 }
                 NavigationModeOverlay(
                     state = overlayState,
-                    isFollowingUser = isFollowingUser,
+                    // Hidden while the breakdown is open: the overlay floats above the scaffold,
+                    // so an expanded sheet would otherwise have a button sitting on top of it.
+                    showRecenterButton = !isFollowingUser &&
+                        bottomSheetState.currentValue != SheetValue.Expanded,
                     onRecenter = { isFollowingUser = true },
-                    onStop = stopNavigation,
-                    onReportAlert = {
-                        val nearestStop = nearestStopTo(userLocation, filteredStopsCollection?.features)
-                        alertReportInitialStopName = nearestStop?.properties?.nom
-                        alertReportInitialLines = nearestStop
-                            ?.let { viewModel.parseLineCodesFromDesserte(it.properties.desserte) }
-                            .orEmpty()
-                        // Opened either way: with no stop resolved the sheet simply starts on its
-                        // own picker, which beats a button that silently does nothing.
-                        showAlertReport = true
-                    },
+                    sheetPeekHeight = navigationPeekHeight,
                     modifier = Modifier.fillMaxSize()
                 )
             }
         }
 
-        // Back is the other way out of navigation mode. The journey and the itinerary sheet
-        // survive it, so re-starting is one tap away.
-        BackHandler(enabled = isNavigating) { stopNavigation() }
+        // Back collapses the journey breakdown first, then leaves navigation. The journey and the
+        // itinerary sheet survive it, so re-starting is one tap away.
+        BackHandler(enabled = isNavigating) {
+            if (bottomSheetState.currentValue == SheetValue.Expanded) {
+                scope.launch { bottomSheetState.partialExpand() }
+            } else {
+                stopNavigation()
+            }
+        }
     }
 }
 

@@ -6,36 +6,24 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -45,26 +33,21 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import eu.dotshell.pelo.generic.service.TransportServiceProvider
-import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
-
-/** Amber used for the "report an alert" affordance, matching the map FAB. */
-private val AlertAmber = Color(0xFFFACC15)
 
 @Composable
 fun NavigationModeOverlay(
     state: NavigationModeUiState,
-    isFollowingUser: Boolean,
+    showRecenterButton: Boolean,
     onRecenter: () -> Unit,
-    onStop: () -> Unit,
-    onReportAlert: () -> Unit,
+    /** Height of the navigation sheet's peek area, so the recentre button clears it. */
+    sheetPeekHeight: Dp,
     modifier: Modifier = Modifier
 ) {
     val strings = StringProvider(LocalPlatformContext.current)
-    var showStopConfirmation by remember { mutableStateOf(false) }
 
     Box(modifier) {
         NavigationInstructionCard(
@@ -76,64 +59,28 @@ fun NavigationModeOverlay(
                 .padding(horizontal = 12.dp, vertical = 10.dp)
         )
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.End
-        ) {
-            // Recentring is the way back from a map the traveller panned away — without it,
-            // making the map interactive would be a one-way door.
-            if (!isFollowingUser) {
-                Box(
-                    modifier = Modifier
-                        .padding(end = 16.dp, bottom = 12.dp)
-                        .size(52.dp)
-                        .shadow(6.dp, CircleShape)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surface)
-                        .clickable(onClick = onRecenter),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.MyLocation,
-                        contentDescription = strings["nav_recenter"],
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+        // Recentring is the way back from a map the traveller panned away — without it, making
+        // the map interactive would be a one-way door.
+        if (showRecenterButton) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = sheetPeekHeight + 12.dp)
+                    .size(52.dp)
+                    .shadow(6.dp, CircleShape)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .clickable(onClick = onRecenter),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.MyLocation,
+                    contentDescription = strings["nav_recenter"],
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(24.dp)
+                )
             }
-
-            NavigationBottomBar(
-                state = state,
-                onStopRequested = {
-                    if (state.isArrived) onStop() else showStopConfirmation = true
-                },
-                onReportAlert = onReportAlert,
-                modifier = Modifier.fillMaxWidth()
-            )
         }
-    }
-
-    if (showStopConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showStopConfirmation = false },
-            title = { Text(strings["nav_stop_confirm_title"]) },
-            text = { Text(strings["nav_stop_confirm_message"]) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showStopConfirmation = false
-                    onStop()
-                }) {
-                    Text(strings["nav_stop_confirm_action"])
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showStopConfirmation = false }) {
-                    Text(strings["cancel"])
-                }
-            }
-        )
     }
 }
 
@@ -294,151 +241,6 @@ private fun NavigationStatusLine(state: NavigationModeUiState) {
     )
 }
 
-@Composable
-private fun NavigationBottomBar(
-    state: NavigationModeUiState,
-    onStopRequested: () -> Unit,
-    onReportAlert: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val strings = StringProvider(LocalPlatformContext.current)
-    val shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
-
-    Box(
-        modifier = modifier
-            .shadow(8.dp, shape)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.surface)
-    ) {
-        Column(
-            // Inset the content, not the surface: the panel still paints behind the gesture bar
-            // while nothing it contains ends up underneath it.
-            modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
-        ) {
-            JourneyProgressBar(
-                fraction = state.progressFraction,
-                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp)
-            )
-
-            if (state.isArrived) {
-                Button(
-                    onClick = onStopRequested,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 16.dp)
-                ) {
-                    Text(strings["nav_finish"])
-                }
-            } else {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 88.dp)
-                        .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    CircularOverlayButton(
-                        icon = Icons.Filled.Close,
-                        contentDescription = strings["nav_stop_navigation"],
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        onClick = onStopRequested
-                    )
-
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = formatRemainingTime(state.remainingSeconds),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            style = MaterialTheme.typography.headlineMedium
-                        )
-                        Text(
-                            text = strings.format("nav_arrival_at", state.arrivalTimeText),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                    }
-
-                    val realtimeConfig = remember { TransportServiceProvider.getRealtimeConfig() }
-                    if (realtimeConfig.userStopAlertsEnabled) {
-                        val drawableProvider = DrawableProvider(LocalPlatformContext.current)
-                        CircularOverlayButton(
-                            painterName = "add_triangle_24px",
-                            drawableProvider = drawableProvider,
-                            contentDescription = strings["alert_report_title"],
-                            tint = AlertAmber,
-                            onClick = onReportAlert
-                        )
-                    } else {
-                        // Keeps the countdown optically centred when the alert button is off.
-                        Spacer(Modifier.width(48.dp))
-                    }
-                }
-            }
-        }
-    }
-}
-
-/**
- * Inset and pill-shaped on purpose. Run edge to edge against the panel's top seam, the track reads
- * as a second surface peeking out from behind the bar rather than as a progress indicator — and a
- * `surfaceContainer` track is literally Sand200 in the light theme, so it looked like a stray
- * beige block. A low-alpha track keeps it part of the panel at any progress.
- */
-@Composable
-private fun JourneyProgressBar(fraction: Float, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(50)
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(4.dp)
-            .clip(shape)
-            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f))
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(fraction.coerceIn(0f, 1f))
-                .fillMaxHeight()
-                .clip(shape)
-                .background(MaterialTheme.colorScheme.primary)
-        )
-    }
-}
-
-@Composable
-private fun CircularOverlayButton(
-    contentDescription: String,
-    tint: Color,
-    onClick: () -> Unit,
-    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
-    painterName: String? = null,
-    drawableProvider: DrawableProvider? = null,
-) {
-    Box(
-        modifier = Modifier
-            .size(48.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                tint = tint,
-                modifier = Modifier.size(26.dp)
-            )
-        } else if (painterName != null && drawableProvider != null) {
-            Icon(
-                painter = drawableProvider.getPainter(painterName),
-                contentDescription = contentDescription,
-                tint = tint,
-                modifier = Modifier.size(26.dp)
-            )
-        }
-    }
-}
-
 /** The instruction as a sentence in the active locale. Also used for the ongoing notification. */
 @Composable
 fun NavigationInstruction.displayText(): String {
@@ -475,18 +277,6 @@ fun NavigationInstruction.displayText(): String {
                 remainingStops
             )
         }
-    }
-}
-
-/** Rounds up, so "1 min" only becomes "0 min" once there is genuinely nothing left. */
-@Composable
-private fun formatRemainingTime(seconds: Int): String {
-    val strings = StringProvider(LocalPlatformContext.current)
-    val minutes = (seconds + 59) / 60
-    return if (minutes < 60) {
-        strings.format("duration_minutes", minutes)
-    } else {
-        strings.format("duration_hours_minutes", minutes / 60, (minutes % 60).toString().padStart(2, '0'))
     }
 }
 

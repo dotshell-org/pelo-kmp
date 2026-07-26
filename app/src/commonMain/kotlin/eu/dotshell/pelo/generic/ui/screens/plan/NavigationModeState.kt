@@ -49,8 +49,6 @@ data class NavigationModeUiState(
     val direction: String?,
     val remainingSeconds: Int,
     val arrivalTimeText: String,
-    /** 0f at departure, 1f at arrival — drives the progress bar. */
-    val progressFraction: Float,
     val isArrived: Boolean,
     val isOffRoute: Boolean,
     /** Guidance is running on the timetable because no fresh fix is available. */
@@ -69,7 +67,6 @@ fun buildNavigationModeUiState(session: NavigationSession): NavigationModeUiStat
 
     val remainingSeconds = computeRemainingJourneySeconds(journey, now)
     val arrivalText = journey.formatArrivalTime()
-    val fraction = computeProgressFraction(journey, now)
 
     val currentLeg = journey.legs.getOrNull(progress.legIndex)
 
@@ -143,7 +140,6 @@ fun buildNavigationModeUiState(session: NavigationSession): NavigationModeUiStat
         direction = displayedLeg?.direction?.takeIf { it.isNotBlank() },
         remainingSeconds = remainingSeconds,
         arrivalTimeText = arrivalText,
-        progressFraction = fraction,
         isArrived = progress.isArrived,
         isOffRoute = progress.isOffRoute,
         isDeadReckoning = progress.isDeadReckoning,
@@ -170,16 +166,6 @@ fun computeRemainingJourneySeconds(journey: JourneyResult, nowSeconds: Int): Int
     val nowNormalized = normalizeTimeAroundReference(nowSeconds, reference)
     val arrivalNormalized = normalizeTimeAroundReference(journey.arrivalTime, reference)
     return (arrivalNormalized - nowNormalized).coerceAtLeast(0)
-}
-
-private fun computeProgressFraction(journey: JourneyResult, nowSeconds: Int): Float {
-    val reference = journey.departureTime
-    val nowNormalized = normalizeTimeAroundReference(nowSeconds, reference)
-    val arrivalNormalized = normalizeTimeAroundReference(journey.arrivalTime, reference)
-    val total = arrivalNormalized - reference
-    if (total <= 0) return 0f
-    val elapsed = nowNormalized - reference
-    return (elapsed.toFloat() / total.toFloat()).coerceIn(0f, 1f)
 }
 
 /**

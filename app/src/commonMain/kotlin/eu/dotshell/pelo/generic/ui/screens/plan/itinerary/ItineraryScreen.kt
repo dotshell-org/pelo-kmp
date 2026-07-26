@@ -532,6 +532,11 @@ fun JourneyDetailsSheetContent(
     onStartNavigation: () -> Unit = {},
     /** Resolving the journey trace is network-bound; the button reports it rather than sit inert. */
     isStartingNavigation: Boolean = false,
+    /**
+     * Whether to show the floating "Start" bar. Off while navigation is already running: the same
+     * breakdown is then reused inside the navigation sheet, where starting again makes no sense.
+     */
+    showStartAction: Boolean = true,
     modifier: Modifier = Modifier,
     useLightColors: Boolean = false,
     scrollAllContent: Boolean = false,
@@ -606,11 +611,14 @@ fun JourneyDetailsSheetContent(
             } else {
                 Spacer(modifier = Modifier.height(80.dp))
             }
-            Spacer(modifier = Modifier.height(bottomBarHeight))
+            // Room for the floating action bar; without one there is nothing to clear.
+            if (showStartAction) {
+                Spacer(modifier = Modifier.height(bottomBarHeight))
+            }
         }
 
         val sheetBgColor = if (useLightColors) SecondaryColor else PrimaryColor
-        Box(
+        if (showStartAction) Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
