@@ -359,7 +359,6 @@ private fun RootScaffold(
     var rerouteDismissed by remember { mutableStateOf(false) }
     var rerouteFailed by remember { mutableStateOf(false) }
     var shownNavigationAlert by remember { mutableStateOf<TrafficAlert?>(null) }
-    val trafficAlerts by viewModel.trafficAlerts.collectAsState(initial = emptyList())
     // Dismissing the prompt silences it for this departure only: coming back onto the route and
     // leaving it again is a new situation, and worth asking about again.
     LaunchedEffect(navigationSession.progress.isOffRoute) {
@@ -1329,9 +1328,14 @@ private fun RootScaffold(
             if (overlayState != null) {
                 // Mirror the instruction into the ongoing notification, so a backgrounded session
                 // says what to do next instead of repeating a fixed sentence.
-                // Keyed on the alert feed as well as the session: the feed refreshes in the
-                // background, and a disruption declared mid-journey is exactly the one worth
-                // hearing about.
+                // Subscribed to here rather than at the top of the scaffold. The alert feed
+                // refreshes in the background, so reading it up there recomposed the whole screen
+                // — MapCanvas included — on every refresh, and it does not survive that: the
+                // itinerary polylines came back scattered across the map. Confined to navigation,
+                // the refresh only touches the guidance that actually cares about it.
+                val trafficAlerts by viewModel.trafficAlerts.collectAsState(initial = emptyList())
+                // Keyed on the alert feed as well as the session: a disruption declared
+                // mid-journey is exactly the one worth hearing about.
                 val navigationAlert = remember(
                     navigationSession.progress.legIndex,
                     navigationSession.journey,
