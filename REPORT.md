@@ -552,14 +552,16 @@ Corrigé sur la branche `fix/navigation` (4 commits). Statut par constat :
 | Expérience | NAV-28 → NAV-31, NAV-34, NAV-35, NAV-36, NAV-37 | ✅ corrigé |
 | iOS | NAV-43 → NAV-46 | ✅ corrigé |
 | Dette | NAV-48, NAV-49, NAV-51, NAV-52, NAV-53, NAV-54 | ✅ corrigé |
-| Fonctionnalités | NAV-32, NAV-38, NAV-47 | ✅ livré dans un second temps |
+| Fonctionnalités | NAV-38, NAV-47 | ✅ livré dans un second temps |
+| Fonctionnalités | NAV-32 | ◐ voix livrée, haptique non traité |
 | Fonctionnalités | NAV-33 | ⚠️ re-cadré — voir ci-dessous |
 
 ### Les quatre points initialement hors périmètre
 
 Traités après coup, chacun dans son propre commit :
 
-- **NAV-32 — guidage vocal.** `SpeechAnnouncer` en `expect`/`actual` (TextToSpeech / AVSpeechSynthesizer),
+- **NAV-32 — guidage vocal** (le volet haptique du constat n'a pas été traité).
+  `SpeechAnnouncer` en `expect`/`actual` (TextToSpeech / AVSpeechSynthesizer),
   avec focus audio en ducking. La politique d'annonce (`navigationVoiceCueFor`) est une fonction pure
   et testée : chaque annonce est réduite à une identité et n'est prononcée qu'une fois, ce qui évite
   que la voix ne se répète à chaque tick d'une seconde. Bouton muet sur la carte d'instruction.
