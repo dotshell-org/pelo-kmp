@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Launchers that ask for the round icon get the adaptive one too; without this they fall
+  back to mipmap-*/ic_launcher_round.png, which tops out at 192px.
+-->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@drawable/ic_launcher_background" />
-    <!-- Margins are baked into the layers by tools/build_app_icons.swift, not inset here. -->
     <foreground android:drawable="@drawable/ic_launcher_foreground" />
     <monochrome android:drawable="@drawable/ic_launcher_monochrome" />
 </adaptive-icon>
