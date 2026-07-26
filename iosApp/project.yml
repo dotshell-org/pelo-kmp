@@ -32,6 +32,10 @@ targets:
         UILaunchScreen: {}
         UIRequiresFullScreen: false
         NSLocationWhenInUseUsageDescription: "Pelo utilise votre position pour centrer la carte et calculer des itinéraires."
+        # Requested only when the user starts navigation. requestAlwaysAuthorization() is a
+        # silent no-op without this key, so the background updates navigation mode relies on
+        # were never actually available.
+        NSLocationAlwaysAndWhenInUseUsageDescription: "Pendant la navigation, Pelo suit votre position même écran éteint pour continuer à vous guider jusqu’à votre arrêt de descente."
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         UISupportedInterfaceOrientations~ipad:
@@ -42,6 +46,10 @@ targets:
         UIBackgroundModes:
           - fetch
           - processing
+          # Navigation mode keeps guiding with the app backgrounded. Without this entry,
+          # allowsBackgroundLocationUpdates raises at runtime and the Always authorization
+          # above is unusable, so the session died the moment the app left the screen.
+          - location
         BGTaskSchedulerPermittedIdentifiers:
           - eu.dotshell.pelo.telemetryUpload
           - eu.dotshell.pelo.trafficAlerts
