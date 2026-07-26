@@ -52,7 +52,7 @@ private val AlertAmber = Color(0xFFFACC15)
  * Height of the always-visible part of the navigation sheet, excluding the drag handle and the
  * gesture inset (the summary carries that itself).
  */
-val NavigationSheetPeekContentHeight: Dp = 104.dp
+val NavigationSheetPeekContentHeight: Dp = 88.dp
 
 /**
  * Vertical space `BottomSheetDefaults.DragHandle` occupies (4dp bar, 22dp padding either side).
@@ -146,7 +146,7 @@ private fun NavigationSheetSummary(
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.navigationBars)
                 .heightIn(min = NavigationSheetPeekContentHeight)
-                .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
+                .padding(start = 20.dp, end = 20.dp, top = 0.dp, bottom = 18.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
@@ -164,7 +164,7 @@ private fun NavigationSheetSummary(
             // let the top of the detail show through under the summary when collapsed.
             .windowInsetsPadding(WindowInsets.navigationBars)
             .heightIn(min = NavigationSheetPeekContentHeight)
-            .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 24.dp),
+            .padding(start = 20.dp, end = 20.dp, top = 0.dp, bottom = 18.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -195,7 +195,8 @@ private fun NavigationSheetSummary(
                 painterName = "add_triangle_24px",
                 drawableProvider = drawableProvider,
                 contentDescription = strings["alert_report_title"],
-                tint = AlertAmber,
+                containerColor = AlertAmber,
+                tint = Color.White,
                 onClick = onReportAlert
             )
         } else {
@@ -210,6 +211,7 @@ private fun CircularOverlayButton(
     contentDescription: String,
     tint: Color,
     onClick: () -> Unit,
+    containerColor: Color = MaterialTheme.colorScheme.surfaceContainerHigh,
     icon: ImageVector? = null,
     painterName: String? = null,
     drawableProvider: DrawableProvider? = null,
@@ -218,7 +220,7 @@ private fun CircularOverlayButton(
         modifier = Modifier
             .size(48.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .background(containerColor)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
