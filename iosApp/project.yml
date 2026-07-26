@@ -21,6 +21,7 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+      - path: Shared
       - path: Assets.xcassets
     info:
       path: Info.plist
@@ -29,6 +30,8 @@ targets:
         CFBundleShortVersionString: "1.1.2"
         CFBundleVersion: "8"
         CADisableMinimumFrameDurationOnPhone: true
+        # Without this the system refuses every Activity.request, silently.
+        NSSupportsLiveActivities: true
         UILaunchScreen: {}
         UIRequiresFullScreen: false
         NSLocationWhenInUseUsageDescription: "Pelo utilise votre position pour centrer la carte et calculer des itinéraires."
@@ -75,6 +78,8 @@ targets:
     dependencies:
       - package: MapLibre
         product: MapLibre
+      - target: PeloLiveActivity
+        embed: true
     preBuildScripts:
       - name: Build Compose framework (Kotlin/Native)
         basedOnDependencyAnalysis: false
@@ -103,3 +108,23 @@ targets:
           else
             echo "warning: Compose resources not found at $SRC"
           fi
+
+  PeloLiveActivity:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "16.1"
+    sources:
+      - path: LiveActivity
+      - path: Shared
+    info:
+      path: LiveActivity/Info.plist
+      properties:
+        CFBundleDisplayName: Pelo Navigation
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: eu.dotshell.pelo.liveactivity
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SKIP_INSTALL: "YES"

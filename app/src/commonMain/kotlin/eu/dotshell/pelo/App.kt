@@ -164,6 +164,8 @@ import eu.dotshell.pelo.generic.utils.location.GeoPoint
 import eu.dotshell.pelo.generic.utils.location.LocationPermissionSignal
 import eu.dotshell.pelo.generic.utils.location.LocationProvider
 import eu.dotshell.pelo.generic.utils.location.HeadingProvider
+import eu.dotshell.pelo.generic.service.NavigationLiveActivity
+import eu.dotshell.pelo.generic.service.NavigationLiveActivityState
 import eu.dotshell.pelo.generic.service.NavigationLocationBus
 import eu.dotshell.pelo.generic.service.NavigationModeController
 import eu.dotshell.pelo.generic.service.NavigationModePlatform
@@ -1347,6 +1349,25 @@ private fun RootScaffold(
                 }
                 DisposableEffect(Unit) {
                     onDispose { NavigationNotificationBridge.setInstruction(null) }
+                }
+
+                // Same guidance, glanceable outside the app. A data class as the effect key means
+                // it is pushed when something a viewer would notice changes — roughly the minute
+                // ticking over, or a new instruction — not on every one-second tick, which would
+                // burn through the platform's update budget for nothing.
+                val liveActivityState = NavigationLiveActivityState(
+                    instruction = instructionText,
+                    lineName = overlayState.displayedLeg?.routeName,
+                    remainingMinutes = (overlayState.remainingSeconds + 59) / 60,
+                    arrivalTimeText = overlayState.arrivalTimeText,
+                    isArrived = overlayState.isArrived,
+                )
+                DisposableEffect(Unit) {
+                    NavigationLiveActivity.start(liveActivityState)
+                    onDispose { NavigationLiveActivity.end() }
+                }
+                LaunchedEffect(liveActivityState) {
+                    NavigationLiveActivity.update(liveActivityState)
                 }
                 NavigationModeOverlay(
                     state = if (rerouteDismissed) overlayState.copy(canReroute = false) else overlayState,

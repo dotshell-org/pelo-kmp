@@ -40,3 +40,5 @@ iosApp/Info.plist
 .swiftpm/
 
 .claude
+# XcodeGen also generates the extension's Info.plist
+iosApp/LiveActivity/Info.plist
