@@ -270,4 +270,9 @@
     <string name="distance_kilometers">%1$s km</string>
     <string name="nav_voice_on">Voice guidance on</string>
     <string name="nav_voice_off">Voice guidance off</string>
+    <string name="nav_reroute_title">You have left the planned route</string>
+    <string name="nav_reroute_action">Recalculate</string>
+    <string name="nav_reroute_running">Recalculating…</string>
+    <string name="nav_reroute_dismiss">Dismiss</string>
+    <string name="nav_reroute_failed">No route found from your position.</string>
 </resources>

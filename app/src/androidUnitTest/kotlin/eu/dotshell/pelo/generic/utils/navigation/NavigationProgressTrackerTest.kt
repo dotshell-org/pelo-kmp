@@ -138,6 +138,32 @@ class NavigationProgressTrackerTest {
     }
 
     @Test
+    fun `off-route time accumulates only while continuously astray`() {
+        val tracker = NavigationProgressTracker(journey)
+        val away = GeoPoint(45.9000, 5.2000)
+
+        tracker.update(bellecour, 8 * 3600 + 6 * 60)
+        assertEquals(0, tracker.update(away, 8 * 3600 + 6 * 60).offRouteSeconds)
+        assertEquals(30, tracker.update(away, 8 * 3600 + 6 * 60 + 30).offRouteSeconds)
+
+        // Back on the route: the clock resets, so a brief detour never accumulates towards a
+        // replanning prompt.
+        assertEquals(0, tracker.update(guillotiere, 8 * 3600 + 7 * 60).offRouteSeconds)
+        assertEquals(0, tracker.update(away, 8 * 3600 + 7 * 60 + 10).offRouteSeconds)
+    }
+
+    @Test
+    fun `losing the signal is not being off-route`() {
+        val tracker = NavigationProgressTracker(journey)
+        tracker.update(bellecour, 8 * 3600 + 6 * 60)
+
+        // No fix at all: dead reckoning, not astray. Offering to replan here would be guessing.
+        val progress = tracker.update(null, 8 * 3600 + 8 * 60)
+        assertFalse(progress.isOffRoute)
+        assertEquals(0, progress.offRouteSeconds)
+    }
+
+    @Test
     fun `arrival fires once the destination is reached`() {
         val tracker = NavigationProgressTracker(journey)
         tracker.update(saxe, 8 * 3600 + 14 * 60)

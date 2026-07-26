@@ -6,8 +6,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -23,6 +25,7 @@ import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Icon
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,6 +50,9 @@ fun NavigationModeOverlay(
     onRecenter: () -> Unit,
     isVoiceEnabled: Boolean,
     onToggleVoice: () -> Unit,
+    isRerouting: Boolean,
+    onReroute: () -> Unit,
+    onDismissReroute: () -> Unit,
     /** Height of the navigation sheet's peek area, so the recentre button clears it. */
     sheetPeekHeight: Dp,
     modifier: Modifier = Modifier
@@ -58,6 +64,9 @@ fun NavigationModeOverlay(
             state = state,
             isVoiceEnabled = isVoiceEnabled,
             onToggleVoice = onToggleVoice,
+            isRerouting = isRerouting,
+            onReroute = onReroute,
+            onDismissReroute = onDismissReroute,
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
@@ -95,6 +104,9 @@ private fun NavigationInstructionCard(
     state: NavigationModeUiState,
     isVoiceEnabled: Boolean,
     onToggleVoice: () -> Unit,
+    isRerouting: Boolean,
+    onReroute: () -> Unit,
+    onDismissReroute: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val strings = StringProvider(LocalPlatformContext.current)
@@ -181,6 +193,61 @@ private fun NavigationInstructionCard(
                 NavigationLineIcon(lineName = upcoming.routeName.orEmpty(), size = 30.dp)
             }
         }
+
+        if (state.canReroute) {
+            Spacer(Modifier.height(8.dp))
+            RerouteBanner(
+                isRerouting = isRerouting,
+                onReroute = onReroute,
+                onDismiss = onDismissReroute,
+            )
+        }
+    }
+}
+
+/**
+ * Offers a new plan when the traveller has clearly left the old one. Deliberately an offer: a
+ * transit reroute can swap every line of the journey, and stepping off the route is not always a
+ * mistake.
+ */
+@Composable
+private fun RerouteBanner(
+    isRerouting: Boolean,
+    onReroute: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val strings = StringProvider(LocalPlatformContext.current)
+    val shape = RoundedCornerShape(16.dp)
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(4.dp, shape)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.errorContainer)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = strings["nav_reroute_title"],
+            color = MaterialTheme.colorScheme.onErrorContainer,
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(onClick = onReroute, enabled = !isRerouting) {
+                Text(strings[if (isRerouting) "nav_reroute_running" else "nav_reroute_action"])
+            }
+            TextButton(onClick = onDismiss, enabled = !isRerouting) {
+                Text(
+                    text = strings["nav_reroute_dismiss"],
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+            }
+        }
     }
 }
 
@@ -245,7 +312,8 @@ private fun NavigationStatusLine(state: NavigationModeUiState) {
     val color: Color
     when {
         state.isArrived -> return
-        state.isOffRoute -> {
+        // Suppressed once the banner below says the same thing with an action attached.
+        state.isOffRoute && !state.canReroute -> {
             message = strings["nav_off_route"]
             color = MaterialTheme.colorScheme.error
         }

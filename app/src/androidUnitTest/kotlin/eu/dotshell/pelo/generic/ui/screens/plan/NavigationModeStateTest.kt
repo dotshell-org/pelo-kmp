@@ -180,6 +180,26 @@ class NavigationModeStateTest {
     }
 
     @Test
+    fun `replanning is offered only after a sustained departure from the route`() {
+        fun canReroute(offRouteSeconds: Int, arrived: Boolean = false) = buildNavigationModeUiState(
+            sessionAt(
+                8 * 3600 + 10 * 60,
+                NavigationProgress(
+                    legIndex = 1, stopIndex = 0, stopCount = 3,
+                    isArrived = arrived,
+                    isOffRoute = offRouteSeconds > 0,
+                    offRouteSeconds = offRouteSeconds,
+                )
+            )
+        )!!.canReroute
+
+        assertFalse("a stray fix must not prompt anything", canReroute(0))
+        assertFalse("nor a few seconds of it", canReroute(10))
+        assertTrue("but boarding the wrong vehicle should be caught", canReroute(30))
+        assertFalse("never once the journey is over", canReroute(60, arrived = true))
+    }
+
+    @Test
     fun `a session without a journey has no state`() {
         assertNull(buildNavigationModeUiState(NavigationSession()))
     }

@@ -18,6 +18,11 @@ data class NavigationProgress(
     val distanceToNextMeters: Int? = null,
     /** The last fix was too far from the planned route to be believed. */
     val isOffRoute: Boolean = false,
+    /**
+     * How long the traveller has been continuously off-route, in seconds. A single stray fix is
+     * noise; only a sustained departure means the plan is actually wrong.
+     */
+    val offRouteSeconds: Int = 0,
     /** No usable fix right now — progress is being driven by the timetable alone. */
     val isDeadReckoning: Boolean = false,
 ) {

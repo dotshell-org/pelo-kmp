@@ -23,6 +23,8 @@ class NavigationProgressTracker(private val journey: JourneyResult) {
 
     private val chain: List<LegChain> = journey.buildChain()
     private var progress: NavigationProgress = initialProgress()
+    /** When the current uninterrupted off-route stretch began, in normalised journey time. */
+    private var offRouteSince: Int? = null
 
     /** The current snapshot, without folding in any new observation. */
     fun current(): NavigationProgress = progress
@@ -54,13 +56,19 @@ class NavigationProgressTracker(private val journey: JourneyResult) {
         val distanceToNext = location?.let { distanceToNextPoint(it, position) }
         val arrived = hasArrived(position, location, now)
 
+        // Off-route needs a fix to establish: with no position at all we are dead-reckoning, not
+        // astray, and offering to replan on that basis would be guessing.
+        val isOffRoute = snap != null && !trusted
+        offRouteSince = if (isOffRoute) (offRouteSince ?: now) else null
+
         progress = NavigationProgress(
             legIndex = position.legIndex,
             stopIndex = position.stopIndex,
             stopCount = legChain.points.size,
             isArrived = arrived,
             distanceToNextMeters = distanceToNext,
-            isOffRoute = snap != null && !trusted,
+            isOffRoute = isOffRoute,
+            offRouteSeconds = offRouteSince?.let { (now - it).coerceAtLeast(0) } ?: 0,
             isDeadReckoning = location == null,
         )
         return progress

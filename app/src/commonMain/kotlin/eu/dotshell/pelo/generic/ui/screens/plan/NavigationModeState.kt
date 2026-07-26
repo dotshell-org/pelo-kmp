@@ -7,6 +7,14 @@ import eu.dotshell.pelo.generic.service.NavigationSession
 private const val DAY_SECONDS = 24 * 3600
 
 /**
+ * How long the traveller must be continuously off-route before replanning is offered.
+ *
+ * Long enough that a bad fix, a tunnel mouth or a brief detour around a building does not prompt
+ * anything; short enough that someone who boarded the wrong vehicle is not carried away in silence.
+ */
+private const val REROUTE_PROMPT_AFTER_SECONDS = 25
+
+/**
  * What the guidance is telling the traveller to do, as data rather than prose. Keeping the
  * wording out of here is what lets the overlay translate it — the previous version hard-coded
  * French sentences into the state, so an English device got a half-translated screen.
@@ -51,6 +59,12 @@ data class NavigationModeUiState(
     val arrivalTimeText: String,
     val isArrived: Boolean,
     val isOffRoute: Boolean,
+    /**
+     * Off-route long enough that the plan is probably wrong, so replanning is worth offering.
+     * Offered rather than applied: a transit reroute can mean entirely different lines, and the
+     * traveller may simply have stepped away on purpose.
+     */
+    val canReroute: Boolean,
     /** Guidance is running on the timetable because no fresh fix is available. */
     val isDeadReckoning: Boolean,
 )
@@ -142,6 +156,7 @@ fun buildNavigationModeUiState(session: NavigationSession): NavigationModeUiStat
         arrivalTimeText = arrivalText,
         isArrived = progress.isArrived,
         isOffRoute = progress.isOffRoute,
+        canReroute = progress.offRouteSeconds >= REROUTE_PROMPT_AFTER_SECONDS && !progress.isArrived,
         isDeadReckoning = progress.isDeadReckoning,
     )
 }

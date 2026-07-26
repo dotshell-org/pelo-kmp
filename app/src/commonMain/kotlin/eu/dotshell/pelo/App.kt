@@ -191,6 +191,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.maplibre.spatialk.geojson.Position
 import eu.dotshell.pelo.generic.data.repository.geocoding.GeocodingRepository
+import io.raptor.Location
 
 @Composable
 fun App(
@@ -349,6 +350,14 @@ private fun RootScaffold(
     var navigationBlockedMessage by remember { mutableStateOf(false) }
     var isVoiceGuidanceEnabled by remember(context) {
         mutableStateOf(NavigationVoicePreference.isEnabled(context))
+    }
+    var isRerouting by remember { mutableStateOf(false) }
+    var rerouteDismissed by remember { mutableStateOf(false) }
+    var rerouteFailed by remember { mutableStateOf(false) }
+    // Dismissing the prompt silences it for this departure only: coming back onto the route and
+    // leaving it again is a new situation, and worth asking about again.
+    LaunchedEffect(navigationSession.progress.isOffRoute) {
+        if (!navigationSession.progress.isOffRoute) rerouteDismissed = false
     }
     DisposableEffect(navigationController) {
         onDispose { navigationController.dispose() }
@@ -1250,6 +1259,19 @@ private fun RootScaffold(
             )
         }
 
+        if (rerouteFailed) {
+            val rerouteStrings = StringProvider(LocalPlatformContext.current)
+            AlertDialog(
+                onDismissRequest = { rerouteFailed = false },
+                text = { Text(rerouteStrings["nav_reroute_failed"]) },
+                confirmButton = {
+                    TextButton(onClick = { rerouteFailed = false }) {
+                        Text(rerouteStrings["close"])
+                    }
+                }
+            )
+        }
+
         if (navigationBlockedMessage) {
             val blockedStrings = StringProvider(LocalPlatformContext.current)
             AlertDialog(
@@ -1295,7 +1317,7 @@ private fun RootScaffold(
                     onDispose { NavigationNotificationBridge.setInstruction(null) }
                 }
                 NavigationModeOverlay(
-                    state = overlayState,
+                    state = if (rerouteDismissed) overlayState.copy(canReroute = false) else overlayState,
                     showRecenterButton = !isFollowingUser,
                     onRecenter = { isFollowingUser = true },
                     isVoiceEnabled = isVoiceGuidanceEnabled,
@@ -1303,6 +1325,45 @@ private fun RootScaffold(
                         isVoiceGuidanceEnabled = !isVoiceGuidanceEnabled
                         NavigationVoicePreference.setEnabled(context, isVoiceGuidanceEnabled)
                     },
+                    isRerouting = isRerouting,
+                    onReroute = {
+                        val from = userLocation
+                        val journey = navigationSession.journey
+                        val destination = journey?.legs?.lastOrNull()
+                        if (!isRerouting && from != null && destination != null) {
+                            isRerouting = true
+                            scope.launch {
+                                // Replan from where the traveller actually is, to where they were
+                                // always going — the destination survives, the route does not.
+                                val replacement = runCatching {
+                                    viewModel.getOptimizedPathsForLocations(
+                                        origin = Location.Point(from.latitude, from.longitude),
+                                        destination = Location.Point(destination.toLat, destination.toLon),
+                                        departureTimeSeconds = GeometryUtils.currentTimeInSeconds(),
+                                        originLabel = myPositionLabel,
+                                        destinationLabel = destination.toStopName,
+                                    )
+                                }.getOrDefault(emptyList()).firstOrNull()
+
+                                if (replacement != null) {
+                                    val trace = withContext(Dispatchers.Default) {
+                                        runCatching { calculateJourneyTrace(replacement, viewModel) }
+                                            .getOrDefault(emptyList())
+                                    }
+                                    // Swap the map and the sheet over too, otherwise the guidance
+                                    // and the drawn route would describe different journeys.
+                                    activeJourneys = listOf(replacement)
+                                    selectedJourney = replacement
+                                    navigationController.start(replacement, trace)
+                                    isFollowingUser = true
+                                } else {
+                                    rerouteFailed = true
+                                }
+                                isRerouting = false
+                            }
+                        }
+                    },
+                    onDismissReroute = { rerouteDismissed = true },
                     sheetPeekHeight = navigationPeekHeight,
                     modifier = Modifier.fillMaxSize()
                 )

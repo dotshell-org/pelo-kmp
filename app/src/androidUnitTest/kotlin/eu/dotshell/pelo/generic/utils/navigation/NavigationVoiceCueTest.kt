@@ -25,6 +25,7 @@ class NavigationVoiceCueTest {
         arrivalTimeText = "08:30",
         isArrived = instruction is NavigationInstruction.Arrived,
         isOffRoute = false,
+        canReroute = false,
         isDeadReckoning = false,
     )
 

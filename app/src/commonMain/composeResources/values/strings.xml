@@ -270,4 +270,9 @@
     <string name="distance_kilometers">%1$s km</string>
     <string name="nav_voice_on">Guidage vocal activé</string>
     <string name="nav_voice_off">Guidage vocal coupé</string>
+    <string name="nav_reroute_title">Vous vous êtes éloigné du trajet</string>
+    <string name="nav_reroute_action">Recalculer</string>
+    <string name="nav_reroute_running">Recalcul…</string>
+    <string name="nav_reroute_dismiss">Ignorer</string>
+    <string name="nav_reroute_failed">Aucun trajet trouvé depuis votre position.</string>
 </resources>
