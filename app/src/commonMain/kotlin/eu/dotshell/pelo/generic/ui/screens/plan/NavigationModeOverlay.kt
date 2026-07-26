@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -143,8 +144,10 @@ private fun NavigationInstructionCard(
 ) {
     val strings = StringProvider(LocalPlatformContext.current)
     val hasUpNext = state.upcomingLeg != null && !state.isArrived
+    // One radius everywhere, except the bottom-left when the "up next" strip is there: that corner
+    // stays square so the strip below it carries the rounding and the two read as one panel.
     val topShape = if (hasUpNext) {
-        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 6.dp, bottomEnd = 6.dp)
+        RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 0.dp, bottomEnd = 20.dp)
     } else {
         RoundedCornerShape(20.dp)
     }
@@ -312,14 +315,17 @@ private fun NavigationBottomBar(
             // while nothing it contains ends up underneath it.
             modifier = Modifier.windowInsetsPadding(WindowInsets.navigationBars)
         ) {
-            JourneyProgressBar(state.progressFraction)
+            JourneyProgressBar(
+                fraction = state.progressFraction,
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp)
+            )
 
             if (state.isArrived) {
                 Button(
                     onClick = onStopRequested,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 16.dp)
+                        .padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 16.dp)
                 ) {
                     Text(strings["nav_finish"])
                 }
@@ -327,8 +333,8 @@ private fun NavigationBottomBar(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 96.dp)
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                        .heightIn(min = 88.dp)
+                        .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
@@ -372,18 +378,27 @@ private fun NavigationBottomBar(
     }
 }
 
+/**
+ * Inset and pill-shaped on purpose. Run edge to edge against the panel's top seam, the track reads
+ * as a second surface peeking out from behind the bar rather than as a progress indicator — and a
+ * `surfaceContainer` track is literally Sand200 in the light theme, so it looked like a stray
+ * beige block. A low-alpha track keeps it part of the panel at any progress.
+ */
 @Composable
-private fun JourneyProgressBar(fraction: Float) {
+private fun JourneyProgressBar(fraction: Float, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(50)
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .height(4.dp)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clip(shape)
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.10f))
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth(fraction.coerceIn(0f, 1f))
-                .height(4.dp)
+                .fillMaxHeight()
+                .clip(shape)
                 .background(MaterialTheme.colorScheme.primary)
         )
     }
