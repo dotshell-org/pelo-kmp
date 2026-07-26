@@ -1,14 +1,12 @@
 package eu.dotshell.pelo.generic.service
 
 import android.Manifest
-import android.content.BroadcastReceiver
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
@@ -26,106 +24,108 @@ import eu.dotshell.pelo.generic.data.cache.TransportCacheImpl
 import eu.dotshell.pelo.generic.data.config.AppConfigLoader
 import eu.dotshell.pelo.generic.data.telemetry.TelemetryEmitter
 import eu.dotshell.pelo.generic.data.telemetry.TripDetector
+import eu.dotshell.pelo.generic.utils.location.GeoPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
+/**
+ * Keeps location alive — and the traveller informed — for the duration of a navigation session.
+ *
+ * The ongoing notification is the only handle on the session once the app is backgrounded, so it
+ * carries the live instruction and a Stop action rather than a fixed sentence.
+ */
 class NavigationModeForegroundService : Service() {
 
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private var locationCallback: LocationCallback? = null
-    private var isScreenReceiverRegistered = false
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var tripDetector: TripDetector? = null
     private var tripDetectorInitJob: Job? = null
+    private var notificationJob: Job? = null
     private var isFinalizing = false
-
-    private val screenOnReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: android.content.Context?, intent: Intent?) {
-            if (intent?.action == Intent.ACTION_SCREEN_ON &&
-                NavigationModeStateStore.isNavigationActive(this@NavigationModeForegroundService)
-            ) {
-                showWakeupFullScreenNotification()
-            }
-        }
-    }
 
     override fun onCreate() {
         super.onCreate()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         createNotificationChannel()
-        registerScreenReceiver()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
-                NavigationModeStateStore.setNavigationActive(this, false)
-                finalizeTripDetector()
-                stopTracking()
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
+                shutDown()
                 return START_NOT_STICKY
             }
+
             ACTION_START, null -> {
+                // Android 14+ refuses to promote a location-typed service without the permission,
+                // and Android 12+ refuses a background start outright. Both throw; neither should
+                // take the app down, and neither may leave the "navigating" flag set behind.
+                val started = runCatching {
+                    startForeground(NOTIFICATION_ID, buildForegroundNotification(null))
+                }.isSuccess
+
+                if (!started || !hasLocationPermission()) {
+                    shutDown()
+                    return START_NOT_STICKY
+                }
+
+                // Only now is the session genuinely running. Setting the flag before this point
+                // meant a failed start left it stuck on: the next launch believed navigation was
+                // under way and pinned the screen awake with no session able to switch it off.
                 NavigationModeStateStore.setNavigationActive(this, true)
-                startForeground(NOTIFICATION_ID, buildForegroundNotification())
                 startTracking()
+                observeInstruction()
                 initializeTripDetector()
                 return START_STICKY
             }
+
             else -> return START_STICKY
         }
     }
 
     override fun onDestroy() {
         stopTracking()
-        unregisterScreenReceiver()
-        
-        // Finalize trip detector - this launches a job in serviceScope
+        notificationJob?.cancel()
+        notificationJob = null
+        NavigationModeStateStore.setNavigationActive(this, false)
         finalizeTripDetector()
-        
-        // Cancel serviceScope after a reasonable delay to allow finalization to complete
-        // This prevents memory leaks from long-running services
-        if (!NavigationModeStateStore.isNavigationActive(this)) {
-            NavigationModeStateStore.setNavigationActive(this, false)
-            // Create a separate scope for cleanup to avoid circular dependency
-            // (can't cancel serviceScope from within serviceScope itself)
-            CoroutineScope(Dispatchers.IO).launch {
-                delay(5000) // 5 seconds grace period
-                serviceScope.cancel()
-            }
+        // Give the trip finalisation a moment to persist before tearing the scope down; it runs
+        // in serviceScope, so it cannot cancel itself.
+        CoroutineScope(Dispatchers.IO).launch {
+            serviceScope.coroutineContext[Job]?.children?.forEach { it.join() }
+            serviceScope.cancel()
         }
-        
         super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    private fun shutDown() {
+        NavigationModeStateStore.setNavigationActive(this, false)
+        finalizeTripDetector()
+        stopTracking()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    private fun hasLocationPermission(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+
     private fun startTracking() {
-        val hasFinePermission = ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        val hasCoarsePermission = ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (!hasFinePermission && !hasCoarsePermission) {
-            stopSelf()
-            return
-        }
-
         if (locationCallback != null) return
 
-        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000L)
-            .setMinUpdateIntervalMillis(2000L)
+        val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1_000L)
+            .setMinUpdateIntervalMillis(1_000L)
             .setWaitForAccurateLocation(false)
             .build()
 
@@ -135,6 +135,9 @@ class NavigationModeForegroundService : Service() {
                 // Feed the trip detector — snap-and-drop happens internally, raw coordinates
                 // are not persisted anywhere outside this callback's stack frame.
                 tripDetector?.onLocationFix(fix.latitude, fix.longitude)
+                // This is the session's location stream, foreground or not; the guidance used to
+                // rely on the UI's, which stops being delivered once the app is backgrounded.
+                NavigationLocationBus.publish(GeoPoint(fix.latitude, fix.longitude))
             }
         }
 
@@ -145,7 +148,7 @@ class NavigationModeForegroundService : Service() {
                 mainLooper
             )
         } catch (_: SecurityException) {
-            stopSelf()
+            shutDown()
         }
     }
 
@@ -153,6 +156,17 @@ class NavigationModeForegroundService : Service() {
         val callback = locationCallback ?: return
         fusedLocationClient.removeLocationUpdates(callback)
         locationCallback = null
+    }
+
+    /** Mirror the on-screen instruction into the ongoing notification. */
+    private fun observeInstruction() {
+        if (notificationJob != null) return
+        notificationJob = serviceScope.launch {
+            NavigationNotificationBridge.instruction.collectLatest { text ->
+                val manager = getSystemService(NotificationManager::class.java)
+                manager?.notify(NOTIFICATION_ID, buildForegroundNotification(text))
+            }
+        }
     }
 
     /**
@@ -178,6 +192,7 @@ class NavigationModeForegroundService : Service() {
             )
             detector.start()
             tripDetector = detector
+            tripDetectorInitJob = null
         }
     }
 
@@ -190,12 +205,15 @@ class NavigationModeForegroundService : Service() {
      */
     private fun finalizeTripDetector() {
         if (isFinalizing) return
-        isFinalizing = true
-        
+
         tripDetectorInitJob?.cancel()
         tripDetectorInitJob = null
+        // Taken *after* the early return for "no detector": setting it first meant that path
+        // latched the guard on for good and every later call became a no-op.
         val detector = tripDetector ?: return
         tripDetector = null
+        isFinalizing = true
+
         serviceScope.launch {
             try {
                 detector.stop().join()
@@ -206,11 +224,10 @@ class NavigationModeForegroundService : Service() {
         }
     }
 
-    private fun buildForegroundNotification(): Notification {
+    private fun buildForegroundNotification(instruction: String?): Notification {
         val launchIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
-
         val pendingIntent = PendingIntent.getActivity(
             this,
             0,
@@ -218,46 +235,32 @@ class NavigationModeForegroundService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(getString(R.string.navigation_mode_notification_title))
-            .setContentText(getString(R.string.navigation_mode_notification_text))
-            .setContentIntent(pendingIntent)
-            .setOngoing(true)
-            .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build()
-    }
-
-    private fun showWakeupFullScreenNotification() {
-        val launchIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                    Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra(EXTRA_FROM_NAVIGATION_WAKEUP, true)
+        val stopIntent = Intent(this, NavigationModeForegroundService::class.java).apply {
+            action = ACTION_STOP
         }
-
-        val fullScreenPendingIntent = PendingIntent.getActivity(
+        val stopPendingIntent = PendingIntent.getService(
             this,
             1,
-            launchIntent,
+            stopIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(this, WAKE_CHANNEL_ID)
+        return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(getString(R.string.navigation_mode_wakeup_title))
-            .setContentText(getString(R.string.navigation_mode_wakeup_text))
-            .setContentIntent(fullScreenPendingIntent)
-            .setFullScreenIntent(fullScreenPendingIntent, true)
-            .setCategory(NotificationCompat.CATEGORY_CALL)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setAutoCancel(true)
+            .setContentTitle(getString(R.string.navigation_mode_notification_title))
+            .setContentText(instruction ?: getString(R.string.navigation_mode_notification_text))
+            .setContentIntent(pendingIntent)
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            // The way out of navigation when the app is not on screen.
+            .addAction(
+                0,
+                getString(R.string.navigation_mode_notification_stop),
+                stopPendingIntent
+            )
             .build()
-
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.notify(WAKE_NOTIFICATION_ID, notification)
     }
 
     private fun createNotificationChannel() {
@@ -274,40 +277,13 @@ class NavigationModeForegroundService : Service() {
             lockscreenVisibility = Notification.VISIBILITY_PUBLIC
         }
         manager.createNotificationChannel(channel)
-
-        val wakeChannel = NotificationChannel(
-            WAKE_CHANNEL_ID,
-            getString(R.string.navigation_mode_wakeup_channel_name),
-            NotificationManager.IMPORTANCE_HIGH
-        ).apply {
-            description = getString(R.string.navigation_mode_wakeup_channel_description)
-            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-            setShowBadge(false)
-        }
-        manager.createNotificationChannel(wakeChannel)
-    }
-
-    private fun registerScreenReceiver() {
-        if (isScreenReceiverRegistered) return
-        val filter = IntentFilter(Intent.ACTION_SCREEN_ON)
-        registerReceiver(screenOnReceiver, filter)
-        isScreenReceiverRegistered = true
-    }
-
-    private fun unregisterScreenReceiver() {
-        if (!isScreenReceiverRegistered) return
-        unregisterReceiver(screenOnReceiver)
-        isScreenReceiverRegistered = false
     }
 
     companion object {
         const val ACTION_START = "eu.dotshell.pelo.action.navigation.START"
         const val ACTION_STOP = "eu.dotshell.pelo.action.navigation.STOP"
-        const val EXTRA_FROM_NAVIGATION_WAKEUP = "extra_from_navigation_wakeup"
 
         private const val CHANNEL_ID = "navigation_mode_channel"
-        private const val WAKE_CHANNEL_ID = "navigation_mode_wakeup_channel"
         private const val NOTIFICATION_ID = 7411
-        private const val WAKE_NOTIFICATION_ID = 7412
     }
 }

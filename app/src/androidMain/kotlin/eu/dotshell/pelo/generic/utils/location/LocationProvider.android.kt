@@ -31,14 +31,14 @@ actual class LocationProvider actual constructor(context: PlatformContext) {
     }
 
     @Suppress("MissingPermission") // permission checked by the caller
-    actual fun startUpdates(onLocation: (GeoPoint) -> Unit) {
+    actual fun startUpdates(intervalMillis: Long, onLocation: (GeoPoint) -> Unit) {
         // Idempotent: remove any previously registered callback first, otherwise a second
         // startUpdates() leaks the old callback (it keeps receiving updates and stopUpdates()
         // only ever removes the most recent one).
         stopUpdates()
         try {
-            val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000L).apply {
-                setMinUpdateIntervalMillis(3000L)
+            val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, intervalMillis).apply {
+                setMinUpdateIntervalMillis(intervalMillis / 2)
                 setWaitForAccurateLocation(false)
             }.build()
             callback = object : LocationCallback() {
@@ -58,4 +58,7 @@ actual class LocationProvider actual constructor(context: PlatformContext) {
             callback = null
         }
     }
+
+    /** No-op: NavigationModeForegroundService is what keeps location alive in the background. */
+    actual fun setNavigationMode(enabled: Boolean) = Unit
 }

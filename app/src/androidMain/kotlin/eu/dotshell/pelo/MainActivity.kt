@@ -29,17 +29,20 @@ class MainActivity : ComponentActivity() {
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private var isNavigationModeEnabled = false
-    private var hasAppliedFirstNavigationCallback = false
 
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Restore lockscreen behavior when navigation is still active in foreground service.
+        // The persisted flag outlives the process; the in-memory session does not. A flag left
+        // set by a crash or a kill would otherwise pin the screen awake and show the app over the
+        // lock screen forever, with no session left that could turn either back off — so treat a
+        // fresh process as "not navigating" and clear the platform state to match.
         if (NavigationModeStateStore.isNavigationActive(this)) {
-            isNavigationModeEnabled = true
-            setNavigationLockScreenBehavior(true)
+            NavigationModeStateStore.setNavigationActive(this, false)
+            stopNavigationForegroundService()
         }
+        setNavigationLockScreenBehavior(false)
 
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.light(
@@ -55,19 +58,15 @@ class MainActivity : ComponentActivity() {
             CompositionLocalProvider(eu.dotshell.pelo.platform.LocalPlatformContext provides this@MainActivity) {
                 App(
                     onNavigationModeChanged = { active ->
-                        if (!hasAppliedFirstNavigationCallback) {
-                            hasAppliedFirstNavigationCallback = true
-                            // Ignore initial Compose state restoration mismatch when service is still active.
-                            if (isNavigationModeEnabled && !active) return@App
+                        if (active != isNavigationModeEnabled) {
+                            isNavigationModeEnabled = active
+                            if (active) {
+                                startNavigationForegroundService()
+                            } else {
+                                stopNavigationForegroundService()
+                            }
+                            setNavigationLockScreenBehavior(active)
                         }
-                        if (active == isNavigationModeEnabled) return@App
-                        isNavigationModeEnabled = active
-                        if (active) {
-                            startNavigationForegroundService()
-                        } else {
-                            stopNavigationForegroundService()
-                        }
-                        setNavigationLockScreenBehavior(active)
                     },
                     // Ask for location only once the user has accepted the terms/privacy policy
                     // (fires immediately on launch for a user who already accepted).
@@ -111,14 +110,29 @@ class MainActivity : ComponentActivity() {
         // otherwise leak across configuration-change recreations). The navigation foreground
         // service runs independently and is unaffected.
         appScope.cancel()
-        // Keep navigation service running when activity/task is closed.
+        // The foreground service keeps the session going when the task is closed; the window
+        // flags belong to this window and go with it.
         if (!isNavigationModeEnabled) {
             setNavigationLockScreenBehavior(false)
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+    }
+
     private fun requestLocationPermissionsIfNeeded() {
-        val missingPermissions = LOCATION_PERMISSIONS.filter {
+        // POST_NOTIFICATIONS goes in the same prompt: without it, Android 13+ silently drops the
+        // navigation foreground-service notification, which is both the only sign that location
+        // tracking is running and the only way back into the app from the shade.
+        val wanted = buildList {
+            addAll(LOCATION_PERMISSIONS)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+        val missingPermissions = wanted.filter {
             ContextCompat.checkSelfPermission(this, it) != android.content.pm.PackageManager.PERMISSION_GRANTED
         }
         if (missingPermissions.isEmpty()) {

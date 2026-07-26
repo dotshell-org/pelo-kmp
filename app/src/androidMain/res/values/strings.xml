@@ -25,12 +25,9 @@
     <string name="_8_min">8 min</string>
     <string name="_15_min">15 min</string>
     <string name="navigation_mode_notification_channel_name">Navigation active</string>
-    <string name="navigation_mode_notification_channel_description">Maintient le mode navigation actif et les positions a jour</string>
-    <string name="navigation_mode_notification_title">Mode navigation en cours</string>
-    <string name="navigation_mode_notification_text">Pelo reste visible sur ecran verrouille et met a jour votre position.</string>
-    <string name="navigation_mode_wakeup_channel_name">Reveil navigation</string>
-    <string name="navigation_mode_wakeup_channel_description">Affiche Pelo au reveil de l ecran pendant la navigation</string>
-    <string name="navigation_mode_wakeup_title">Navigation active</string>
-    <string name="navigation_mode_wakeup_text">Retour a la navigation</string>
+    <string name="navigation_mode_notification_channel_description">Maintient le mode navigation actif et votre position à jour</string>
+    <string name="navigation_mode_notification_title">Navigation en cours</string>
+    <string name="navigation_mode_notification_text">Pelo reste visible sur l\'écran verrouillé et met à jour votre position.</string>
+    <string name="navigation_mode_notification_stop">Arrêter</string>
     <string name="zone_label">Zone %s</string>
 </resources>
