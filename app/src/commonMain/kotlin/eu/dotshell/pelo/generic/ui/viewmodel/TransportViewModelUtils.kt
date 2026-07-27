@@ -140,3 +140,20 @@ data class LineVertexMatch(val index: Int, val distanceMeters: Double)
  * the map drawing straight lines between stops instead of following the road.
  */
 const val MAX_STOP_TO_LINE_METERS = 1_500.0
+
+/**
+ * The leg's own endpoint coordinates, in GeoJSON order, or null when the router did not supply
+ * them (coordinate endpoints and some cached entries decode as 0,0).
+ */
+fun eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLeg.startCoordinateOrNull(): List<Double>? =
+    coordinateOrNull(fromLat, fromLon)
+
+fun eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLeg.endCoordinateOrNull(): List<Double>? =
+    coordinateOrNull(toLat, toLon)
+
+private fun coordinateOrNull(lat: Double, lon: Double): List<Double>? =
+    if (lat in -90.0..90.0 && lon in -180.0..180.0 && (lat != 0.0 || lon != 0.0)) {
+        listOf(lon, lat)
+    } else {
+        null
+    }

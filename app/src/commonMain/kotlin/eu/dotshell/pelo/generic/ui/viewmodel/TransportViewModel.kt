@@ -1347,7 +1347,9 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         val endMatchMethod = if (endStop != null) "ID" else if (finalEndStop != null) "coordinates" else "failed"
         Log.i("TransportViewModel", "Stop matching: start=$startMatchMethod, end=$endMatchMethod")
 
-        if (finalStartStop == null || finalEndStop == null) {
+        if ((finalStartStop == null && leg.startCoordinateOrNull() == null) ||
+            (finalEndStop == null && leg.endCoordinateOrNull() == null)
+        ) {
             Log.e("TransportViewModel", "Stops not found: startStopId=$startStopId, endStopId=$endStopId")
             // Debug: list some stop GTFS IDs to see what format they have
             if (stops.isNotEmpty()) {
@@ -1358,14 +1360,27 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
             return emptyList()
         }
 
-        Log.i("TransportViewModel", "Found stops: ${finalStartStop.properties.nom} (GTFS: ${finalStartStop.properties.id}, GID: ${finalStartStop.id}) -> ${finalEndStop.properties.nom} (GTFS: ${finalEndStop.properties.id}, GID: ${finalEndStop.id})")
+        Log.i("TransportViewModel", "Found stops: ${finalStartStop?.properties?.nom} (GTFS: ${finalStartStop?.properties?.id}) -> ${finalEndStop?.properties?.nom} (GTFS: ${finalEndStop?.properties?.id})")
 
         for (line in lines) {
             val lineGeometry = line.multiLineStringGeometry
             @Suppress("USELESS_IS_CHECK")
             if (lineGeometry is MultiLineStringGeometry) {
-                val startCoord = listOf(finalStartStop.geometry.coordinates[0], finalStartStop.geometry.coordinates[1])
-                val endCoord = listOf(finalEndStop.geometry.coordinates[0], finalEndStop.geometry.coordinates[1])
+                // The leg's own coordinates win over the looked-up stop's.
+                //
+                // Raptor and the WFS stop feed are different GTFS datasets with different
+                // numbering: id 10780 is "Bellecour" to the router and "Part-Dieu Villette Sud" to
+                // the stop collection. The id lookup therefore *succeeds* on the wrong stop rather
+                // than failing, so the coordinate fallback below never runs and the section gets
+                // cut between two points kilometres from the leg. The router already carries the
+                // real position of each end; use it, and keep the looked-up stop only for legs
+                // that arrive without coordinates.
+                val startCoord = leg.startCoordinateOrNull()
+                    ?: finalStartStop?.geometry?.coordinates?.let { listOf(it[0], it[1]) }
+                    ?: continue
+                val endCoord = leg.endCoordinateOrNull()
+                    ?: finalEndStop?.geometry?.coordinates?.let { listOf(it[0], it[1]) }
+                    ?: continue
 
                 // Every part of the geometry, not just the first.
                 //
