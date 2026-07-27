@@ -789,6 +789,12 @@ private fun RootScaffold(
                 }
             }
             if (lats.isNotEmpty()) {
+                // Hand the camera to the journey. Following the user outranks a manual focus, so
+                // without this the fit is computed and then ignored. Android hid the omission:
+                // maplibre rewrites the camera position continuously there, which trips the
+                // map-moved callback and clears the flag as a side effect. iOS does not, so the
+                // map simply stayed pinned on the traveller at street zoom.
+                isCenteredOnUser = false
                 manualFocusCenter = Position(latitude = lats.average(), longitude = lons.average())
                 val latMin = lats.minOrNull() ?: 45.75
                 val latMax = lats.maxOrNull() ?: 45.75
