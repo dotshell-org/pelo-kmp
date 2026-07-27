@@ -1364,31 +1364,35 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
             val lineGeometry = line.multiLineStringGeometry
             @Suppress("USELESS_IS_CHECK")
             if (lineGeometry is MultiLineStringGeometry) {
-                val coordinates = lineGeometry.coordinates
-                val firstLine = coordinates.firstOrNull() ?: continue
-
                 val startCoord = listOf(finalStartStop.geometry.coordinates[0], finalStartStop.geometry.coordinates[1])
                 val endCoord = listOf(finalEndStop.geometry.coordinates[0], finalEndStop.geometry.coordinates[1])
 
-                // A line name resolves to several traces (directions, variants, partial services)
-                // and only some serve this leg's stops. They are ranked by how closely they pass
-                // the two stops, so the best one is used rather than whichever the feed returned
-                // first. Rejection is reserved for the absurd: bus geometry is coarse and stops sit
-                // well off the centreline, so a tight bound threw every bus variant away and left
-                // the map drawing straight lines between stops.
-                val startMatch = nearestVertexOnLine(firstLine, startCoord) ?: continue
-                val endMatch = nearestVertexOnLine(firstLine, endCoord) ?: continue
-                val variantFitMeters = maxOf(startMatch.distanceMeters, endMatch.distanceMeters)
-                if (variantFitMeters > MAX_STOP_TO_LINE_METERS) continue
+                // Every part of the geometry, not just the first.
+                //
+                // A route is a MultiLineString and is routinely split into several parts. Looking
+                // only at the first meant that when a leg's stops sat on a later part, the nearest
+                // vertex within part one landed on its extremity — so the section ran from the stop
+                // all the way to the end of that part. That is the leg cut on one side only.
+                //
+                // Parts are ranked with the variants below: whichever passes closest to both stops
+                // wins, rather than whichever happens to come first. Rejection is reserved for the
+                // absurd — bus geometry is coarsely sampled and stops sit well off the centreline,
+                // so a tight bound threw every bus variant away and left straight lines instead.
+                for (part in lineGeometry.coordinates) {
+                    if (part.size < 2) continue
 
-                var startIndex = startMatch.index
-                var endIndex = endMatch.index
+                    val startMatch = nearestVertexOnLine(part, startCoord) ?: continue
+                    val endMatch = nearestVertexOnLine(part, endCoord) ?: continue
+                    val variantFitMeters = maxOf(startMatch.distanceMeters, endMatch.distanceMeters)
+                    if (variantFitMeters > MAX_STOP_TO_LINE_METERS) continue
 
-                if (startIndex != -1 && endIndex != -1) {
+                    val startIndex = startMatch.index
+                    val endIndex = endMatch.index
+
                     var sectionCoordinates: List<List<Double>> = if (startIndex < endIndex) {
-                        firstLine.subList(startIndex, endIndex + 1)
+                        part.subList(startIndex, endIndex + 1)
                     } else {
-                        firstLine.subList(endIndex, startIndex + 1).reversed()
+                        part.subList(endIndex, startIndex + 1).reversed()
                     }
 
                     // Replace first and last points with exact stop positions
