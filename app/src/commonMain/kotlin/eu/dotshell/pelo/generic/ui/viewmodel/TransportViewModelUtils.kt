@@ -132,9 +132,11 @@ fun nearestVertexOnLine(
 data class LineVertexMatch(val index: Int, val distanceMeters: Double)
 
 /**
- * How far a stop may sit from a line's polyline and still be considered served by it.
+ * How far a stop may sit from a line's polyline before the variant is discarded outright.
  *
- * Generous on purpose: platforms sit off the centreline, and some traces are coarsely sampled.
- * Beyond this the variant simply does not go there.
+ * Deliberately loose. Ranking is what picks the right variant; this only catches the absurd case
+ * of a trace that goes somewhere else entirely. A tight bound (200 m) rejected every bus variant
+ * in Lyon — bus geometry is coarsely sampled and stops sit well off the centreline — which left
+ * the map drawing straight lines between stops instead of following the road.
  */
-const val MAX_STOP_TO_LINE_METERS = 200.0
+const val MAX_STOP_TO_LINE_METERS = 1_500.0

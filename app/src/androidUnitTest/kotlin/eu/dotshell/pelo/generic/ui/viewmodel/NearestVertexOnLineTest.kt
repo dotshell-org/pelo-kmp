@@ -39,10 +39,22 @@ class NearestVertexOnLineTest {
 
     @Test
     fun `a stop the line never approaches reports a distance that disqualifies it`() {
-        val match = nearestVertexOnLine(line, listOf(4.9000, 45.8000))!!
+        // Far outside Lyon: the trace does not go there under any reading.
+        val match = nearestVertexOnLine(line, listOf(5.2000, 46.1000))!!
         assertTrue(
             "must exceed the acceptance bound, got ${match.distanceMeters}",
             match.distanceMeters > MAX_STOP_TO_LINE_METERS,
+        )
+    }
+
+    @Test
+    fun `a bus stop set well back from a coarse trace is still accepted`() {
+        // Bus geometry is coarsely sampled and stops sit off the centreline. A tight bound threw
+        // every bus variant in Lyon away, and the map fell back to straight lines between stops.
+        val match = nearestVertexOnLine(line, listOf(4.8540, 45.7550))!!
+        assertTrue(
+            "several hundred metres must still qualify, got ${match.distanceMeters}",
+            match.distanceMeters < MAX_STOP_TO_LINE_METERS,
         )
     }
 

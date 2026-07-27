@@ -1371,42 +1371,18 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
                 val endCoord = listOf(finalEndStop.geometry.coordinates[0], finalEndStop.geometry.coordinates[1])
 
                 // A line name resolves to several traces (directions, variants, partial services)
-                // and only some serve this leg's stops. Matching without a distance bound accepted
-                // any of them and sliced between two meaningless indices, which is what put
-                // fragments of unrelated traces on the map. A variant that does not come near both
-                // stops is skipped; if none qualifies, the caller falls back to a straight line,
-                // which is wrong but coherent.
+                // and only some serve this leg's stops. They are ranked by how closely they pass
+                // the two stops, so the best one is used rather than whichever the feed returned
+                // first. Rejection is reserved for the absurd: bus geometry is coarse and stops sit
+                // well off the centreline, so a tight bound threw every bus variant away and left
+                // the map drawing straight lines between stops.
                 val startMatch = nearestVertexOnLine(firstLine, startCoord) ?: continue
                 val endMatch = nearestVertexOnLine(firstLine, endCoord) ?: continue
-                if (startMatch.distanceMeters > MAX_STOP_TO_LINE_METERS ||
-                    endMatch.distanceMeters > MAX_STOP_TO_LINE_METERS
-                ) {
-                    continue
-                }
                 val variantFitMeters = maxOf(startMatch.distanceMeters, endMatch.distanceMeters)
+                if (variantFitMeters > MAX_STOP_TO_LINE_METERS) continue
 
                 var startIndex = startMatch.index
                 var endIndex = endMatch.index
-
-                if (startIndex != -1 && endIndex != -1) {
-                    val initialLength = kotlin.math.abs(endIndex - startIndex)
-
-                    if (initialLength < 10) {
-                        val extendBy = 5
-
-                        startIndex = if (startIndex > extendBy) {
-                            startIndex - extendBy
-                        } else {
-                            0
-                        }
-
-                        endIndex = if (endIndex < firstLine.size - extendBy - 1) {
-                            endIndex + extendBy
-                        } else {
-                            firstLine.size - 1
-                        }
-                    }
-                }
 
                 if (startIndex != -1 && endIndex != -1) {
                     var sectionCoordinates: List<List<Double>> = if (startIndex < endIndex) {
