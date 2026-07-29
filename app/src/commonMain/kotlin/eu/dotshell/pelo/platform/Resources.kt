@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import eu.dotshell.pelo.resources.Res
 import eu.dotshell.pelo.resources.allDrawableResources
 import eu.dotshell.pelo.resources.allStringResources
+import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
@@ -22,8 +23,22 @@ class DrawableProvider(@Suppress("unused") private val context: PlatformContext)
     fun getPainter(name: String): Painter =
         painterResource(Res.allDrawableResources.getValue(name))
 
+    /** Same as [getPainter], for a resource already resolved through [find]. */
+    @Composable
+    fun getPainter(resource: DrawableResource): Painter =
+        painterResource(resource)
+
     fun hasDrawable(name: String): Boolean =
         Res.allDrawableResources.containsKey(name)
+
+    companion object {
+        /**
+         * Name lookup that needs neither a context nor a composition, so screens can resolve
+         * their icons once on a background thread instead of once per chip per recomposition.
+         */
+        fun find(name: String): DrawableResource? =
+            Res.allDrawableResources[name]
+    }
 }
 
 /**

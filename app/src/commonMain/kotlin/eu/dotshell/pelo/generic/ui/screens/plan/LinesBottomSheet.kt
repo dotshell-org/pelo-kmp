@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,7 +34,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,16 +44,27 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.dotshell.pelo.generic.data.models.realtime.alerts.official.AlertSeverity
 import eu.dotshell.pelo.generic.data.models.realtime.alerts.official.AlertSeverity as TrafficAlertSeverity
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModelInterface
 import eu.dotshell.pelo.generic.utils.LineColorHelper
-import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
 import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
+
+/** One LazyColumn row: a category title, or a single row of chips inside a category. */
+private sealed interface LinesListItem {
+    data class Header(val categoryId: String) : LinesListItem
+    data class ChipRow(
+        val categoryId: String,
+        val index: Int,
+        val lines: List<LineEntry>,
+        val isLastRow: Boolean
+    ) : LinesListItem
+}
 
 /**
  * Bottom Sheet qui affiche toutes les lignes organisées par catégories
@@ -69,11 +78,13 @@ fun LinesBottomSheet(
 ) {
     val platformContext = LocalPlatformContext.current
     // Remembered: DrawableProvider has identity equality, so re-creating it every recomposition
-    // made the remember(allLines, drawableProvider) key below change each pass and re-ran the
-    // (filter + bucket + natural sort) categorizeLines() on every keystroke.
+    // would make every remember() keyed on it re-run each pass.
     val drawableProvider = remember(platformContext) { DrawableProvider(platformContext) }
     val strings = StringProvider(platformContext)
-    var searchQuery by remember { mutableStateOf("") }
+    // Resolved once here rather than inside every chip: a stringResource() per line meant one
+    // resource read per chip, hundreds of them on a single frame.
+    val lineLabelTemplate = strings["line_label"]
+    val searchQuery by remember { mutableStateOf("") }
 
     // State pour gérer le scroll
     val listState = rememberLazyListState()
@@ -101,7 +112,7 @@ fun LinesBottomSheet(
                 if (available.y < 0 && isAtBottom) {
                     return Offset(0f, available.y)
                 }
-                // Ne PAS bloquer le scroll vers le haut quand on est en haut pour permettre 
+                // Ne PAS bloquer le scroll vers le haut quand on est en haut pour permettre
                 // l'interaction avec la BottomSheet (dismiss par drag)
                 return Offset.Zero
             }
@@ -137,35 +148,20 @@ fun LinesBottomSheet(
         }
     }
 
-    // Organize lines by category
-    val categorizedLines = remember(allLines, drawableProvider) {
-        val hasLineIcon: (String) -> Boolean = { lineName ->
-            drawableProvider.hasDrawable(LineIconResolver.getDrawableNameForLineName(lineName))
-        }
-        categorizeLines(allLines, hasLineIcon).toList()
-    }
+    // Categorised off the main thread and memoised across openings — see LinesCatalog.
+    val categorizedLines = rememberLineCategories(allLines)
+
+    // Decode the icons the user has not reached yet, in the frames left idle between scrolls.
+    LineIconWarmup(allLines = allLines, pauseWhileScrolling = listState)
 
     // Filtrer les lignes selon la recherche
     val filteredCategories = remember(categorizedLines, searchQuery) {
         if (searchQuery.isEmpty()) {
             categorizedLines
         } else {
-            categorizedLines.mapNotNull { (category, lines) ->
-                val filtered = lines.filter { SearchUtils.fuzzyContains(it, searchQuery) }
-                if (filtered.isNotEmpty()) category to filtered else null
-            }
-        }
-    }
-
-    // Flatten: one header item + one flat "lines" item per category
-    data class CategoryItem(val category: String)
-    data class CategoryLinesItem(val category: String, val lines: List<String>)
-
-    val flattenedItems = remember(filteredCategories) {
-        buildList {
-            filteredCategories.forEach { (category, lines) ->
-                add(CategoryItem(category))
-                add(CategoryLinesItem(category, lines))
+            categorizedLines.mapNotNull { category ->
+                val filtered = category.lines.filter { SearchUtils.fuzzyContains(it.name, searchQuery) }
+                if (filtered.isNotEmpty()) category.copy(lines = filtered) else null
             }
         }
     }
@@ -177,142 +173,181 @@ fun LinesBottomSheet(
             .background(bottomSheetContainerColor(), RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
             .padding(16.dp)
     ) {
-        // List of lines by category
-        LazyColumn(
-            state = listState,
+        // The chip grid is laid out by hand rather than with FlowRow so that each row can be its
+        // own lazy item: one item per category would compose every chip of that category (150+
+        // for the buses) in a single frame, which is what made the list stutter while scrolling.
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .nestedScroll(nestedScrollConnection),
-            userScrollEnabled = true
         ) {
-            items(
-                items = flattenedItems,
-                key = { item ->
-                    when (item) {
-                        is CategoryItem -> "header_${item.category}"
-                        is CategoryLinesItem -> "lines_${item.category}"
-                        else -> item.hashCode()
-                    }
-                },
-                contentType = { item ->
-                    when (item) {
-                        is CategoryItem -> "header"
-                        is CategoryLinesItem -> "lines"
-                        else -> null
-                    }
-                }
-            ) { item ->
-                when (item) {
-                    is CategoryItem -> {
-                        Column {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            val categoryText = when (item.category) {
-                                "Métro" -> strings["category_metro"]
-                                "Funiculaire" -> strings["category_funicular"]
-                                "Tramway" -> strings["category_tramway"]
-                                "Navigone" -> strings["category_navigone"]
-                                "Chrono" -> strings["category_chrono"]
-                                "Pleine Lune" -> strings["category_pleine_lune"]
-                                "Gare Express" -> strings["category_gare_express"]
-                                "Navette" -> strings["category_navette"]
-                                "Soyeuse" -> strings["category_soyeuse"]
-                                "Zone Industrielle" -> strings["category_zone_industrielle"]
-                                "Bus" -> strings["category_bus"]
-                                "Cars du Rhône TCL unifié" -> strings["category_cars_du_rhone"]
-                                "Junior Direct" -> strings["category_junior_direct"]
-                                else -> item.category
-                            }
-                            Text(
-                                text = categoryText,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 4.dp, bottom = 4.dp)
+            val itemWidth = 72.dp
+            val availableWidth = maxWidth
+
+            // Nombre d'items par ligne (minimum 4)
+            val itemsPerRow = (availableWidth / itemWidth).toInt().coerceAtLeast(4)
+
+            // Si itemsPerRow est 4 mais que ça ne rentre pas avec itemWidth,
+            // on réduit dynamiquement la taille de l'item pour que ça rentre.
+            val actualItemWidth = if (availableWidth < itemWidth * itemsPerRow) {
+                availableWidth / itemsPerRow
+            } else {
+                itemWidth
+            }
+
+            // Calcul de l'écart pour la justification (SpaceBetween)
+            // gap = (TotalWidth - (itemsPerRow * actualItemWidth)) / (itemsPerRow - 1)
+            val gap = if (itemsPerRow > 1) {
+                (availableWidth - (actualItemWidth * itemsPerRow)) / (itemsPerRow - 1)
+            } else {
+                0.dp
+            }
+
+            val flattenedItems = remember(filteredCategories, itemsPerRow) {
+                buildList {
+                    filteredCategories.forEach { category ->
+                        add(LinesListItem.Header(category.id))
+                        val rows = category.lines.chunked(itemsPerRow)
+                        rows.forEachIndexed { rowIndex, rowLines ->
+                            add(
+                                LinesListItem.ChipRow(
+                                    categoryId = category.id,
+                                    index = rowIndex,
+                                    lines = rowLines,
+                                    isLastRow = rowIndex == rows.lastIndex
+                                )
                             )
                         }
                     }
+                }
+            }
 
-                    is CategoryLinesItem -> {
-                        // On calcule l'espacement pour justifier à gauche et à droite,
-                        // et on applique le même espacement à la dernière ligne.
-                        val itemWidth = 72.dp
-                        androidx.compose.foundation.layout.BoxWithConstraints(
+            // List of lines by category
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(nestedScrollConnection),
+                userScrollEnabled = true
+            ) {
+                items(
+                    items = flattenedItems,
+                    key = { item ->
+                        when (item) {
+                            is LinesListItem.Header -> "header_${item.categoryId}"
+                            is LinesListItem.ChipRow -> "row_${item.categoryId}_${item.index}"
+                        }
+                    },
+                    contentType = { item ->
+                        when (item) {
+                            is LinesListItem.Header -> "header"
+                            is LinesListItem.ChipRow -> "row"
+                        }
+                    }
+                ) { item ->
+                    when (item) {
+                        is LinesListItem.Header -> {
+                            Column {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                val categoryText = when (item.categoryId) {
+                                    "Métro" -> strings["category_metro"]
+                                    "Funiculaire" -> strings["category_funicular"]
+                                    "Tramway" -> strings["category_tramway"]
+                                    "Navigone" -> strings["category_navigone"]
+                                    "Chrono" -> strings["category_chrono"]
+                                    "Pleine Lune" -> strings["category_pleine_lune"]
+                                    "Gare Express" -> strings["category_gare_express"]
+                                    "Navette" -> strings["category_navette"]
+                                    "Soyeuse" -> strings["category_soyeuse"]
+                                    "Zone Industrielle" -> strings["category_zone_industrielle"]
+                                    "Bus" -> strings["category_bus"]
+                                    "Cars du Rhône TCL unifié" -> strings["category_cars_du_rhone"]
+                                    "Junior Direct" -> strings["category_junior_direct"]
+                                    else -> item.categoryId
+                                }
+                                Text(
+                                    text = categoryText,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 4.dp, bottom = 4.dp)
+                                )
+                            }
+                        }
+
+                        is LinesListItem.ChipRow -> {
+                            LineChipRow(
+                                item = item,
+                                itemsPerRow = itemsPerRow,
+                                itemWidth = actualItemWidth,
+                                gap = gap,
+                                lineAlerts = lineAlerts,
+                                lineLabelTemplate = lineLabelTemplate,
+                                drawableProvider = drawableProvider,
+                                onLineClick = onLineClick
+                            )
+                        }
+                    }
+                }
+
+                // Message if no results
+                if (filteredCategories.isEmpty() && searchQuery.isNotEmpty()) {
+                    item(key = "no_results") {
+                        Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 0.dp)
-                                .padding(bottom = 8.dp)
+                                .padding(32.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            val availableWidth = maxWidth
-                            
-                            // Nombre d'items par ligne (minimum 4)
-                            val itemsPerRow = (availableWidth / itemWidth).toInt().coerceAtLeast(4)
-                            
-                            // Si itemsPerRow est 4 mais que ça ne rentre pas avec itemWidth=80dp,
-                            // on réduit dynamiquement la taille de l'item pour que ça rentre.
-                            val actualItemWidth = if (availableWidth < itemWidth * itemsPerRow) {
-                                availableWidth / itemsPerRow
-                            } else {
-                                itemWidth
-                            }
-                            
-                            // Calcul de l'écart pour la justification (SpaceBetween)
-                            // gap = (TotalWidth - (itemsPerRow * actualItemWidth)) / (itemsPerRow - 1)
-                            val gap = if (itemsPerRow > 1) {
-                                (availableWidth - (actualItemWidth * itemsPerRow)) / (itemsPerRow - 1)
-                            } else {
-                                0.dp
-                            }
-
-                            val rows = item.lines.chunked(itemsPerRow)
-                            Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
-                                rows.forEachIndexed { rowIndex, rowLines ->
-                                    val isLastRow = rowIndex == rows.lastIndex
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = if (isLastRow || itemsPerRow == 1) {
-                                            Arrangement.spacedBy(gap)
-                                        } else {
-                                            Arrangement.SpaceBetween
-                                        }
-                                    ) {
-                                        rowLines.forEach { line ->
-                                            val alertSeverity = lineAlerts[line.uppercase()]
-                                            LineChip(
-                                                lineName = line,
-                                                onClick = { onLineClick(line) },
-                                                alertSeverity = alertSeverity,
-                                                drawableProvider = drawableProvider,
-                                                modifier = Modifier.width(actualItemWidth)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
+                            Text(
+                                text = strings["no_lines_found"],
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
                         }
                     }
                 }
             }
+        }
+    }
+}
 
-            // Message if no results
-            if (filteredCategories.isEmpty() && searchQuery.isNotEmpty()) {
-                item(key = "no_results") {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = strings["no_lines_found"],
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
-                }
-            }
+/**
+ * A single row of chips. Justified left and right, with the last row of a category keeping the
+ * same spacing instead of being stretched.
+ */
+@Composable
+private fun LineChipRow(
+    item: LinesListItem.ChipRow,
+    itemsPerRow: Int,
+    itemWidth: Dp,
+    gap: Dp,
+    lineAlerts: Map<String, TrafficAlertSeverity>,
+    lineLabelTemplate: String,
+    drawableProvider: DrawableProvider,
+    onLineClick: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = if (item.isLastRow) 8.dp else 0.dp),
+        horizontalArrangement = if (item.isLastRow || itemsPerRow == 1) {
+            Arrangement.spacedBy(gap)
+        } else {
+            Arrangement.SpaceBetween
+        }
+    ) {
+        item.lines.forEach { line ->
+            LineChip(
+                line = line,
+                onClick = { onLineClick(line.name) },
+                alertSeverity = lineAlerts[line.alertKey],
+                lineLabelTemplate = lineLabelTemplate,
+                drawableProvider = drawableProvider,
+                modifier = Modifier.width(itemWidth)
+            )
         }
     }
 }
@@ -322,18 +357,13 @@ fun LinesBottomSheet(
  */
 @Composable
 private fun LineChip(
-    lineName: String,
+    line: LineEntry,
     onClick: () -> Unit,
+    lineLabelTemplate: String,
     modifier: Modifier = Modifier,
     alertSeverity: TrafficAlertSeverity? = null,
     drawableProvider: DrawableProvider
 ) {
-    val strings = StringProvider(LocalPlatformContext.current)
-    val drawableName = remember(lineName) { LineIconResolver.getDrawableNameForLineName(lineName) }
-    val hasIcon = remember(drawableName, drawableProvider) {
-        drawableProvider.hasDrawable(drawableName)
-    }
-
     Box(
         modifier = modifier
             .height(50.dp),
@@ -347,19 +377,21 @@ private fun LineChip(
                 .clickable(onClick = onClick),
             contentAlignment = Alignment.Center
         ) {
-            if (hasIcon) {
+            if (line.icon != null) {
                 // Use official TCL icon
                 Icon(
-                    painter = drawableProvider.getPainter(drawableName),
-                    contentDescription = strings["line_label"].replace("%s", lineName),
+                    painter = drawableProvider.getPainter(line.icon),
+                    contentDescription = lineLabelTemplate.replace("%s", line.name),
                     modifier = Modifier.size(64.dp),
                     tint = Color.Unspecified
                 )
             } else {
                 // Fallback if icon doesn't exist
-                val backgroundColor = Color(LineColorHelper.getColorForLineString(lineName))
+                val backgroundColor = remember(line.name) {
+                    Color(LineColorHelper.getColorForLineString(line.name))
+                }
                 // Contrast color painted on the fixed line-color badge — must NOT follow the theme.
-                val textColor = if (lineName.uppercase() == "T3") Color.Black else Color.White
+                val textColor = if (line.alertKey == "T3") Color.Black else Color.White
 
                 Box(
                     modifier = Modifier
@@ -369,7 +401,7 @@ private fun LineChip(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = lineName,
+                        text = line.name,
                         color = textColor,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
@@ -430,110 +462,4 @@ private fun AlertBadge(
             )
         }
     }
-}
-
-/**
- * Organises lines by category and filters those which haven't icon.
- */
-private fun categorizeLines(
-    lines: List<String>,
-    hasLineIcon: (String) -> Boolean
-): Map<String, List<String>> {
-    // Keep lines with icons, and keep NAVI* even without a dedicated icon file.
-    val linesWithIcon = lines.filter { line ->
-        val upperLine = line.uppercase()
-        hasLineIcon(line) || upperLine.startsWith("NAVI")
-    }
-
-    val metros = mutableListOf<String>()
-    val trams = mutableListOf<String>()
-    val funiculaires = mutableListOf<String>()
-    val chrono = mutableListOf<String>()
-    val pleineLune = mutableListOf<String>()
-    val jd = mutableListOf<String>()
-    val navigone = mutableListOf<String>()
-    val gareExpress = mutableListOf<String>()
-    val soyeuses = mutableListOf<String>()
-    val navettes = mutableListOf<String>()
-    val zi = mutableListOf<String>()
-    val carsDuRhone = mutableListOf<String>()
-    val bus = mutableListOf<String>()
-
-    linesWithIcon.forEach { line ->
-        val upperLine = line.uppercase()
-        when {
-            upperLine in setOf("A", "B", "C", "D") -> metros.add(line)
-            upperLine.startsWith("F") && (upperLine == "F1" || upperLine == "F2") -> funiculaires.add(
-                line
-            )
-
-            upperLine.startsWith("TB") || upperLine == "RX" || upperLine.contains("RHON") -> trams.add(
-                line
-            )
-
-            upperLine.startsWith("T") && upperLine.length == 2 -> trams.add(line)
-            upperLine.startsWith("C") && upperLine.length >= 2 -> chrono.add(line)
-            upperLine.startsWith("PL") -> pleineLune.add(line)
-            upperLine.startsWith("JD") -> jd.add(line)
-            upperLine.startsWith("NAVI") -> navigone.add(line)
-            upperLine.startsWith("GE") -> gareExpress.add(line)
-            upperLine.startsWith("S") -> soyeuses.add(line)
-            upperLine.startsWith("ZI") -> zi.add(line)
-            upperLine.startsWith("N") -> navettes.add(line)
-            upperLine.length >= 3 && upperLine != "128" && upperLine.all { it.isDigit() } -> carsDuRhone.add(
-                line
-            )
-
-            else -> bus.add(line)
-        }
-    }
-
-    // Natural sort that correctly handles numbers in strings
-    val naturalComparator = Comparator<String> { a, b ->
-        val partsA = a.split(Regex("(?<=\\D)(?=\\d)|(?<=\\d)(?=\\D)"))
-        val partsB = b.split(Regex("(?<=\\D)(?=\\d)|(?<=\\d)(?=\\D)"))
-        val maxParts = maxOf(partsA.size, partsB.size)
-
-        for (i in 0 until maxParts) {
-            val partA = partsA.getOrNull(i)
-            val partB = partsB.getOrNull(i)
-
-            if (partA == null) return@Comparator -1 // a est plus court
-            if (partB == null) return@Comparator 1  // b est plus court
-
-            val numA = partA.toIntOrNull()
-            val numB = partB.toIntOrNull()
-
-            if (numA != null && numB != null) {
-                val numCompare = numA.compareTo(numB)
-                if (numCompare != 0) return@Comparator numCompare
-            } else {
-                val strCompare = partA.compareTo(partB)
-                if (strCompare != 0) return@Comparator strCompare
-            }
-        }
-        return@Comparator 0
-    }
-
-    fun naturalSort(lines: List<String>): List<String> {
-        return lines.sortedWith(naturalComparator)
-    }
-
-    val result = mutableMapOf<String, List<String>>()
-
-    if (metros.isNotEmpty()) result["Métro"] = naturalSort(metros)
-    if (funiculaires.isNotEmpty()) result["Funiculaire"] = naturalSort(funiculaires)
-    if (trams.isNotEmpty()) result["Tramway"] = naturalSort(trams)
-    if (navigone.isNotEmpty()) result["Navigone"] = naturalSort(navigone)
-    if (chrono.isNotEmpty()) result["Chrono"] = naturalSort(chrono)
-    if (pleineLune.isNotEmpty()) result["Pleine Lune"] = naturalSort(pleineLune)
-    if (gareExpress.isNotEmpty()) result["Gare Express"] = naturalSort(gareExpress)
-    if (navettes.isNotEmpty()) result["Navette"] = naturalSort(navettes)
-    if (soyeuses.isNotEmpty()) result["Soyeuse"] = naturalSort(soyeuses)
-    if (zi.isNotEmpty()) result["Zone Industrielle"] = naturalSort(zi)
-    if (bus.isNotEmpty()) result["Bus"] = naturalSort(bus)
-    if (carsDuRhone.isNotEmpty()) result["Cars du Rhône TCL unifié"] = naturalSort(carsDuRhone)
-    if (jd.isNotEmpty()) result["Junior Direct"] = naturalSort(jd)
-
-    return result
 }

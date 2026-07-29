@@ -124,6 +124,8 @@ import eu.dotshell.pelo.generic.ui.screens.Destination
 import eu.dotshell.pelo.generic.ui.screens.plan.AllSchedulesSheetContent
 import eu.dotshell.pelo.generic.ui.screens.plan.LineDetailsBottomSheet
 import eu.dotshell.pelo.generic.ui.screens.plan.LineInfo
+import eu.dotshell.pelo.generic.ui.screens.plan.LINES_SHEET_FIRST_SCREEN_ICONS
+import eu.dotshell.pelo.generic.ui.screens.plan.LineIconWarmup
 import eu.dotshell.pelo.generic.ui.screens.plan.LinesBottomSheet
 import eu.dotshell.pelo.generic.ui.screens.plan.AlertReportBottomSheet
 import eu.dotshell.pelo.generic.ui.screens.plan.MapStyleSelectionSheet
@@ -327,7 +329,18 @@ private fun RootScaffold(
     val userFavorites by viewModel.userFavorites.collectAsState(initial = emptyList())
     val stops = (stopsUiState as? TransportStopsUiState.Success)?.stops
     val selectedLineName = selectedLine?.lineName
-    
+
+    // Opening the lines sheet used to do all of this on its first frame, on the main thread:
+    // aggregate the lines (walking the desserte of every stop), categorise them (a natural sort
+    // per category), then decode a screenful of icons — which is why it hung for a beat before
+    // appearing. The aggregation now runs off-thread as soon as the data lands, and LineIconWarmup
+    // builds the catalog and decodes the first screenful over a few idle frames while the user is
+    // still on the map, leaving the sheet nothing to do but draw.
+    val allLines by produceState(emptyList<String>(), linesUiState, stopsUiState) {
+        value = withContext(Dispatchers.Default) { viewModel.getAllAvailableLines() }
+    }
+    LineIconWarmup(allLines = allLines, limit = LINES_SHEET_FIRST_SCREEN_ICONS)
+
     var userLocation by remember { mutableStateOf<Position?>(null) }
     // Device heading (degrees clockwise from north) for the direction cone on the location dot;
     // null until the compass reports (or on devices without a magnetometer).
@@ -1218,7 +1231,6 @@ private fun RootScaffold(
 
         if (showLinesSheet) {
             val linesSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-            val allLines = remember(linesUiState, stopsUiState) { viewModel.getAllAvailableLines() }
             ModalBottomSheet(
                 onDismissRequest = { showLinesSheet = false },
                 containerColor = bottomSheetContainerColor(),

@@ -168,10 +168,16 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
     override val offlineDownloadState: StateFlow<OfflineDownloadState>
         get() = offlineDataManager.downloadState
 
-    // Cache for expensive line aggregation used by LinesBottomSheet.
-    private var cachedAvailableLines: List<String> = emptyList()
-    private var cachedAvailableLinesUiState: TransportLinesUiState? = null
-    private var cachedAvailableLinesStopsState: TransportStopsUiState? = null
+    // Cache for expensive line aggregation used by LinesBottomSheet. Held as a single object:
+    // the caller runs this off the main thread, and publishing three separate fields could be
+    // observed half-updated (new state keys, previous line list).
+    private class AvailableLinesCache(
+        val uiState: TransportLinesUiState,
+        val stopsState: TransportStopsUiState,
+        val lines: List<String>
+    )
+
+    private var cachedAvailableLines: AvailableLinesCache? = null
 
     // Cache alert line index to avoid O(lines * alerts) recomputation in UI.
     private var cachedAlertIndexSource: List<TrafficAlert>? = null
@@ -766,10 +772,10 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         val currentUiState = uiState.value
         val currentStopsState = stopsUiState.value
 
-        if (currentUiState === cachedAvailableLinesUiState &&
-            currentStopsState === cachedAvailableLinesStopsState
-        ) {
-            return cachedAvailableLines
+        cachedAvailableLines?.let { cache ->
+            if (currentUiState === cache.uiState && currentStopsState === cache.stopsState) {
+                return cache.lines
+            }
         }
 
         val linesFromLoadedFeatures = when (currentUiState) {
@@ -794,9 +800,7 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
             .distinctBy { it.uppercase() }
             .toList()
 
-        cachedAvailableLinesUiState = currentUiState
-        cachedAvailableLinesStopsState = currentStopsState
-        cachedAvailableLines = aggregated
+        cachedAvailableLines = AvailableLinesCache(currentUiState, currentStopsState, aggregated)
         return aggregated
     }
 
@@ -1242,9 +1246,7 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
     }
 
     private fun invalidateAvailableLinesCache() {
-        cachedAvailableLines = emptyList()
-        cachedAvailableLinesUiState = null
-        cachedAvailableLinesStopsState = null
+        cachedAvailableLines = null
     }
 
     private fun resolveScheduleRouteName(raw: String): String {
