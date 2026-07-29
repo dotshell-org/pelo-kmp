@@ -247,7 +247,7 @@ fun LinesBottomSheet(
                 ) { item ->
                     when (item) {
                         is LinesListItem.Header -> {
-                            Column(modifier = Modifier.fillMaxWidth().background(Color.Transparent)) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 val categoryText = when (item.categoryId) {
                                     "Métro" -> strings["category_metro"]
@@ -332,7 +332,6 @@ private fun LineChipRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color.Transparent)
             .padding(bottom = if (item.isLastRow) 8.dp else 0.dp),
         horizontalArrangement = if (item.isLastRow || itemsPerRow == 1) {
             Arrangement.spacedBy(gap)
@@ -365,17 +364,21 @@ private fun LineChip(
     alertSeverity: TrafficAlertSeverity? = null,
     drawableProvider: DrawableProvider
 ) {
+    // The touch target is the whole cell. It used to be an inner 64.dp box inside this 50.dp
+    // one: taller than its parent, so it reached 7.dp into the rows above and below, where
+    // Compose has to arbitrate between it and the row actually under the finger — a press near
+    // the top or bottom edge of a badge could land on the neighbouring row's line. The badges
+    // themselves are 83.5x28 vectors drawn with ContentScale.Fit, so nothing is clipped by
+    // moving the bounds in: the visible icon is 64x21.5dp, well inside the cell.
     Box(
         modifier = modifier
-            .height(50.dp),
+            .height(50.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        // Content Box with clipping and click
         Box(
-            modifier = Modifier
-                .size(64.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(onClick = onClick),
+            modifier = Modifier.size(64.dp),
             contentAlignment = Alignment.Center
         ) {
             if (line.icon != null) {
@@ -396,7 +399,8 @@ private fun LineChip(
 
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .fillMaxWidth()
+                        .height(50.dp)
                         .background(backgroundColor)
                         .padding(horizontal = 4.dp, vertical = 2.dp),
                     contentAlignment = Alignment.Center
