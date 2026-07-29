@@ -1,7 +1,9 @@
 package eu.dotshell.pelo.generic.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -149,6 +151,7 @@ fun StationBottomSheet(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .background(Color.Transparent)
                         .horizontalScroll(rememberScrollState())
                         .padding(bottom = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)

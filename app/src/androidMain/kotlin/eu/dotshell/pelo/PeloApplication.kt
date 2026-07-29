@@ -10,6 +10,7 @@ import eu.dotshell.pelo.generic.data.repository.offline.SchedulesRepository
 import eu.dotshell.pelo.generic.data.telemetry.TelemetryService
 import eu.dotshell.pelo.generic.service.TransportServiceProvider
 import eu.dotshell.pelo.platform.BackgroundScheduler
+import eu.dotshell.pelo.platform.FileSystem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -34,6 +35,9 @@ class PeloApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         Log.i(TAG, "PeloApplication onCreate()")
+        
+        // Ensure AppConfig is loaded synchronously before UI tries to access it
+        AppConfigLoader.loadConfig(FileSystem(this))
         
         // Move all heavy initialization to background to avoid blocking UI thread
         appInitScope.launch {

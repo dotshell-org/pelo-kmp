@@ -247,7 +247,7 @@ fun LinesBottomSheet(
                 ) { item ->
                     when (item) {
                         is LinesListItem.Header -> {
-                            Column {
+                            Column(modifier = Modifier.fillMaxWidth().background(Color.Transparent)) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 val categoryText = when (item.categoryId) {
                                     "Métro" -> strings["category_metro"]
@@ -332,6 +332,7 @@ private fun LineChipRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .background(Color.Transparent)
             .padding(bottom = if (item.isLastRow) 8.dp else 0.dp),
         horizontalArrangement = if (item.isLastRow || itemsPerRow == 1) {
             Arrangement.spacedBy(gap)
