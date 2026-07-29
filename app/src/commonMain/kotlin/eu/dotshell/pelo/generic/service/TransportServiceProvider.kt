@@ -25,6 +25,7 @@ import eu.dotshell.pelo.generic.data.config.AppMapStyleConfig
 import eu.dotshell.pelo.platform.FileSystem
 import eu.dotshell.pelo.platform.PlatformContext
 import eu.dotshell.pelo.specific.TransportLineServiceImpl
+import kotlin.concurrent.Volatile
 
 /**
  * Service provider for the application
@@ -32,6 +33,9 @@ import eu.dotshell.pelo.specific.TransportLineServiceImpl
  * Replaces dependency injection for a simpler approach
  */
 object TransportServiceProvider {
+
+    @Volatile
+    private var initialized = false
 
     private lateinit var transportConfig: TransportConfig
     private lateinit var transportApi: TransportApi
@@ -46,9 +50,24 @@ object TransportServiceProvider {
     private var vehicleSpeedBaseline: Map<String, LineSpeedBaselineData> = emptyMap()
 
     /**
-     * Initializes the provider with Lyon TCL configuration
+     * Initializes the provider with Lyon TCL configuration.
+     *
+     * Idempotent: three call sites race for it at startup — `PeloApplication.onCreate` and
+     * `App()`'s init effect on Android, `initializeKmpDependencies()` and that same effect on
+     * iOS — and each pass rebuilt every service, including a second Ktor client, and reset the
+     * theme. The flag is only raised once the fields below are all assigned, so returning early
+     * always means the provider is fully usable; a caller is never handed a half-built state.
+     *
+     * It narrows the window rather than closing it: two callers that arrive together still both
+     * run the body, writing equivalent values. Closing it entirely would mean publishing the
+     * services as one immutable object instead of a dozen `lateinit var`s.
+     *
+     * The [context] of the winning call is the one that sticks. Any of them works — it is only
+     * used to read bundled assets.
      */
     fun initialize(context: PlatformContext) {
+        if (initialized) return
+
         // Load configuration from config.json
         val appConfig = AppConfigLoader.loadConfig(FileSystem(context))
 
@@ -94,6 +113,9 @@ object TransportServiceProvider {
 
         // Apply the default theme
         eu.dotshell.pelo.generic.ui.theme.TransportThemeProvider.setTheme(transportTheme)
+
+        // Last: everything above is assigned, so an early return is safe from here on.
+        initialized = true
     }
 
     /**
