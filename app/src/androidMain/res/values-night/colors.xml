@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- DarkColorScheme.background is pure black; see values/colors.xml. -->
+    <color name="splash_background">#FF000000</color>
+
+</resources>

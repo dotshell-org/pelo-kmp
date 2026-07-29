@@ -2,7 +2,12 @@
 <resources>
 
     <style name="Theme.Pelo" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowSplashScreenBackground">#000000</item>
+        <item name="android:windowBackground">@color/splash_background</item>
+        <!--
+            Same colour as the window behind it: the splash used to be hardcoded black and the
+            window white, so a light-themed launch went black -> white -> app.
+        -->
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
         <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
     </style>
 </resources>

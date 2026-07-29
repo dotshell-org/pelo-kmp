@@ -1,2 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources />
+<resources>
+
+    <!--
+        Window background shown between the launcher tap and the first Compose frame, and the
+        splash background on API 31+. Matches LightColorScheme.background (SecondaryColor, white);
+        values-night matches DarkColorScheme.background (black). Without a night variant the
+        platform theme's light background flashed white on the way into a dark-themed app.
+    -->
+    <color name="splash_background">#FFFFFFFF</color>
+
+</resources>

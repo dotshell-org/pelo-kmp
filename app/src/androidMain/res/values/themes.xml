@@ -2,5 +2,12 @@
 <resources>
 
     <style name="Theme.Pelo" parent="android:Theme.Material.Light.NoActionBar">
+        <!--
+            What the system draws from the launcher tap until Compose's first frame — including
+            the whole time MainActivity holds that frame back. The platform parent theme is Light,
+            so without this it flashed white on the way into a dark-themed app. Below API 31 this
+            *is* the splash: there is no windowSplashScreen* support to fall back on.
+        -->
+        <item name="android:windowBackground">@color/splash_background</item>
     </style>
 </resources>

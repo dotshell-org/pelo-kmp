@@ -3,6 +3,8 @@ package eu.dotshell.pelo
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
+import android.view.View
+import android.view.ViewTreeObserver
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -29,6 +31,15 @@ class MainActivity : ComponentActivity() {
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private var isNavigationModeEnabled = false
+
+    // Splash hand-off state. See holdSplashUntilReady().
+    private var isUiReady = false
+    private var contentView: View? = null
+
+    // Held as one instance: a `::releaseSplash` reference is SAM-converted at each use site, and
+    // removeCallbacks() matches on the Runnable itself, so posting and removing separate
+    // conversions could leave the timeout queued against a destroyed Activity.
+    private val releaseSplashRunnable = Runnable { releaseSplash() }
 
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,6 +68,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             CompositionLocalProvider(eu.dotshell.pelo.platform.LocalPlatformContext provides this@MainActivity) {
                 App(
+                    onReady = ::releaseSplash,
                     onNavigationModeChanged = { active ->
                         if (active != isNavigationModeEnabled) {
                             isNavigationModeEnabled = active
@@ -74,6 +86,8 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+
+        holdSplashUntilReady()
 
         // Start all background preloading AFTER setContent to ensure UI displays immediately
         // This is critical for fast first render - do NOT block on these operations
@@ -104,8 +118,44 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Keeps the launch screen up until the app has something real to show.
+     *
+     * Blocking the first draw is what holds it: on API 31+ that is the system splash, below it is
+     * the window background, and either way the user sees one screen instead of the app cutting to
+     * an empty surface while the view model is still being built. [App] calls back through
+     * [releaseSplash] as soon as it can render the map.
+     *
+     * The delayed release is not optional. A pre-draw listener that returns false only gets asked
+     * again on the next traversal, so if the UI went idle while still not ready, nothing would ever
+     * ask again and the splash would stay up for good. The timeout also covers a failed init, which
+     * leaves the view model null forever.
+     */
+    private fun holdSplashUntilReady() {
+        val content: View = findViewById(android.R.id.content)
+        contentView = content
+        content.viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
+            override fun onPreDraw(): Boolean {
+                if (!isUiReady) return false
+                content.viewTreeObserver.removeOnPreDrawListener(this)
+                return true
+            }
+        })
+        content.postDelayed(releaseSplashRunnable, MAX_SPLASH_HOLD_MS)
+    }
+
+    /** Lets the held first frame through. Safe to call more than once, and from any point. */
+    private fun releaseSplash() {
+        if (isUiReady) return
+        isUiReady = true
+        // Nothing may be invalidating by now, so ask for the traversal that runs the listener.
+        contentView?.invalidate()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        contentView?.removeCallbacks(releaseSplashRunnable)
+        contentView = null
         // Cancel the activity-scoped init work so it doesn't outlive the Activity (it would
         // otherwise leak across configuration-change recreations). The navigation foreground
         // service runs independently and is unaffected.
@@ -203,6 +253,13 @@ class MainActivity : ComponentActivity() {
     }
 
     companion object {
+        /**
+         * Ceiling on the splash hold. Long enough for the config parse and view model build that
+         * [App] waits on, short enough that a cold or failing start still shows the app rather than
+         * looking hung. Never wait on the network or on a location fix here — neither is bounded.
+         */
+        private const val MAX_SPLASH_HOLD_MS = 1200L
+
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1001
         private val LOCATION_PERMISSIONS = arrayOf(
             android.Manifest.permission.ACCESS_FINE_LOCATION,

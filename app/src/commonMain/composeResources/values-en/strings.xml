@@ -276,4 +276,5 @@
     <string name="nav_reroute_dismiss">Dismiss</string>
     <string name="nav_reroute_failed">No route found from your position.</string>
     <string name="nav_alert_on_line">Line %1$s: %2$s</string>
+    <string name="startup_failed">Loading failed. Please restart the app.</string>
 </resources>

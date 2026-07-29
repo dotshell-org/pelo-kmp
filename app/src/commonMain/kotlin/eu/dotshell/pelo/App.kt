@@ -89,6 +89,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
@@ -191,6 +192,7 @@ import eu.dotshell.pelo.platform.Log
 import eu.dotshell.pelo.platform.appVersionName
 import eu.dotshell.pelo.platform.ioDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.maplibre.spatialk.geojson.Position
@@ -199,10 +201,21 @@ import eu.dotshell.pelo.generic.data.models.realtime.alerts.official.TrafficAler
 import eu.dotshell.pelo.generic.utils.navigation.selectNavigationAlert
 import io.raptor.Location
 
+/**
+ * How long the placeholder stays silent before showing that something is still loading. Past the
+ * platform's own splash ceiling, so in a normal launch this is never reached.
+ */
+private const val SLOW_START_INDICATOR_DELAY_MS = 1500L
+
+/**
+ * @param onReady fires on the first composition that has a map to draw. Platforms use it to drop
+ *   their launch screen, so nothing is gated on it beyond that — it is not a "fully loaded" signal.
+ */
 @Composable
 fun App(
     onNavigationModeChanged: (Boolean) -> Unit = {},
     onConsentAccepted: () -> Unit = {},
+    onReady: () -> Unit = {},
 ) {
     val context = LocalPlatformContext.current
     var viewModel by remember { mutableStateOf<TransportViewModel?>(null) }
@@ -265,27 +278,45 @@ fun App(
                     Box(Modifier.fillMaxSize()) {
                         val vm = viewModel
                         if (vm != null) {
+                            // First frame with a map in it: the launch screen can step aside. The
+                            // map's own tiles, the lines and the location dot arrive afterwards,
+                            // on the map — waiting for those here would mean holding the launch
+                            // screen on a network call and a GPS fix, neither of which is bounded.
+                            LaunchedEffect(Unit) { onReady() }
                             RootScaffold(vm, onNavigationModeChanged)
                         } else {
-                            Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
-                        }
-
-                        if (isInitializing) {
+                            // The launch screen normally covers this entirely. It only becomes
+                            // visible if the platform gave up waiting (MAX_SPLASH_HOLD_MS) or if
+                            // init failed, hence the delay before admitting to being slow rather
+                            // than a spinner pinned in a corner from the first millisecond.
+                            var showSlowIndicator by remember { mutableStateOf(false) }
+                            LaunchedEffect(Unit) {
+                                delay(SLOW_START_INDICATOR_DELAY_MS)
+                                showSlowIndicator = true
+                            }
                             Box(
                                 modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(16.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                                        RoundedCornerShape(999.dp)
-                                    )
-                                    .padding(12.dp)
+                                    .fillMaxSize()
+                                    .background(MaterialTheme.colorScheme.background),
+                                contentAlignment = Alignment.Center
                             ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    strokeWidth = 2.dp,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
+                                // Init done but no view model means it threw: a spinner would
+                                // promise progress that is never coming.
+                                if (!isInitializing) {
+                                    Text(
+                                        text = StringProvider(context)["startup_failed"],
+                                        color = MaterialTheme.colorScheme.onBackground,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.padding(32.dp)
+                                    )
+                                } else if (showSlowIndicator) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(28.dp),
+                                        strokeWidth = 3.dp,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
                             }
                         }
                     }
