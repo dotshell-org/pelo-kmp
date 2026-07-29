@@ -77,6 +77,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.debounce
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -379,13 +380,28 @@ private fun RootScaffold(
     var hasCenteredInitially by remember { mutableStateOf(false) }
     val locationProvider = remember { LocationProvider(context) }
     val headingProvider = remember { HeadingProvider(context) }
+    val mapSettings = remember(context) { Settings(context, "map_prefs") }
+    val initialLat = remember { mapSettings.getString("last_lat", "45.75").toDoubleOrNull() ?: 45.75 }
+    val initialLon = remember { mapSettings.getString("last_lon", "4.85").toDoubleOrNull() ?: 4.85 }
+    val initialZoom = remember { mapSettings.getString("last_zoom", "12.0").toDoubleOrNull() ?: 12.0 }
+
     val cameraState = rememberCameraState(
         firstPosition = CameraPosition(
-            target = org.maplibre.spatialk.geojson.Position(latitude = 45.75, longitude = 4.85),
-            zoom = 12.0,
+            target = org.maplibre.spatialk.geojson.Position(latitude = initialLat, longitude = initialLon),
+            zoom = initialZoom,
             bearing = 0.0
         )
     )
+
+    LaunchedEffect(cameraState) {
+        snapshotFlow { cameraState.position }
+            .debounce(1000L)
+            .collect { pos ->
+                mapSettings.putString("last_lat", pos.target.latitude.toString())
+                mapSettings.putString("last_lon", pos.target.longitude.toString())
+                mapSettings.putString("last_zoom", pos.zoom.toString())
+            }
+    }
     val navigationController = remember(context) { NavigationModeController(context) }
     val navigationSession by navigationController.session.collectAsState()
     val isNavigating = navigationSession.isActive
@@ -461,21 +477,8 @@ private fun RootScaffold(
         } else if (selectedTab == Destination.PLAN) {
             val loc = userLocation
             if (loc != null) {
-                cameraState.position = CameraPosition(
-                    target = org.maplibre.spatialk.geojson.Position(latitude = loc.latitude, longitude = loc.longitude),
-                    zoom = 18.0,
-                    bearing = 0.0,
-                    tilt = 0.0
-                )
                 isCenteredOnUser = true
                 hasCenteredInitially = true
-            } else {
-                cameraState.position = CameraPosition(
-                    target = cameraState.position.target,
-                    zoom = cameraState.position.zoom,
-                    bearing = 0.0,
-                    tilt = 0.0
-                )
             }
         }
     }
