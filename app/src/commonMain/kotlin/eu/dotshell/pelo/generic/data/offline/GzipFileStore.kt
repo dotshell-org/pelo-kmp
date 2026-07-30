@@ -3,6 +3,7 @@ package eu.dotshell.pelo.generic.data.offline
 import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
+import okio.SYSTEM
 import okio.buffer
 import okio.gzip
 
