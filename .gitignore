@@ -22,6 +22,9 @@ scripts/.venv
 # Keystore files
 *.jks
 *.keystore
+
+# Play Console upload certificate — deploy artefact, regenerated from the console
+upload_certificate.pem
 /nul
 
 .kotlin
