@@ -68,7 +68,7 @@
     <string name="timetable_up_to_date">Timetables are up to date</string>
     <string name="timetable_update_ready">Update downloaded — applies on next launch</string>
     <string name="timetable_update_incompatible">Update needs a newer app version</string>
-    <string name="timetable_check_failed">Couldn\'t check right now</string>
+    <string name="timetable_check_failed">Couldn't check right now</string>
     <string name="legal_title">Legal notice / Terms</string>
     <string name="credits_title">Credits</string>
     <string name="contact_title">Contact us</string>
