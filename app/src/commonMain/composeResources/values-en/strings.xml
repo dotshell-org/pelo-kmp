@@ -68,7 +68,7 @@
     <string name="timetable_up_to_date">Timetables are up to date</string>
     <string name="timetable_update_ready">Update downloaded — applies on next launch</string>
     <string name="timetable_update_incompatible">Update needs a newer app version</string>
-    <string name="timetable_check_failed">Couldn't check right now</string>
+    <string name="timetable_check_failed">Couldn’t check right now</string>
     <string name="legal_title">Legal notice / Terms</string>
     <string name="credits_title">Credits</string>
     <string name="contact_title">Contact us</string>
@@ -206,7 +206,7 @@
     <string name="legal_liability_title">Liability</string>
     <string name="legal_liability_content">Information (schedules, disruptions) is provided for guidance only. Dotshell declines all responsibility in the event of inaccuracies in data from third parties or unavailability of the transport network.\n</string>
     <string name="legal_ip_title">Intellectual Property</string>
-    <string name="legal_ip_content">The Application's source code is distributed under the GPL-3.0 license. Trademarks and logos of transport networks remain the property of their respective owners.\n</string>
+    <string name="legal_ip_content">The Application’s source code is distributed under the GPL-3.0 license. Trademarks and logos of transport networks remain the property of their respective owners.\n</string>
     <string name="legal_updates_title">Updates</string>
     <string name="legal_updates_content">Dotshell reserves the right to modify these Terms. The applicable version is the one available in the Application at the time of its use.\n</string>
     <string name="credits_transport_data_title">Transport Data</string>
@@ -214,7 +214,7 @@
     <string name="credits_cartography_title">Mapping</string>
     <string name="credits_cartography_content">Map data is provided by MapLibre and OpenStreetMaps.\n\nMap styles (namely Positron, Dark Matter, OSM Bright, and Liberty) are provided by OpenMapTiles. The application uses the Map Tiler Positron (Light) theme by default.\n\nSatellite view tiles come from ESRI World Imagery.</string>
     <string name="credits_development_title">Development</string>
-    <string name="credits_development_content">The application is developed independently by Dotshell under the GPL-3.0 license. Pelo is not affiliated with TCL or SYTRAL.\n\nThe source code is available on Dotshell's GitHub page at the following repositories: pelo-android for the Android application source code, pelo-ios for the iOS/iPadOS application, raptor-gtfs-pipeline, raptor-kt, and raptor-sw for the RAPTOR routing system, and finally TCL-API-mirror for the real-time data mirror.\n\nAny contribution is open to the community.\n\nFor more information, go to dotshell.eu.</string>
+    <string name="credits_development_content">The application is developed independently by Dotshell under the GPL-3.0 license. Pelo is not affiliated with TCL or SYTRAL.\n\nThe source code is available on Dotshell’s GitHub page at the following repositories: pelo-android for the Android application source code, pelo-ios for the iOS/iPadOS application, raptor-gtfs-pipeline, raptor-kt, and raptor-sw for the RAPTOR routing system, and finally TCL-API-mirror for the real-time data mirror.\n\nAny contribution is open to the community.\n\nFor more information, go to dotshell.eu.</string>
     <string name="credits_open_link">Open</string>
     <string name="contact_header">A question? A problem?</string>
     <string name="contact_subtitle">Feel free to contact us with any questions, suggestions, or to report a bug.</string>
