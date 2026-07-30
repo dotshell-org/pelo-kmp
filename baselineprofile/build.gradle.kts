@@ -2,6 +2,9 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.test)
+    // AGP 9 reports this plugin as redundant, but gradle.properties sets
+    // android.builtInKotlin=false, so AGP's own Kotlin support is off and the `kotlin { }`
+    // extension used below comes from here. Drop it only together with that flag.
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.baselineprofile)
 }

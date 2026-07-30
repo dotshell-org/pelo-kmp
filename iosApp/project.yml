@@ -62,8 +62,8 @@ targets:
         SWIFT_VERSION: "5.0"
         TARGETED_DEVICE_FAMILY: "1,2"
         ENABLE_USER_SCRIPT_SANDBOXING: "NO"
-        FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]: $(inherited) ../app/build/bin/iosArm64/debugFramework
-        FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]: $(inherited) ../app/build/bin/iosSimulatorArm64/debugFramework
+        FRAMEWORK_SEARCH_PATHS[sdk=iphoneos*]: $(inherited) ../shared/build/bin/iosArm64/debugFramework
+        FRAMEWORK_SEARCH_PATHS[sdk=iphonesimulator*]: $(inherited) ../shared/build/bin/iosSimulatorArm64/debugFramework
         # ComposeApp MUST be linked explicitly, and BEFORE MapLibre. Swift's `import
         # ComposeApp` only auto-links it (LC_LINKER_OPTION), which ld processes *after*
         # every command-line input — so MapLibre.framework, which publicly exports its
@@ -87,9 +87,9 @@ targets:
           export JAVA_HOME="$HOME/Library/Java/jdk-21.0.11+10/Contents/Home"
           export ANDROID_HOME="$HOME/Library/Android/sdk"
           if [[ "$SDK_NAME" == *simulator* ]]; then
-            "$PROJECT_DIR/../gradlew" -p "$PROJECT_DIR/.." :app:linkDebugFrameworkIosSimulatorArm64
+            "$PROJECT_DIR/../gradlew" -p "$PROJECT_DIR/.." :shared:linkDebugFrameworkIosSimulatorArm64
           else
-            "$PROJECT_DIR/../gradlew" -p "$PROJECT_DIR/.." :app:linkDebugFrameworkIosArm64
+            "$PROJECT_DIR/../gradlew" -p "$PROJECT_DIR/.." :shared:linkDebugFrameworkIosArm64
           fi
     postBuildScripts:
       - name: Copy Compose resources into the app bundle
@@ -99,7 +99,7 @@ targets:
           # drawable/ + values/ for the Compose Resources `Res` API) into the app bundle,
           # under the package-prefixed path the iOS Res reader expects:
           #   <bundle>/compose-resources/composeResources/<packageOfResClass>/...
-          SRC="$PROJECT_DIR/../app/build/generated/compose/resourceGenerator/preparedResources/commonMain/composeResources"
+          SRC="$PROJECT_DIR/../shared/build/generated/compose/resourceGenerator/preparedResources/commonMain/composeResources"
           DST="${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/compose-resources/composeResources/eu.dotshell.pelo.resources"
           if [ -d "$SRC" ]; then
             mkdir -p "$DST"
