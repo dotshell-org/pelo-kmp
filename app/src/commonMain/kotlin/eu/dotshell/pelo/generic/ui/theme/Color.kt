@@ -324,6 +324,14 @@ val SecondaryColor = Color.White
 val AccentColor = BrandOrange
 val AccentColorShade = BrandOrangeDark
 
+/**
+ * The blue of the user's position on the map, and of the controls that act on it — starting
+ * navigation, above all. Named because those have to stay the same blue: the map dot used to
+ * hardcode it while the "Démarrer" button was [PrimaryColor], which is black, and therefore
+ * invisible against a dark bottom sheet.
+ */
+val UserLocationColor = Blue500
+
 // Neutral (non-bluish) dark gray used for bottom sheets in dark mode, so they read as a
 // distinct surface above the pure-black navbar and map rather than blending into them.
 val DarkSheetSurface = Color(0xFF181818)

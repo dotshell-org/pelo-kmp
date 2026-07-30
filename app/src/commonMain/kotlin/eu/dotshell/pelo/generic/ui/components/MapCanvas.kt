@@ -71,6 +71,7 @@ import org.maplibre.spatialk.geojson.Geometry
 import org.maplibre.spatialk.geojson.Feature
 import org.maplibre.compose.sources.getBaseSource
 import eu.dotshell.pelo.generic.ui.theme.AccentColor
+import eu.dotshell.pelo.generic.ui.theme.UserLocationColor
 import kotlinx.coroutines.withTimeoutOrNull
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.input.pointer.pointerInput
@@ -738,7 +739,7 @@ fun MapCanvas(
                     id = "user-location",
                     source = userSource,
                     radius = const(8.dp),
-                    color = const(Color(0xFF3B82F6)),
+                    color = const(UserLocationColor),
                 )
             }
 

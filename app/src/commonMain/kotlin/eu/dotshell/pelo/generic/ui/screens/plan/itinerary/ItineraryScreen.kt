@@ -77,6 +77,7 @@ import eu.dotshell.pelo.generic.ui.theme.Sand50
 import eu.dotshell.pelo.generic.ui.theme.Sand100
 import eu.dotshell.pelo.generic.ui.theme.Sand200
 import eu.dotshell.pelo.generic.ui.theme.SecondaryColor
+import eu.dotshell.pelo.generic.ui.theme.UserLocationColor
 import eu.dotshell.pelo.generic.utils.LineColorHelper
 import kotlinx.datetime.Clock
 import kotlinx.datetime.DateTimeUnit
@@ -640,11 +641,13 @@ fun JourneyDetailsSheetContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                // "Démarrer" button on the left - even closer to edge
+                // "Démarrer" button on the left - even closer to edge.
+                // Same blue as the location dot: it used to be PrimaryColor (black), which sat
+                // invisible on the dark sheet, and read as one more label rather than the action.
                 Box(
                     modifier = Modifier
                         .background(
-                            color = PrimaryColor,
+                            color = UserLocationColor,
                             shape = RoundedCornerShape(24.dp)
                         )
                         .clickable(enabled = !isStartingNavigation) { onStartNavigation() }

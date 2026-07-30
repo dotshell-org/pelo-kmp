@@ -43,13 +43,18 @@ fun initializeKmpDependencies() {
  * Compose entry point, exported to Swift as `ComposeAppKt.MainViewController()`. Provides the iOS
  * [PlatformContext] and hosts the shared [App] (commonMain). The iosApp Xcode target wraps this
  * UIViewController in SwiftUI.
+ *
+ * @param onReady fires on the first frame that has a map in it. `ContentView` keeps a stand-in for
+ *   the launch screen over the Compose view until then — iOS drops the real launch screen as soon
+ *   as the first frame renders, so unlike Android it can only be imitated, not held.
  */
-fun MainViewController(): UIViewController {
+fun MainViewController(onReady: () -> Unit): UIViewController {
 
     return ComposeUIViewController {
         CompositionLocalProvider(LocalPlatformContext provides IosPlatformContext) {
             ProvideAppLocale(LanguageManager.current.tag) {
             App(
+                onReady = onReady,
                 onNavigationModeChanged = { active ->
                     // The counterpart of Android's FLAG_KEEP_SCREEN_ON. Without it the phone
                     // locked itself mid-journey after the usual idle timeout, which is exactly
