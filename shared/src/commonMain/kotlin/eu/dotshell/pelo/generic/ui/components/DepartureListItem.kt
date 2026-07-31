@@ -33,8 +33,9 @@ fun DepartureListItem(
     departureTime: String,
     onClick: () -> Unit
 ) {
-    val drawableProvider = DrawableProvider(LocalPlatformContext.current)
-    val strings = StringProvider(LocalPlatformContext.current)
+    val context = LocalPlatformContext.current
+    val drawableProvider = remember(context) { DrawableProvider(context) }
+    val strings = remember(context) { StringProvider(context) }
     val drawableName = remember(lineName) {
         LineIconResolver.getDrawableNameForLineName(lineName)
     }

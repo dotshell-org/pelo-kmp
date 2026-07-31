@@ -72,8 +72,9 @@ fun StationBottomSheet(
     val departuresInset = 20.dp
     val actionsInset = 8.dp
 
-    val drawableProvider = DrawableProvider(LocalPlatformContext.current)
-    val strings = StringProvider(LocalPlatformContext.current)
+    val platformContext = LocalPlatformContext.current
+    val drawableProvider = remember(platformContext) { DrawableProvider(platformContext) }
+    val strings = remember(platformContext) { StringProvider(platformContext) }
     val realtimeConfig = remember { eu.dotshell.pelo.generic.service.TransportServiceProvider.getRealtimeConfig() }
     val stationName = stationInfo?.nom
 

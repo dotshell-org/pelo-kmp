@@ -664,7 +664,7 @@ fun InlineItinerarySheetContent(
                 // Show extra large line icons on the left when a journey is selected.
                 // Weighted + wrapping: the close button is measured first and keeps its normal
                 // size; the badge strip flows onto extra lines when the journey has many legs
-                val drawableProvider = DrawableProvider(context)
+                val drawableProvider = remember(context) { DrawableProvider(context) }
                 FlowRow(
                     modifier = Modifier.weight(1f).padding(end = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),

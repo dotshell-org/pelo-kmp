@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.remember
 import eu.dotshell.pelo.generic.data.models.search.LineSearchResult
 import androidx.compose.material3.MaterialTheme
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
@@ -29,11 +30,14 @@ fun LineSearchResultItem(
     lineResult: LineSearchResult,
     onClick: () -> Unit
 ) {
-    val drawableName = LineIconResolver.getDrawableNameForLineName(lineResult.lineName)
-    val drawableProvider = DrawableProvider(LocalPlatformContext.current)
-    val stringProvider = StringProvider(LocalPlatformContext.current)
-    val hasDrawable = drawableProvider.hasDrawable(drawableName)
-    val hasModeBus = drawableProvider.hasDrawable("mode_bus")
+    val context = LocalPlatformContext.current
+    val drawableProvider = remember(context) { DrawableProvider(context) }
+    val stringProvider = remember(context) { StringProvider(context) }
+    val drawableName = remember(lineResult.lineName) {
+        LineIconResolver.getDrawableNameForLineName(lineResult.lineName)
+    }
+    val hasDrawable = remember(drawableName) { drawableProvider.hasDrawable(drawableName) }
+    val hasModeBus = remember { drawableProvider.hasDrawable("mode_bus") }
 
     ListItem(
         headlineContent = {

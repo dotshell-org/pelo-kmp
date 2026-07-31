@@ -105,7 +105,8 @@ fun CompactJourneyCard(
     showAvoidedAlertsBadge: Boolean = false,
     avoidedAlertsLabel: String? = null
 ) {
-    val drawableProvider = DrawableProvider(LocalPlatformContext.current)
+    val platformContext = LocalPlatformContext.current
+    val drawableProvider = remember(platformContext) { DrawableProvider(platformContext) }
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val primaryTextColor = remember(useLightColors) {
@@ -320,8 +321,9 @@ private fun JourneyLegItem(
     isLast: Boolean,
     useLightColors: Boolean
 ) {
-    val drawableProvider = DrawableProvider(LocalPlatformContext.current)
-    val strings = StringProvider(LocalPlatformContext.current)
+    val platformContext = LocalPlatformContext.current
+    val drawableProvider = remember(platformContext) { DrawableProvider(platformContext) }
+    val strings = remember(platformContext) { StringProvider(platformContext) }
     val walkingLegColor = if (useLightColors) PrimaryColor else SecondaryColor
     val lineColor = remember(leg.isWalking, leg.routeName, walkingLegColor) {
         if (leg.isWalking) walkingLegColor else Color(

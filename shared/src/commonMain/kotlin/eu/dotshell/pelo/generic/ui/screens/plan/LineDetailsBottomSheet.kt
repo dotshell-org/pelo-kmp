@@ -1023,8 +1023,12 @@ private fun ConnectionBadge(
     size: Dp = 32.dp,
     onClick: (() -> Unit)? = null
 ) {
-    val drawableProvider = DrawableProvider(LocalPlatformContext.current)
-    val strings = StringProvider(LocalPlatformContext.current)
+    // One of these per connection of every stop in the list. The provider used to be rebuilt on
+    // each recomposition, which also meant the remember below keyed on a value that always
+    // changed — so hasDrawable was recomputed every time too.
+    val context = LocalPlatformContext.current
+    val drawableProvider = remember(context) { DrawableProvider(context) }
+    val strings = remember(context) { StringProvider(context) }
     val drawableName = remember(lineName) {
         LineIconResolver.getDrawableNameForLineName(lineName)
     }

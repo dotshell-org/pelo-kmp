@@ -649,7 +649,7 @@ private fun RootScaffold(
         }
     }
 
-    val fabDrawableProvider = DrawableProvider(LocalPlatformContext.current)
+    val fabDrawableProvider = remember(context) { DrawableProvider(context) }
 
     var filteredStopsCollection by remember { mutableStateOf<StopCollection?>(null) }
     LaunchedEffect(stops, selectedLineName, itineraryActive, activeJourneys, selectedJourney) {
