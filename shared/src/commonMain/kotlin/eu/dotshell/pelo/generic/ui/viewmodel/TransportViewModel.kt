@@ -799,7 +799,7 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
     override suspend fun searchAddresses(query: String): List<AddressSearchResult> =
         GeocodingRepository.getInstance().searchAddresses(query)
 
-    override fun searchLines(query: String): List<LineSearchResult> {
+    override suspend fun searchLines(query: String): List<LineSearchResult> {
         return schedulesRepository.searchLinesByName(query)
     }
 

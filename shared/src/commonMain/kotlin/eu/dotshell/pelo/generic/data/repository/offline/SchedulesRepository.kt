@@ -123,12 +123,16 @@ class SchedulesRepository private constructor(context: PlatformContext) : ApiSch
         return results
     }
 
-    override fun searchLinesByName(query: String): List<LineSearchResult> {
+    override suspend fun searchLinesByName(query: String): List<LineSearchResult> {
         return raptorRepository.searchLinesByName(query)
     }
 
     override fun getAllRouteNames(): List<String> {
-        return raptorRepository.searchLinesByName("").map { it.lineName }.distinct().sorted()
+        // Same names as before, without going through searchLinesByName(""), which wrapped each
+        // one in a LineSearchResult — a line-type classification apiece — only to be unwrapped
+        // again here. Stays non-suspend: resolveScheduleRouteName calls it several times per
+        // timetable load from non-suspend code.
+        return raptorRepository.currentPeriodRouteNames()
     }
 
     fun getAllBusLikeRouteNames(): List<String> {

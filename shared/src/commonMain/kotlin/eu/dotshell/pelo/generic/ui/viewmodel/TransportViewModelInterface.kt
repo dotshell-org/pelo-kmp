@@ -47,7 +47,7 @@ interface TransportViewModelInterface {
 
     suspend fun searchStops(query: String): List<StationSearchResult>
     suspend fun searchAddresses(query: String): List<AddressSearchResult>
-    fun searchLines(query: String): List<LineSearchResult>
+    suspend fun searchLines(query: String): List<LineSearchResult>
 
     fun loadAllLines()
     fun preloadStops()

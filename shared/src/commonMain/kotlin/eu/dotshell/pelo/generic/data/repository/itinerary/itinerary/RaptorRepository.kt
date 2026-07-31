@@ -372,21 +372,84 @@ class RaptorRepository private constructor(private val context: PlatformContext)
      * must be expanded into the real names with this list.
      */
     fun getAllRouteNames(): Set<String> =
-        getRoutesForPeriod("school_on_weekdays").map { it.name }.toSet()
+        indexFor(PERIOD_SCHOOL_ON_WEEKDAYS).sortedRouteNames.toSet()
+
+    /**
+     * Distinct, sorted route names of the ACTIVE period.
+     *
+     * Non-suspend on purpose: it feeds resolveScheduleRouteName, which sits on non-suspend
+     * schedule paths that are called several times per timetable load. It used to go through
+     * searchLinesByName(""), which wrapped every name in a LineSearchResult — one line-type
+     * classification each — only for the caller to unwrap them again.
+     */
+    fun currentPeriodRouteNames(): List<String> {
+        val period = raptorLibrary?.getCurrentPeriod() ?: return emptyList()
+        return indexFor(period).sortedRouteNames
+    }
 
     private data class RouteVariant(
         val route: Route,
         val stopNames: List<String>
     )
 
-    private fun getVariantsForRoute(periodId: String, routeName: String): List<RouteVariant> {
-        val routes = getRoutesForPeriod(periodId)
-        val stops = getStopsForPeriod(periodId)
+    // Note: [buildDessertesByStopName] lives at the bottom of this file, top-level and internal,
+    // so the one piece of index-building whose semantics are not obvious can be tested directly.
+
+    /**
+     * Lookup tables for one schedule period, built once and kept.
+     *
+     * Keying on the period id alone is safe: [getRoutesForPeriod] and [getStopsForPeriod] delegate
+     * to RaptorLibrary, which parses each period exactly once, and a staged dataset is only ever
+     * promoted at cold start before anything reads it (see [initialize]). A period id therefore
+     * names the same data for the life of the process, and there is nothing to invalidate when the
+     * active period changes — the key already carries that.
+     *
+     * Where the callers used to compare names with `equals(ignoreCase = true)`, the tables key on
+     * `lowercase()`. The two agree for every name in this dataset, which is French stop and line
+     * names.
+     */
+    private class PeriodIndex(routes: List<Route>, private val stops: List<Stop>) {
         val stopById = stops.associateBy { it.id }
-        return routes
-            .filter { it.name.equals(routeName, ignoreCase = true) }
+        val routesById = routes.groupBy { it.id }
+        val routesByLowercaseName = routes.groupBy { it.name.lowercase() }
+
+        /** Distinct route names, sorted — the shape both the line search and the name lookup want. */
+        val sortedRouteNames = routes.map { it.name }.distinct().sorted()
+
+        /**
+         * Stop name (lowercased) to its desserte string, e.g. `"C3:A,C3:R"`.
+         *
+         * Built in a single pass on first use. searchStopsByName asks for up to fifty of these per
+         * keystroke, and the previous shape rebuilt a groupBy over every route in the period and
+         * scanned every stop on each one of those calls.
+         */
+        val dessertesByStopName: Map<String, String> by lazy {
+            buildDessertesByStopName(stops, routesById)
+        }
+    }
+
+    /**
+     * Copy-on-write: the map is replaced, never mutated, so a reader can never observe a half-built
+     * table without a lock — and these are read from non-suspend paths, where the repository's
+     * Mutex is not available. Two threads racing on a miss build the same index twice and one wins,
+     * the same benign outcome as the @Volatile singletons elsewhere in this file.
+     */
+    @Volatile
+    private var periodIndexes: Map<String, PeriodIndex> = emptyMap()
+
+    private fun indexFor(periodId: String): PeriodIndex {
+        periodIndexes[periodId]?.let { return it }
+        val index = PeriodIndex(getRoutesForPeriod(periodId), getStopsForPeriod(periodId))
+        periodIndexes = periodIndexes + (periodId to index)
+        return index
+    }
+
+    private fun getVariantsForRoute(periodId: String, routeName: String): List<RouteVariant> {
+        val index = indexFor(periodId)
+        return index.routesByLowercaseName[routeName.lowercase()]
+            .orEmpty()
             .map { route ->
-                val stopNames = route.stopIds.toList().mapNotNull { stopById[it]?.name }
+                val stopNames = route.stopIds.toList().mapNotNull { index.stopById[it]?.name }
                 RouteVariant(route, stopNames)
             }
             .filter { it.stopNames.isNotEmpty() }
@@ -890,19 +953,23 @@ class RaptorRepository private constructor(private val context: PlatformContext)
         return now.hour * 3600 + now.minute * 60 + now.second
     }
 
-    fun searchLinesByName(query: String): List<LineSearchResult> {
-        val currentPeriod = raptorLibrary?.getCurrentPeriod() ?: return emptyList()
-        val routes = getRoutesForPeriod(currentPeriod)
-        val allNames = routes
-            .map { it.name }
-            .distinct()
+    /**
+     * Suspending because it scans the active period's routes, and the caller is a debounced
+     * LaunchedEffect — i.e. the main thread. searchStopsByName next to it was already doing this;
+     * this one was not, so every keystroke ran the scan on the UI thread.
+     */
+    suspend fun searchLinesByName(query: String): List<LineSearchResult> = withContext(ioDispatcher) {
+        val currentPeriod = raptorLibrary?.getCurrentPeriod() ?: return@withContext emptyList()
+        val allNames = indexFor(currentPeriod).sortedRouteNames
+        // Hoisted: this was resolved once per result.
+        val rules = TransportServiceProvider.getTransportLineRules()
         if (query.isBlank()) {
-            return allNames.sorted().map {
-                LineSearchResult(lineName = it, category = TransportServiceProvider.getTransportLineRules().getTransportType(it))
+            return@withContext allNames.map {
+                LineSearchResult(lineName = it, category = rules.getTransportType(it))
             }
         }
         val normalizedQuery = query.trim().uppercase()
-        return allNames
+        allNames
             .filter {
                 it.uppercase().contains(normalizedQuery) || normalizedQuery.contains(it.uppercase())
             }
@@ -917,10 +984,7 @@ class RaptorRepository private constructor(private val context: PlatformContext)
             ))
             .take(20)
             .map { lineName ->
-                LineSearchResult(
-                    lineName = lineName,
-                    category = TransportServiceProvider.getTransportLineRules().getTransportType(lineName)
-                )
+                LineSearchResult(lineName = lineName, category = rules.getTransportType(lineName))
             }
     }
 
@@ -971,23 +1035,43 @@ class RaptorRepository private constructor(private val context: PlatformContext)
         }
 
         val period = raptorLibrary?.getCurrentPeriod() ?: PERIOD_SCHOOL_ON_WEEKDAYS
-        val stops = getStopsForPeriod(period)
-        val routes = getRoutesForPeriod(period)
-        val routeById = routes.groupBy { it.id }
-
-        val dessertes = stops
-            .filter { it.name.equals(stopName, ignoreCase = true) }
-            .flatMap { stop ->
-                stop.routeIds.flatMap { routeId ->
-                    val variants = routeById[routeId].orEmpty()
-                        .distinctBy { it.stopIds.joinToString(",") }
-                    variants.mapIndexed { index, route ->
-                        val dir = if (index == 0) "A" else "R"
-                        "${route.name}:$dir"
-                    }
-                }
-            }
-            .distinct()
-        return if (dessertes.isEmpty()) null else dessertes.joinToString(",")
+        return indexFor(period).dessertesByStopName[stopName.lowercase()]
     }
+}
+
+/**
+ * Builds the whole "stop name -> desserte" table for one period in a single pass.
+ *
+ * The desserte of a stop is the comma-joined list of `"<routeName>:<A|R>"` entries for every route
+ * calling there, where A/R distinguishes the two directions — determined, as it always was, by the
+ * order of a route's distinct stop sequences.
+ *
+ * All stops sharing a name contribute to the same entry: the network has several stop records per
+ * physical stop (one per quay), and the caller asks by name. Names are folded with `lowercase()`
+ * where the previous per-call scan used `equals(ignoreCase = true)`; the two agree for every name
+ * in this dataset.
+ *
+ * Top-level and internal so it can be exercised without a PlatformContext or the `.bin` assets.
+ */
+internal fun buildDessertesByStopName(
+    stops: List<Stop>,
+    routesById: Map<Int, List<Route>>
+): Map<String, String> {
+    val byName = LinkedHashMap<String, MutableList<String>>()
+    for (stop in stops) {
+        val bucket = byName.getOrPut(stop.name.lowercase()) { mutableListOf() }
+        for (routeId in stop.routeIds) {
+            routesById[routeId].orEmpty()
+                .distinctBy { it.stopIds.joinToString(",") }
+                .forEachIndexed { index, route ->
+                    bucket += "${route.name}:${if (index == 0) "A" else "R"}"
+                }
+        }
+    }
+    val out = HashMap<String, String>(byName.size)
+    for ((name, entries) in byName) {
+        val joined = entries.distinct().joinToString(",")
+        if (joined.isNotEmpty()) out[name] = joined
+    }
+    return out
 }
