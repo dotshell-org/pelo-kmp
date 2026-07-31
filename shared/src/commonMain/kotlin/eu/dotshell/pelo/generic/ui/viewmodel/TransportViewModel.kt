@@ -5,6 +5,7 @@ import eu.dotshell.pelo.platform.ioDispatcher
 import androidx.lifecycle.ViewModel
 import eu.dotshell.pelo.platform.Log
 import eu.dotshell.pelo.platform.PlatformContext
+import eu.dotshell.pelo.platform.isUnmeteredNetwork
 import androidx.lifecycle.viewModelScope
 import eu.dotshell.pelo.generic.data.models.stops.Favorite
 import eu.dotshell.pelo.generic.data.models.realtime.vehiclepositions.SimpleVehiclePosition
@@ -43,6 +44,7 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.plus
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,6 +65,12 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         private const val TAG = "TransportViewModel"
         // Set to false for production builds to skip string formatting overhead in hot paths
         private const val DEBUG_LOGGING = false
+
+        /**
+         * How long the offline tile prefetch waits before starting, so it competes with neither
+         * the first frame nor the initial line/stop/alert loads.
+         */
+        private const val OFFLINE_PREFETCH_DELAY_MS = 30_000L
     }
 
     private val transportApi: TransportApi = TransportServiceProvider.getTransportApi()
@@ -190,31 +198,50 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
     init {
         // Load favorites first (synchronous SharedPrefs read, instant)
         loadFavorites()
-        viewModelScope.launch(ioDispatcher) {
-            while (true) {
-                offlineDataManager.refreshOfflineDataInfo()
-                val info = offlineDataManager.offlineDataInfo.value
-                if (!info.isAvailable) {
-                    try {
-                        offlineDataManager.downloadAllOfflineData()
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Auto-download failed: ${e.message}")
-                    }
-                }
-                
-                offlineDataManager.refreshOfflineDataInfo()
-                if (offlineDataManager.offlineDataInfo.value.isAvailable) {
-                    break // Download succeeded or was already available
-                }
-                
-                // Retry every 5 minutes if it failed
-                kotlinx.coroutines.delay(5 * 60 * 1000L)
-            }
-        }
+        prefetchOfflineTiles()
         // Fire all async loads in parallel — each launches its own coroutine
         loadTransportLines()
         loadStops()
         loadTrafficAlerts()
+    }
+
+    /**
+     * Pulls the offline map tiles once, in the background, and only over a network that is free
+     * to use.
+     *
+     * This used to be a `while (true)` that fired the instant the view model was built and retried
+     * every five minutes. Three things were wrong with that. `OfflineDataInfo.isAvailable` is just
+     * `downloadedMapStyles.isNotEmpty()`, so it is false on every fresh install — meaning hundreds
+     * of megabytes of tiles left on whatever connection was to hand, nobody having asked. The
+     * download then competed with the first frame for the network and the disk. And a device that
+     * never reaches an unmetered network retried for as long as the app stayed open.
+     *
+     * The info refresh stays unconditional: the map style picker reads
+     * `offlineDataInfo.downloadedMapStyles` to know which styles work offline, whether or not
+     * anything is downloading today. Only the download itself is gated.
+     *
+     * On iOS this never runs: `isUnmeteredNetwork` is hardcoded to false there, because a real
+     * check needs NWPathMonitor and reports asynchronously.
+     */
+    private fun prefetchOfflineTiles() {
+        viewModelScope.launch(ioDispatcher) {
+            offlineDataManager.refreshOfflineDataInfo()
+            if (offlineDataManager.offlineDataInfo.value.isAvailable) return@launch
+            if (!isUnmeteredNetwork(context)) {
+                Log.i(TAG, "Offline tiles: skipped, network is metered or unknown")
+                return@launch
+            }
+            // Let the map, the lines and the first interactions have the device to themselves.
+            kotlinx.coroutines.delay(OFFLINE_PREFETCH_DELAY_MS)
+            try {
+                offlineDataManager.downloadAllOfflineData()
+            } catch (e: CancellationException) {
+                // Shutting down, not failing: let it propagate or the scope never finishes closing.
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Offline tiles: prefetch failed: ${e.message}")
+            }
+        }
     }
 
     /**
