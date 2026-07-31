@@ -100,6 +100,20 @@ private val BUNDLED_STYLE_DESCRIPTORS = mapOf(
 private const val BASEMAP_VECTOR_SOURCE_ID = "openmaptiles"
 
 /**
+ * Stop icon tiers as (priority, minimum zoom, layer id prefix): metro and funicular appear from
+ * 12.5, tram from 14, bus from 17. Priority is compared as a string to avoid numeric conversion
+ * mismatches in the layer filter.
+ *
+ * At file level rather than in the map content lambda, where it was rebuilt on every recomposition
+ * of that scope.
+ */
+private val STOP_PRIORITY_TIERS = listOf(
+    Triple("2", 12.5f, "transport-stops-priority-2"),
+    Triple("1", 14.0f, "transport-stops-priority-1"),
+    Triple("0", 17.0f, "transport-stops-priority-0")
+)
+
+/**
  * Source layers holding the basemap's named features: `place` covers localities — hamlets,
  * neighbourhoods, suburbs, towns — and `poi` covers named points such as shops and venues.
  */
@@ -183,8 +197,6 @@ fun MapCanvas(
     bearing: Double? = null,
     tilt: Double? = null,
 ) {
-    Log.i("MapCanvas", "compose entered, stops=${stops?.features?.size} shouldRenderStops=${!selectedLineName.isNullOrBlank() || initialZoom >= STOP_RENDER_MIN_ZOOM} lines=${lines?.features?.size}")
-
     val fallbackPainter = remember {
         object : Painter() {
             override val intrinsicSize: Size = Size(14f, 14f)
@@ -449,7 +461,6 @@ fun MapCanvas(
         cameraState = cameraState,
         options = mapOptions,
     ) {
-        Log.i("MapCanvas", "MaplibreMap content lambda compose start")
         // key(styleUrl) ensures all layers/sources are rebuilt when the style changes.
         androidx.compose.runtime.key(styleUrl) {
             // ------------------------------------------------------------------
@@ -618,15 +629,7 @@ fun MapCanvas(
                     fallback = fallback,
                 )
 
-                // Loop over slots to stack multiple icons vertically at multi-line stations (like Bellecour).
-                // Priority gates the zoom (metro/funicular from 12.5f, tram from 14f, bus from 17f).
-                // String-based priority comparison to avoid numerical conversion mismatches.
-                val tiers = listOf(
-                    Triple("2", 12.5f, "transport-stops-priority-2"),
-                    Triple("1", 14.0f, "transport-stops-priority-1"),
-                    Triple("0", 17.0f, "transport-stops-priority-0")
-                )
-                for ((priority, minZoom, baseId) in tiers) {
+                for ((priority, minZoom, baseId) in STOP_PRIORITY_TIERS) {
                     val actualMinZoom = if (itineraryGeoJson != null) 12.5f else minZoom
                     for (slot in slots) {
                         SymbolLayer(

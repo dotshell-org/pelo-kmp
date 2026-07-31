@@ -55,14 +55,22 @@ private fun getLineColor(lineName: String): Color {
     return Color(LineColorHelper.getColorForLineString(lineName))
 }
 
-private fun getAllDayScheduleColor(hour: String, minute: String, defaultColor: Color): Color {
+/**
+ * [nowMinutes] is passed in rather than read here: this is called once per displayed minute, so a
+ * busy hour is fifteen to twenty calls and a screenful four or five hours' worth. Reading the clock
+ * inside meant that many instant-to-local-datetime conversions on every recomposition.
+ */
+private fun getAllDayScheduleColor(
+    hour: String,
+    minute: String,
+    defaultColor: Color,
+    nowMinutes: Int
+): Color {
     val hourInt = hour.toIntOrNull() ?: return defaultColor
     val minuteInt = minute.toIntOrNull() ?: return defaultColor
     // Hours 24+ are GTFS service-day times of after-midnight runs (night lines)
     if (hourInt !in 0..47 || minuteInt !in 0..59) return defaultColor
 
-    val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
-    val nowMinutes = now.hour * 60 + now.minute
     val scheduleMinutes = hourInt * 60 + minuteInt
     val diffMinutes = scheduleMinutes - nowMinutes
 
@@ -189,7 +197,13 @@ fun AllSchedulesSheetContent(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        val list = groupedSchedules.entries.toList()
+        val list = remember(groupedSchedules) { groupedSchedules.entries.toList() }
+        // One clock read for the whole sheet instead of one per minute cell.
+        val nowMinutes = remember(groupedSchedules) {
+            val now = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault())
+            now.hour * 60 + now.minute
+        }
+        val lineColor = getLineColor(allSchedulesInfo.lineName)
 
         LazyColumn(
             modifier = Modifier
@@ -210,7 +224,7 @@ fun AllSchedulesSheetContent(
                         text = "${displayHour}h",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = getLineColor(allSchedulesInfo.lineName),
+                        color = lineColor,
                         modifier = Modifier.width(50.dp)
                     )
 
@@ -220,7 +234,12 @@ fun AllSchedulesSheetContent(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         minutesList.forEach { minute ->
-                            val minuteColor = getAllDayScheduleColor(hour, minute, MaterialTheme.colorScheme.onSurface)
+                            val minuteColor = getAllDayScheduleColor(
+                                hour,
+                                minute,
+                                MaterialTheme.colorScheme.onSurface,
+                                nowMinutes
+                            )
                             Text(
                                 text = minute,
                                 style = MaterialTheme.typography.bodyLarge,

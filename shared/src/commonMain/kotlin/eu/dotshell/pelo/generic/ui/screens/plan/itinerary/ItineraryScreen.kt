@@ -621,20 +621,21 @@ fun JourneyDetailsSheetContent(
         }
 
         val sheetBgColor = if (useLightColors) SecondaryColor else PrimaryColor
+        val startActionScrim = remember(sheetBgColor) {
+            Brush.verticalGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    sheetBgColor.copy(alpha = 0.85f),
+                    sheetBgColor,
+                    sheetBgColor
+                )
+            )
+        }
         if (showStartAction) Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .background(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            sheetBgColor.copy(alpha = 0.85f),
-                            sheetBgColor,
-                            sheetBgColor
-                        )
-                    )
-                )
+                .background(brush = startActionScrim)
                 .padding(horizontal = 16.dp, vertical = 16.dp)
         ) {
             Row(

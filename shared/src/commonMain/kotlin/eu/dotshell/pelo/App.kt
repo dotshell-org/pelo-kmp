@@ -81,6 +81,7 @@ import kotlinx.coroutines.flow.debounce
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -1307,14 +1308,19 @@ private fun RootScaffold(
         }
 
         if (showAlertReport) {
-            val nearestStopCandidate = nearestStopTo(userLocation, filteredStopsCollection?.features)
-                ?.let { stop ->
-                    eu.dotshell.pelo.generic.data.models.search.StationSearchResult(
-                        stopName = stop.properties.nom,
-                        stopId = stop.properties.id,
-                        lines = viewModel.parseLineCodesFromDesserte(stop.properties.desserte)
-                    )
-                }
+            // nearestStopTo measures a distance for every stop in the network. Unmemoised it ran
+            // on every recomposition for as long as the report sheet was open — so on every GPS
+            // fix, and on anything else that touched this scaffold.
+            val nearestStopCandidate = remember(userLocation, filteredStopsCollection) {
+                nearestStopTo(userLocation, filteredStopsCollection?.features)
+                    ?.let { stop ->
+                        eu.dotshell.pelo.generic.data.models.search.StationSearchResult(
+                            stopName = stop.properties.nom,
+                            stopId = stop.properties.id,
+                            lines = viewModel.parseLineCodesFromDesserte(stop.properties.desserte)
+                        )
+                    }
+            }
 
             val initialStop = alertReportInitialStopName?.let { name ->
                 eu.dotshell.pelo.generic.data.models.search.StationSearchResult(
@@ -1616,7 +1622,11 @@ private fun PlanContent(
         else -> null
     }
     val showAllLines by viewModel.showAllLinesOnMap.collectAsState(initial = false)
-    val strongLines = allLines?.filter { lineRules.isStrongLine(it.properties.lineName) }
+    // isStrongLine normalises each name, so this walked the whole network on every recomposition —
+    // and, being a key of the remember below, forced a structural comparison of the result too.
+    val strongLines = remember(allLines, lineRules) {
+        allLines?.filter { lineRules.isStrongLine(it.properties.lineName) }
+    }
     val mapLines = remember(strongLines, selectedLineName, allLines, showAllLines) {
         if (allLines == null) return@remember null
         val strongs = strongLines ?: emptyList()
@@ -1631,6 +1641,14 @@ private fun PlanContent(
         }
     }
 
+    // Wrapped once rather than at the call site. FeatureCollection is @Immutable, so Compose
+    // compares it with equals — a structural walk of every line geometry — and a fresh wrapper on
+    // each recomposition guaranteed that walk. Held here, the comparison hits the identity check
+    // in the generated equals instead. During navigation this ran once a second.
+    val mapLinesCollection = remember(mapLines) {
+        mapLines?.let { FeatureCollection(features = it) }
+    }
+
     Box(Modifier.fillMaxSize()) {
         BottomSheetScaffold(
             modifier = Modifier.fillMaxSize(),
@@ -1643,7 +1661,6 @@ private fun PlanContent(
             }
         ) {
             Box(Modifier.fillMaxSize()) {
-                Log.i("PeloApp", "PlanContent: before MapCanvas")
                 MapCanvas(
                     modifier = Modifier.fillMaxSize(),
                     styleUrl = effectiveMapStyle.styleUrl,
@@ -1660,7 +1677,7 @@ private fun PlanContent(
                         isCenteredOnUser -> 0.0
                         else -> null
                     },
-                    lines = mapLines?.let { FeatureCollection(features = it) },
+                    lines = mapLinesCollection,
                     stops = filteredStopsCollection,
                     userLocation = userLocation,
                     heading = heading,
@@ -1727,56 +1744,63 @@ private fun PlanContent(
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Canvas(
+                                // drawWithCache rather than Canvas: the four needles depend only on
+                                // the size, so they are built when that changes and merely drawn
+                                // afterwards. As a plain draw block they were four Path
+                                // allocations per frame, and this rotates with the map.
+                                Spacer(
                                     modifier = Modifier
                                         .size(24.dp)
                                         .graphicsLayer {
                                             rotationZ = -cameraState.position.bearing.toFloat()
                                         }
-                                ) {
-                                    val width = size.width
-                                    val height = size.height
-                                    val centerX = width / 2f
-                                    val centerY = height / 2f
+                                        .drawWithCache {
+                                            val width = size.width
+                                            val height = size.height
+                                            val centerX = width / 2f
+                                            val centerY = height / 2f
 
-                                    // Path for the North (Red) pointer (Left half)
-                                    val northLeftPath = Path().apply {
-                                        moveTo(centerX, 0f)                     // Top tip
-                                        lineTo(centerX - width * 0.2f, centerY)  // Middle left
-                                        lineTo(centerX, centerY - height * 0.05f)// Center inner
-                                        close()
-                                    }
-                                    // Path for the North (Red) pointer (Right half)
-                                    val northRightPath = Path().apply {
-                                        moveTo(centerX, 0f)                     // Top tip
-                                        lineTo(centerX + width * 0.2f, centerY)  // Middle right
-                                        lineTo(centerX, centerY - height * 0.05f)// Center inner
-                                        close()
-                                    }
+                                            // Path for the North (Red) pointer (Left half)
+                                            val northLeftPath = Path().apply {
+                                                moveTo(centerX, 0f)                     // Top tip
+                                                lineTo(centerX - width * 0.2f, centerY)  // Middle left
+                                                lineTo(centerX, centerY - height * 0.05f)// Center inner
+                                                close()
+                                            }
+                                            // Path for the North (Red) pointer (Right half)
+                                            val northRightPath = Path().apply {
+                                                moveTo(centerX, 0f)                     // Top tip
+                                                lineTo(centerX + width * 0.2f, centerY)  // Middle right
+                                                lineTo(centerX, centerY - height * 0.05f)// Center inner
+                                                close()
+                                            }
 
-                                    // Path for the South (White) pointer (Left half)
-                                    val southLeftPath = Path().apply {
-                                        moveTo(centerX, height)                 // Bottom tip
-                                        lineTo(centerX - width * 0.2f, centerY)  // Middle left
-                                        lineTo(centerX, centerY + height * 0.05f)// Center inner
-                                        close()
-                                    }
-                                    // Path for the South (White) pointer (Right half)
-                                    val southRightPath = Path().apply {
-                                        moveTo(centerX, height)                 // Bottom tip
-                                        lineTo(centerX + width * 0.2f, centerY)  // Middle right
-                                        lineTo(centerX, centerY + height * 0.05f)// Center inner
-                                        close()
-                                    }
+                                            // Path for the South (White) pointer (Left half)
+                                            val southLeftPath = Path().apply {
+                                                moveTo(centerX, height)                 // Bottom tip
+                                                lineTo(centerX - width * 0.2f, centerY)  // Middle left
+                                                lineTo(centerX, centerY + height * 0.05f)// Center inner
+                                                close()
+                                            }
+                                            // Path for the South (White) pointer (Right half)
+                                            val southRightPath = Path().apply {
+                                                moveTo(centerX, height)                 // Bottom tip
+                                                lineTo(centerX + width * 0.2f, centerY)  // Middle right
+                                                lineTo(centerX, centerY + height * 0.05f)// Center inner
+                                                close()
+                                            }
 
-                                    // Draw North halves
-                                    drawPath(northLeftPath, AccentColor)        // Brand orange
-                                    drawPath(northRightPath, AccentColorShade)  // Darker orange for shadow
+                                            onDrawBehind {
+                                                // Draw North halves
+                                                drawPath(northLeftPath, AccentColor)        // Brand orange
+                                                drawPath(northRightPath, AccentColorShade)  // Darker orange for shadow
 
-                                    // Draw South halves
-                                    drawPath(southLeftPath, Sand200)            // Light sand
-                                    drawPath(southRightPath, Color.White)       // Pure white for highlight
-                                }
+                                                // Draw South halves
+                                                drawPath(southLeftPath, Sand200)            // Light sand
+                                                drawPath(southRightPath, Color.White)       // Pure white for highlight
+                                            }
+                                        }
+                                )
                             }
                         }
 
