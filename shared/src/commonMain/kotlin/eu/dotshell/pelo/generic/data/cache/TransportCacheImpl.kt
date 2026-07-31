@@ -190,14 +190,23 @@ class TransportCacheImpl private constructor(context: PlatformContext) : Transpo
     }
 
     private suspend fun loadLineCache(slot: LineCacheSlot): List<Feature>? {
-        if (slot.memory != null && isTimestampValid(slot.timestamp)) {
-            if (isInvalidLineCache(slot.memory.orEmpty())) {
-                slot.memory = null
-                slot.timestamp = 0L
-                invalidateLineCache(slot.fileName, slot.timestampKey)
-                return null
+        val memory = slot.memory
+        if (memory != null) {
+            if (isTimestampValid(slot.timestamp)) {
+                if (isInvalidLineCache(memory)) {
+                    slot.memory = null
+                    slot.timestamp = 0L
+                    invalidateLineCache(slot.fileName, slot.timestampKey)
+                    return null
+                }
+                return memory
             }
-            return slot.memory
+            // Expired. The disk copy was written by the same call that filled this field, with
+            // this timestamp, so it cannot be fresher — reading it would gunzip and parse a file
+            // already known to be stale, only to reject it. Drop the memory and refetch.
+            slot.memory = null
+            slot.timestamp = 0L
+            return null
         }
 
         val timestamp = settings.getLong(slot.timestampKey, 0)
@@ -254,8 +263,15 @@ class TransportCacheImpl private constructor(context: PlatformContext) : Transpo
     }
 
     override suspend fun getStops(): List<StopFeature>? = stopsMutex.withLock {
-        if (stopsCache != null && isTimestampValid(stopsTimestamp)) {
-            return@withLock stopsCache
+        if (stopsCache != null) {
+            if (isTimestampValid(stopsTimestamp)) {
+                return@withLock stopsCache
+            }
+            // Same reasoning as loadLineCache: the disk copy shares this timestamp, so it is
+            // stale too and re-reading it is wasted work.
+            stopsCache = null
+            stopsTimestamp = 0L
+            return@withLock null
         }
 
         val timestamp = settings.getLong(KEY_STOPS_TIMESTAMP, 0)

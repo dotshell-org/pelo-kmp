@@ -5,6 +5,7 @@ import eu.dotshell.pelo.platform.FileSystem
 import eu.dotshell.pelo.platform.PlatformContext
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
+import kotlin.concurrent.Volatile
 import kotlinx.datetime.plus
 import kotlinx.serialization.json.Json
 
@@ -22,10 +23,10 @@ class HolidayDetector(
     private val schoolHolidays: List<HolidayPeriod> = loadSchoolHolidays()
 
     private fun loadSchoolHolidays(): List<HolidayPeriod> {
+        cachedPeriods[holidayFileName]?.let { return it }
         return try {
             val json = fileSystem.readAsset(holidayFileName)
-            val jsonConfig = Json { ignoreUnknownKeys = true }
-            val holidaysData = jsonConfig.decodeFromString<HolidaysData>(json)
+            val holidaysData = JSON.decodeFromString<HolidaysData>(json)
             holidaysData.holidays.mapNotNull { holiday ->
                 val startDate = try {
                     LocalDate.parse(holiday.startDateInclusive)
@@ -47,10 +48,26 @@ class HolidayDetector(
                         endDate = endDate ?: startDate.plus(2, DateTimeUnit.MONTH)
                     )
                 } else null
-            }
+            }.also { cachedPeriods = cachedPeriods + (holidayFileName to it) }
         } catch (e: Exception) {
             emptyList()
         }
+    }
+
+    companion object {
+        private val JSON = Json { ignoreUnknownKeys = true }
+
+        /**
+         * Parsed periods per asset name. The bundled holidays file cannot change while the process
+         * runs, and two detectors are built per process (one by RaptorRepository, one by the view
+         * model), so without this the asset was read and parsed twice. The Json instance was also
+         * being constructed inside the parse rather than reused.
+         *
+         * Copy-on-write: replaced, never mutated, so a reader cannot see it half-built. A lost
+         * race just parses twice, which is what already happened.
+         */
+        @Volatile
+        private var cachedPeriods: Map<String, List<HolidayPeriod>> = emptyMap()
     }
 
     /**
