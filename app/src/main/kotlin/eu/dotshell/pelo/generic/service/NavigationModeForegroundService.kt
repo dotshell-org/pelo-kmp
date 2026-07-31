@@ -32,6 +32,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Keeps location alive — and the traveller informed — for the duration of a navigation session.
@@ -45,6 +46,13 @@ class NavigationModeForegroundService : Service() {
     private var locationCallback: LocationCallback? = null
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    // Outlives serviceScope by design, purely to close it down: the finalisation it waits on runs
+    // inside serviceScope, which therefore cannot cancel itself. Held in a field, and bounded by a
+    // timeout, because the anonymous CoroutineScope this replaces was unreachable the moment it
+    // was created — if a child never completed, that join outlived the service with no handle.
+    private val teardownScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     private var tripDetector: TripDetector? = null
     private var tripDetectorInitJob: Job? = null
     private var notificationJob: Job? = null
@@ -96,11 +104,13 @@ class NavigationModeForegroundService : Service() {
         notificationJob = null
         NavigationModeStateStore.setNavigationActive(this, false)
         finalizeTripDetector()
-        // Give the trip finalisation a moment to persist before tearing the scope down; it runs
-        // in serviceScope, so it cannot cancel itself.
-        CoroutineScope(Dispatchers.IO).launch {
-            serviceScope.coroutineContext[Job]?.children?.forEach { it.join() }
+        // Give the trip finalisation a moment to persist before tearing the scope down.
+        teardownScope.launch {
+            withTimeoutOrNull(TEARDOWN_GRACE_MS) {
+                serviceScope.coroutineContext[Job]?.children?.forEach { it.join() }
+            }
             serviceScope.cancel()
+            teardownScope.cancel()
         }
         super.onDestroy()
     }
@@ -180,7 +190,7 @@ class NavigationModeForegroundService : Service() {
         if (TelemetryEmitter.optInManager()?.isOptedIn != true) return
 
         tripDetectorInitJob = serviceScope.launch {
-            val cache = TransportCacheImpl(applicationContext)
+            val cache = TransportCacheImpl.getInstance(applicationContext)
             val stops = runCatching { cache.getStops() }.getOrNull().orEmpty()
             if (stops.isEmpty()) return@launch
 
@@ -285,5 +295,8 @@ class NavigationModeForegroundService : Service() {
 
         private const val CHANNEL_ID = "navigation_mode_channel"
         private const val NOTIFICATION_ID = 7411
+
+        /** How long teardown waits for trip finalisation to persist before cancelling anyway. */
+        private const val TEARDOWN_GRACE_MS = 5_000L
     }
 }

@@ -13,6 +13,7 @@ import eu.dotshell.pelo.platform.BackgroundScheduler
 import eu.dotshell.pelo.platform.FileSystem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
@@ -22,8 +23,10 @@ class PeloApplication : Application(), Configuration.Provider {
         private const val TAG = "PeloApplication"
     }
 
-    // Application-level coroutine scope for background initialization
-    private val appInitScope = CoroutineScope(Dispatchers.Default)
+    // Application-level coroutine scope for background initialization.
+    // SupervisorJob: the initialisations below are independent, and one throwing must not cancel
+    // the scope and take the others down with it.
+    private val appInitScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     // On-demand WorkManager initialization (replaces automatic ContentProvider init)
     // This defers non-critical startup work until WorkManager is first accessed.
@@ -39,18 +42,24 @@ class PeloApplication : Application(), Configuration.Provider {
         // Ensure AppConfig is loaded synchronously before UI tries to access it
         AppConfigLoader.loadConfig(FileSystem(this))
         
-        // Move all heavy initialization to background to avoid blocking UI thread
+        // Move all heavy initialization to background to avoid blocking UI thread.
+        // One launch each: these were four sequential steps in a single coroutine, so an
+        // exception in any of them silently skipped every step that followed. Only the last two
+        // carried their own try/catch, which meant a failure in the provider init took the
+        // telemetry setup down with it and left no trace of why.
         appInitScope.launch {
-            // Verify Raptor assets are available at startup (async)
-            verifyRaptorAssets()
-            
-            // Initialize transport service provider (contains Retrofit instance)
-            TransportServiceProvider.initialize(this@PeloApplication)
-            
-            // Schedule traffic alerts in background
-            BackgroundScheduler(this@PeloApplication).ensureTrafficAlertsScheduled()
-            
-            // Initialize telemetry in background
+            runCatching { verifyRaptorAssets() }
+                .onFailure { Log.e(TAG, "Raptor asset check failed", it) }
+        }
+        appInitScope.launch {
+            runCatching { TransportServiceProvider.initialize(this@PeloApplication) }
+                .onFailure { Log.e(TAG, "Transport service init failed", it) }
+        }
+        appInitScope.launch {
+            runCatching { BackgroundScheduler(this@PeloApplication).ensureTrafficAlertsScheduled() }
+                .onFailure { Log.w(TAG, "Traffic alert scheduling skipped", it) }
+        }
+        appInitScope.launch {
             initializeTelemetry()
         }
     }

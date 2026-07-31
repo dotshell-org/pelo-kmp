@@ -100,7 +100,7 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
     private val favoritesRepository = FavoritesRepository(context)
     val raptorRepository = RaptorRepository.getInstance(context)
     val offlineDataManager = OfflineDataManager(transportApi, context)
-    private val transportCache by lazy { eu.dotshell.pelo.generic.data.cache.TransportCacheImpl(context) }
+    private val transportCache by lazy { eu.dotshell.pelo.generic.data.cache.TransportCacheImpl.getInstance(context) }
     private val offlineRepository by lazy { eu.dotshell.pelo.generic.data.offline.OfflineRepository(context) }
     private val _linesState = MutableStateFlow<TransportLinesState>(TransportLinesState.Loading)
 

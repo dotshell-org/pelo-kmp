@@ -37,6 +37,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -58,8 +59,10 @@ import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.FileSystem
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
+import eu.dotshell.pelo.platform.ioDispatcher
 import androidx.compose.material3.MaterialTheme
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
@@ -99,12 +102,22 @@ fun SettingsScreen(
     val validUntilTemplate = strings["timetable_data_valid_until"]
     val expiringTemplate = strings["timetable_data_expiring"]
     val expiredTemplate = strings["timetable_data_expired"]
-    val timetableDataSubtitle: String? = remember(platformContext, monthNames) {
-        val info = DatasetInfoLoader.load(FileSystem(platformContext))
-        val endDate = DatasetFreshness.parseIsoDate(info?.validity?.endDate)
-        if (endDate == null) {
-            null
-        } else {
+    // Off the composition thread: the first call opens dataset.json (asset or downloaded copy)
+    // and parses it. DatasetInfoLoader memoises afterwards, so this costs once per process — but
+    // once on the main thread is still once too many. The row stays hidden until the value lands,
+    // which is what it already did whenever there was no usable end date.
+    val timetableDataSubtitle: String? by produceState<String?>(
+        initialValue = null,
+        platformContext,
+        monthNames,
+        validUntilTemplate,
+        expiringTemplate,
+        expiredTemplate
+    ) {
+        value = withContext(ioDispatcher) {
+            val info = DatasetInfoLoader.load(FileSystem(platformContext))
+            val endDate = DatasetFreshness.parseIsoDate(info?.validity?.endDate)
+                ?: return@withContext null
             val today = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date
             val formatted = DatasetFreshness.formatLongDate(
                 endDate,
