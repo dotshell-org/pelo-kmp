@@ -37,3 +37,12 @@ expect fun exportFile(context: PlatformContext, filename: String, content: Strin
  * Conservative: when connectivity cannot be determined, returns false.
  */
 expect fun isUnmeteredNetwork(context: PlatformContext): Boolean
+
+/**
+ * The process-scoped context behind [context]. Android returns `applicationContext`, so anything
+ * held for the life of the process cannot pin the Activity that happened to create it; iOS has no
+ * such distinction and returns [context] unchanged.
+ *
+ * Use this whenever a singleton stores a context — see `TransportViewModelHolder`.
+ */
+expect fun applicationContextOf(context: PlatformContext): PlatformContext

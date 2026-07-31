@@ -47,6 +47,7 @@ import kotlinx.datetime.plus
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
@@ -1317,9 +1318,25 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         return eu.dotshell.pelo.generic.ui.viewmodel.normalizeStopName(stopName)
     }
 
-    override fun onCleared() {
+    /**
+     * Releases everything this view model started.
+     *
+     * Exists because the teardown path was otherwise unreachable: [onCleared] is `protected` and
+     * `ViewModel.clear()` is `internal`, so application code cannot call either, and nothing owns
+     * this view model through a ViewModelStoreOwner. `TransportViewModelHolder` keeps it for the
+     * life of the process, so in normal operation this runs only from tests — but a leak that
+     * cannot even be closed by hand is worse than one that can.
+     *
+     * Safe to call more than once: cancelling an already-cancelled job or scope is a no-op.
+     */
+    fun dispose() {
         vehiclePositionsJob?.cancel()
         globalLiveJob?.cancel()
+        viewModelScope.cancel()
+    }
+
+    override fun onCleared() {
+        dispose()
         super.onCleared()
     }
 

@@ -22,6 +22,8 @@ actual fun isUnmeteredNetwork(context: PlatformContext): Boolean = try {
     false
 }
 
+actual fun applicationContextOf(context: PlatformContext): PlatformContext = context.applicationContext
+
 actual fun appVersionName(context: PlatformContext): String = try {
     val info = context.packageManager.getPackageInfo(context.packageName, 0)
     info.versionName ?: "unknown"

@@ -15,10 +15,16 @@ import eu.dotshell.pelo.platform.LocalPlatformContext
  * [onConsentSatisfied] fires once when the app proceeds past the gate — either right after the
  * user accepts, or immediately on launch for a returning user who already accepted. It's the hook
  * platforms use to defer follow-up prompts (e.g. the location permission request) until consent.
+ *
+ * [onConsentScreenShown] fires instead when the gate puts its own screen up. Without it, a very
+ * first launch held the launch screen for the full timeout: the "we have something to draw" signal
+ * lives inside [content], which this branch never composes, so the consent screen sat invisible
+ * underneath until the platform gave up waiting.
  */
 @Composable
 fun TermsConsentGate(
     onConsentSatisfied: () -> Unit = {},
+    onConsentScreenShown: () -> Unit = {},
     content: @Composable () -> Unit
 ) {
     val context = LocalPlatformContext.current
@@ -30,6 +36,7 @@ fun TermsConsentGate(
     val needsAcceptance = !state.accepted || (state.versionAccepted ?: 0) < config.version
 
     if (needsAcceptance) {
+        LaunchedEffect(Unit) { onConsentScreenShown() }
         TermsConsentScreen(
             consent = config,
             legalSections = legalSections,

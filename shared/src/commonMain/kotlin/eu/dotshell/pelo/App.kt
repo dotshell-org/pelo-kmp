@@ -163,6 +163,7 @@ import eu.dotshell.pelo.generic.data.repository.offline.theme.ThemePreferenceRep
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportLinesUiState
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportStopsUiState
 import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModel
+import eu.dotshell.pelo.generic.ui.viewmodel.TransportViewModelHolder
 import eu.dotshell.pelo.generic.ui.viewmodel.findStopByCoordinates
 import eu.dotshell.pelo.generic.utils.location.GeoPoint
 import eu.dotshell.pelo.generic.utils.location.LocationPermissionSignal
@@ -229,8 +230,10 @@ fun App(
             try {
                 TransportServiceProvider.initialize(context)
                 Log.i("PeloApp", "TransportProvider init done")
-                val vm = TransportViewModel(context)
-                Log.i("PeloApp", "TransportViewModel constructor done")
+                // Process-scoped: an Activity recreation (a system theme switch is enough) must
+                // reuse this one, not build a second alongside it.
+                val vm = TransportViewModelHolder.getOrCreate(context)
+                Log.i("PeloApp", "TransportViewModel ready")
                 withContext(Dispatchers.Main) {
                     viewModel = vm
                     isInitializing = false
@@ -274,7 +277,12 @@ fun App(
         )
     ) {
         PeloTheme(darkTheme = darkTheme) {
-            TermsConsentGate(onConsentSatisfied = onConsentAccepted) {
+            TermsConsentGate(
+                onConsentSatisfied = onConsentAccepted,
+                // A first launch has a real screen to show before there is any map: let the
+                // launch screen step aside for it rather than hiding it until the timeout.
+                onConsentScreenShown = onReady,
+            ) {
                 TelemetryOptInGate {
                     Box(Modifier.fillMaxSize()) {
                         val vm = viewModel
