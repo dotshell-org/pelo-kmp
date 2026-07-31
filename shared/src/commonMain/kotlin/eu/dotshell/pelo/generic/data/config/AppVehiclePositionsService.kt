@@ -6,6 +6,7 @@ import eu.dotshell.pelo.generic.data.models.realtime.vehiclepositions.VehiclePos
 import eu.dotshell.pelo.generic.data.network.VehiclePositionsService
 import eu.dotshell.pelo.platform.Log
 import eu.dotshell.pelo.platform.createHttpClientEngine
+import eu.dotshell.pelo.platform.ioDispatcher
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.sse.SSE
 import io.ktor.client.plugins.sse.sse
@@ -14,6 +15,7 @@ import io.ktor.http.HttpHeaders
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.serialization.json.Json
@@ -93,7 +95,12 @@ class AppVehiclePositionsService(
             val backoff = (1_000L * (1L shl attempt.coerceAtMost(5).toInt())).coerceAtMost(30_000L)
             delay(backoff)
             true
-        }
+        }.flowOn(ioDispatcher)
+        // Without this the whole stream ran in the collector's context, and both collectors are
+        // viewModelScope.launch {} — i.e. Dispatchers.Main.immediate. Every SSE event parsed the
+        // entire fleet's JSON on the UI thread. flowOn goes last so it covers the channelFlow and
+        // the retry alike; the downstream per-line filters stay with the collector, which is where
+        // they belong.
     }
 
     private fun parsePositionsEventData(data: String): List<SimpleVehiclePosition> {

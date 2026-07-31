@@ -554,8 +554,15 @@ private fun RootScaffold(
     // Keyed on linesUiState as well as the positions: vehicle dots take their colour from the
     // operator palette registered when the lines load, so a stream that starts first has to be
     // re-serialized once that data lands or the dots keep the per-mode fallback colour.
-    val vehiclesGeoJson = remember(activeVehiclePositions, linesUiState) {
-        if (activeVehiclePositions.isEmpty()) null else toVehiclesGeoJson(activeVehiclePositions)
+    // Serialising the fleet builds a JsonObject tree and stringifies it — roughly eight JSON
+    // primitives per vehicle — so it does not belong in composition. Same shape as linesGeoJson
+    // and stopsGeoJson in MapCanvas, and itineraryGeoJson just below.
+    val vehiclesGeoJson by produceState<String?>(null, activeVehiclePositions, linesUiState) {
+        value = if (activeVehiclePositions.isEmpty()) {
+            null
+        } else {
+            withContext(Dispatchers.Default) { toVehiclesGeoJson(activeVehiclePositions) }
+        }
     }
     val vehicleIconName = remember(selectedLine?.lineName) {
         selectedLine?.lineName?.let { LineIconResolver.getDrawableNameForLineName(it) }
@@ -1596,8 +1603,9 @@ private fun PlanContent(
 
     val isGlobalLiveEnabled by viewModel.isGlobalLiveEnabled.collectAsState(initial = false)
     val isLiveTrackingEnabled by viewModel.isLiveTrackingEnabled.collectAsState(initial = false)
-    val vehiclePositions by viewModel.vehiclePositions.collectAsState(initial = emptyList())
-    val globalVehiclePositions by viewModel.globalVehiclePositions.collectAsState(initial = emptyList())
+    // The fleet itself is drawn from RootScaffold; here only the fact that it is non-empty is
+    // needed, and subscribing to the lists for that recomposed this whole screen on every push.
+    val hasVehicles by viewModel.hasActiveVehicles.collectAsState(initial = false)
 
     val isOffline by viewModel.isOffline.collectAsState()
     val offlineDataInfo by viewModel.offlineDataInfo.collectAsState()
@@ -1853,11 +1861,6 @@ private fun PlanContent(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             val isLiveModeEnabled = isLiveTrackingEnabled || isGlobalLiveEnabled
-                            val hasVehicles = when {
-                                isLiveTrackingEnabled -> vehiclePositions.isNotEmpty()
-                                isGlobalLiveEnabled -> globalVehiclePositions.isNotEmpty()
-                                else -> false
-                            }
                             val isActiveNoVehicles = isLiveModeEnabled && !hasVehicles
 
                             val infiniteTransition = rememberInfiniteTransition(label = "live_dot")

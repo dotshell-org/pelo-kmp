@@ -50,9 +50,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -134,6 +137,29 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
 
     private val _isGlobalLiveEnabled = MutableStateFlow(false)
     override val isGlobalLiveEnabled: StateFlow<Boolean> = _isGlobalLiveEnabled.asStateFlow()
+
+    /**
+     * Whether the live layer currently has anything to show.
+     *
+     * PlanContent subscribed to both position lists purely to reach this one boolean, so every SSE
+     * push recomposed that whole subtree with the entire fleet in hand. Derived here instead, the
+     * lists stay subscribed only where they are actually drawn.
+     *
+     * Declared after the four flows it combines: these are property initialisers, so referring to
+     * one before its declaration leaves it null at construction time.
+     */
+    override val hasActiveVehicles: StateFlow<Boolean> = combine(
+        _isLiveTrackingEnabled,
+        _isGlobalLiveEnabled,
+        _vehiclePositions,
+        _globalVehiclePositions
+    ) { liveTracking, globalLive, positions, globalPositions ->
+        when {
+            liveTracking -> positions.isNotEmpty()
+            globalLive -> globalPositions.isNotEmpty()
+            else -> false
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     // Toggle to draw every line trace on the map (not only the strong ones),
     // mirroring the global-live button behaviour: on until tapped again.
@@ -1148,9 +1174,10 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         _isLiveTrackingEnabled.value = true
         _vehiclePositions.value = emptyList()
 
-        vehiclePositionsJob = viewModelScope.launch {
-            // Focused per-line stream (one request per poll); the filter stays
-            // as a safety net in case the backend returns more than the asked line.
+        vehiclePositionsJob = viewModelScope.launch(ioDispatcher) {
+            // Not a per-line subscription: SIRI publishes the whole fleet on one stream and the
+            // service filters it. This second pass narrows by the app's own line-name rules,
+            // which normalise where the service compares literally.
             vehiclePositionsRepository.streamVehiclePositionsByLine(lineName.trim()).collect { result ->
                 result.onSuccess { allPositions ->
                     val requested = lineName.trim()
@@ -1192,7 +1219,7 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         _isGlobalLiveEnabled.value = true
         _globalVehiclePositions.value = emptyList()
 
-        globalLiveJob = viewModelScope.launch {
+        globalLiveJob = viewModelScope.launch(ioDispatcher) {
             vehiclePositionsRepository.streamAllVehiclePositions().collect { result ->
                 result.onSuccess { allPositions ->
                     _globalVehiclePositions.value = allPositions
