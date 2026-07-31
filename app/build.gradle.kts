@@ -1,139 +1,35 @@
 import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+/**
+ * Android entry points only: Application, Activity, the navigation foreground service, the
+ * manifest and res/. Everything else — including the whole Compose UI, which is shared with iOS —
+ * lives in :shared.
+ *
+ * This module deliberately does *not* apply the Kotlin Multiplatform plugin: that combination
+ * with 'com.android.application' is deprecated in AGP 9 and removed in AGP 10.
+ */
 plugins {
-    alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.serialization)
+    // Kept for the `compose.*` dependency accessors: they pin the same Compose artifacts the
+    // shared module resolves, which the version catalog alone cannot do (its ui-tooling entry
+    // carries no version, it relied on a BOM this project never applied).
     alias(libs.plugins.compose.multiplatform)
     alias(libs.plugins.baselineprofile)
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_11)
+    }
 }
 
 val localProperties = Properties()
 val localPropertiesFile = rootProject.file("local.properties")
 if (localPropertiesFile.exists()) {
     localProperties.load(localPropertiesFile.inputStream())
-}
-
-kotlin {
-    compilerOptions {
-        // expect/actual classes are still flagged "Beta"; this project relies on them
-        // intentionally (Settings, FileSystem, LocationProvider, …). Opt in to silence the warning.
-        freeCompilerArgs.add("-Xexpect-actual-classes")
-    }
-
-    androidTarget {
-        compilerOptions {
-            jvmTarget.set(JvmTarget.JVM_11)
-        }
-    }
-
-    listOf(
-        iosArm64(),
-        iosSimulatorArm64()
-    ).forEach { iosTarget ->
-        iosTarget.binaries.framework {
-            baseName = "ComposeApp"
-            isStatic = true
-        }
-    }
-
-    sourceSets {
-        commonMain.dependencies {
-            implementation(compose.runtime)
-            implementation(compose.foundation)
-            implementation(compose.material3)
-            implementation(compose.ui)
-            implementation(compose.components.resources)
-            implementation(compose.materialIconsExtended)
-
-            // JetBrains lifecycle (Compose Multiplatform) — provides androidx.lifecycle.ViewModel
-            // + viewModelScope in commonMain (same package as the Android artifact).
-            implementation(libs.jetbrains.lifecycle.viewmodel)
-
-            // Ktor (replaces Retrofit/OkHttp/Gson)
-            implementation(libs.ktor.client.core)
-            implementation(libs.ktor.client.content.negotiation)
-            implementation(libs.ktor.serialization.kotlinx.json)
-            implementation(libs.ktor.client.logging)
-
-            // Kotlinx
-            implementation(libs.kotlinx.coroutines.core)
-            implementation(libs.kotlinx.serialization.json)
-            implementation(libs.kotlinx.datetime)
-
-            // okio — cross-platform file IO + gzip (replaces java.io + java.util.zip)
-            implementation(libs.okio)
-
-            // maplibre-compose — Compose Multiplatform map (probe: verifying toolchain compatibility)
-            implementation(libs.maplibre.compose)
-
-            // Raptor-KT
-            implementation(libs.raptor.kt)
-        }
-
-        androidMain.dependencies {
-            implementation(compose.preview)
-
-            // Ktor engine for Android (uses OkHttp under the hood)
-            implementation(libs.ktor.client.okhttp)
-            implementation(libs.okhttp)
-
-            // Android-specific
-            implementation(libs.material)
-            implementation(libs.androidx.compose.foundation.layout)
-            implementation(libs.transport.runtime)
-            implementation(libs.androidx.ui.graphics)
-            implementation(libs.androidx.core.ktx)
-            implementation(libs.androidx.lifecycle.runtime.ktx)
-            implementation(libs.androidx.lifecycle.process)
-            implementation(libs.androidx.activity.compose)
-            implementation(libs.androidx.navigation.compose)
-            implementation(libs.androidx.compose.material.icons.extended)
-            implementation(libs.androidx.lifecycle.viewmodel.compose)
-            implementation(libs.androidx.compose.ui.geometry)
-            implementation(libs.androidx.work.runtime.ktx)
-            implementation(libs.google.play.services.location)
-            implementation(libs.androidx.profileinstaller)
-            implementation(libs.androidx.security.crypto)
-            implementation(libs.kotlinx.coroutines.android)
-
-            // MapLibre (Android-only)
-            implementation(libs.maplibre.android)
-        }
-
-        androidMain {
-            kotlin.exclude("eu/dotshell/pelo/generic/data/models/**")
-            kotlin.exclude("eu/dotshell/pelo/specific/data/model/**")
-        }
-
-        iosMain.dependencies {
-            // Ktor engine for iOS
-            implementation(libs.ktor.client.darwin)
-        }
-
-        androidUnitTest.dependencies {
-            implementation(libs.junit)
-        }
-    }
-}
-
-compose.resources {
-    publicResClass = true
-    packageOfResClass = "eu.dotshell.pelo.resources"
-    generateResClass = always
-}
-
-// Compose compiler stability/skippability reports — off by default (they add build overhead).
-// Enable to hunt recomposition hotspots; output lands in app/build/compose_compiler/:
-//   ./gradlew :app:assembleDebug -PcomposeCompilerReports=true
-composeCompiler {
-    if (project.findProperty("composeCompilerReports") == "true") {
-        val dir = layout.buildDirectory.dir("compose_compiler")
-        reportsDestination.set(dir)
-        metricsDestination.set(dir)
-    }
 }
 
 android {
@@ -147,15 +43,6 @@ android {
     }
     namespace = "eu.dotshell.pelo"
     compileSdk = 36
-
-    testOptions {
-        unitTests {
-            // Let android.util.Log (and other android.* stubs) return defaults instead
-            // of throwing "not mocked" in plain JVM unit tests, so common code that logs
-            // can be exercised without an instrumented device.
-            isReturnDefaultValues = true
-        }
-    }
 
     defaultConfig {
         applicationId = "eu.dotshell.pelo"
@@ -189,6 +76,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
+    buildFeatures {
+        compose = true
+    }
+
     lint {
         abortOnError = false
         warningsAsErrors = false
@@ -203,6 +94,18 @@ android {
 }
 
 dependencies {
+    implementation(project(":shared"))
+
+    // What MainActivity, PeloApplication and NavigationModeForegroundService need directly.
+    implementation(compose.runtime)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.work.runtime.ktx)
+    implementation(libs.androidx.profileinstaller)
+    implementation(libs.kotlinx.coroutines.android)
+    // NavigationModeForegroundService drives the fused location client itself.
+    implementation(libs.google.play.services.location)
+
     debugImplementation(compose.uiTooling)
     // Baseline Profile generated by the :baselineprofile module. AGP merges it into the release
     // build and ProfileInstaller (already a dependency) AOT-compiles those paths on first launch.

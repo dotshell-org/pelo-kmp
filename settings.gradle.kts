@@ -25,4 +25,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Pelo"
 include(":app")
+include(":shared")
 include(":baselineprofile")

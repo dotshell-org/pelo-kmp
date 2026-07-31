@@ -29,6 +29,7 @@ upload_certificate.pem
 
 .kotlin
 app/build
+shared/build
 baselineprofile/build
 app/release/
 
