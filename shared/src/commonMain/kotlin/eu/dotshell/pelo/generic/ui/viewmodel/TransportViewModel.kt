@@ -4,6 +4,7 @@ import eu.dotshell.pelo.platform.ioDispatcher
 
 import androidx.lifecycle.ViewModel
 import eu.dotshell.pelo.platform.Log
+import eu.dotshell.pelo.platform.AppForegroundState
 import eu.dotshell.pelo.platform.PlatformContext
 import eu.dotshell.pelo.platform.isUnmeteredNetwork
 import androidx.lifecycle.viewModelScope
@@ -100,6 +101,9 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
     }
     private var vehiclePositionsJob: Job? = null
     private var globalLiveJob: Job? = null
+
+    /** The line [startLiveTracking] was asked for, so a backgrounded stream can be put back. */
+    private var trackedLineName: String? = null
     private val favoritesRepository = FavoritesRepository(context)
     val raptorRepository = RaptorRepository.getInstance(context)
     val offlineDataManager = OfflineDataManager(transportApi, context)
@@ -226,6 +230,7 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         // Load favorites first (synchronous SharedPrefs read, instant)
         loadFavorites()
         prefetchOfflineTiles()
+        observeForegroundForLiveStreams()
         // Fire all async loads in parallel — each launches its own coroutine
         loadTransportLines()
         loadStops()
@@ -1171,31 +1176,16 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
             stopGlobalLive()
         }
         vehiclePositionsJob?.cancel()
+        trackedLineName = lineName
         _isLiveTrackingEnabled.value = true
         _vehiclePositions.value = emptyList()
-
-        vehiclePositionsJob = viewModelScope.launch(ioDispatcher) {
-            // Not a per-line subscription: SIRI publishes the whole fleet on one stream and the
-            // service filters it. This second pass narrows by the app's own line-name rules,
-            // which normalise where the service compares literally.
-            vehiclePositionsRepository.streamVehiclePositionsByLine(lineName.trim()).collect { result ->
-                result.onSuccess { allPositions ->
-                    val requested = lineName.trim()
-                    val requestedNormalized = lineRules.normalizeForComparison(requested)
-
-                    _vehiclePositions.value = allPositions.filter {
-                        lineRules.normalizeForComparison(it.lineName) == requestedNormalized
-                    }
-                }.onFailure {
-                    Log.w("TransportViewModel", "Vehicle live stream error: ${it.message}")
-                }
-            }
-        }
+        vehiclePositionsJob = launchLineStream(lineName)
     }
 
     override fun stopLiveTracking() {
         vehiclePositionsJob?.cancel()
         vehiclePositionsJob = null
+        trackedLineName = null
         _isLiveTrackingEnabled.value = false
         _vehiclePositions.value = emptyList()
     }
@@ -1218,15 +1208,69 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         }
         _isGlobalLiveEnabled.value = true
         _globalVehiclePositions.value = emptyList()
+        globalLiveJob = launchGlobalStream()
+    }
 
-        globalLiveJob = viewModelScope.launch(ioDispatcher) {
-            vehiclePositionsRepository.streamAllVehiclePositions().collect { result ->
-                result.onSuccess { allPositions ->
-                    _globalVehiclePositions.value = allPositions
-                }.onFailure {
-                    Log.w("TransportViewModel", "Global live stream error: ${it.message}")
+    private fun launchLineStream(lineName: String): Job = viewModelScope.launch(ioDispatcher) {
+        // Not a per-line subscription: SIRI publishes the whole fleet on one stream and the
+        // service filters it. This second pass narrows by the app's own line-name rules,
+        // which normalise where the service compares literally.
+        val requestedNormalized = lineRules.normalizeForComparison(lineName.trim())
+        vehiclePositionsRepository.streamVehiclePositionsByLine(lineName.trim()).collect { result ->
+            result.onSuccess { allPositions ->
+                _vehiclePositions.value = allPositions.filter {
+                    lineRules.normalizeForComparison(it.lineName) == requestedNormalized
                 }
+            }.onFailure {
+                Log.w("TransportViewModel", "Vehicle live stream error: ${it.message}")
             }
+        }
+    }
+
+    private fun launchGlobalStream(): Job = viewModelScope.launch(ioDispatcher) {
+        vehiclePositionsRepository.streamAllVehiclePositions().collect { result ->
+            result.onSuccess { allPositions ->
+                _globalVehiclePositions.value = allPositions
+            }.onFailure {
+                Log.w("TransportViewModel", "Global live stream error: ${it.message}")
+            }
+        }
+    }
+
+    /**
+     * Drops the vehicle streams while the app is not in front of the user, and puts back whichever
+     * was running when it returns.
+     *
+     * The enabled flags are left alone throughout: they carry the user's choice, and the map must
+     * still read as "live" when they come back. Only the subscriptions go. The last positions are
+     * kept too — they are what the map is currently drawing, and the first push after resuming
+     * replaces them.
+     *
+     * Nothing here fires on a screen change: this is app-wide foreground, so moving between the
+     * map and settings does not disturb the stream.
+     */
+    private fun observeForegroundForLiveStreams() {
+        AppForegroundState.start(context)
+        viewModelScope.launch {
+            AppForegroundState.isForeground.collect { foreground ->
+                if (foreground) resumeLiveStreams() else suspendLiveStreams()
+            }
+        }
+    }
+
+    private fun suspendLiveStreams() {
+        vehiclePositionsJob?.cancel()
+        vehiclePositionsJob = null
+        globalLiveJob?.cancel()
+        globalLiveJob = null
+    }
+
+    private fun resumeLiveStreams() {
+        if (_isLiveTrackingEnabled.value && vehiclePositionsJob == null) {
+            trackedLineName?.let { vehiclePositionsJob = launchLineStream(it) }
+        }
+        if (_isGlobalLiveEnabled.value && globalLiveJob == null) {
+            globalLiveJob = launchGlobalStream()
         }
     }
 
