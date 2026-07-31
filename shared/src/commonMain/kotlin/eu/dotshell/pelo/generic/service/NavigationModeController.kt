@@ -189,7 +189,7 @@ class NavigationModeController(
         if (TelemetryEmitter.optInManager()?.isOptedIn != true) return
 
         tripDetectorInitJob = scope.launch {
-            val stops = runCatching { TransportCacheImpl(context).getStops() }.getOrNull().orEmpty()
+            val stops = runCatching { TransportCacheImpl.getInstance(context).getStops() }.getOrNull().orEmpty()
             if (stops.isEmpty()) return@launch
 
             val telemetryConfig = runCatching { AppConfigLoader.getConfig().telemetry }.getOrNull()

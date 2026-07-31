@@ -22,6 +22,9 @@ actual fun appVersionName(context: PlatformContext): String =
 // feature is effectively off on iOS, matching its currently unverified status.
 actual fun isUnmeteredNetwork(context: PlatformContext): Boolean = false
 
+// iOS has no Activity/Application split — the context is already process-wide.
+actual fun applicationContextOf(context: PlatformContext): PlatformContext = context
+
 actual val ioDispatcher: CoroutineDispatcher = Dispatchers.Default
 
 actual fun exportFile(context: PlatformContext, filename: String, content: String) {

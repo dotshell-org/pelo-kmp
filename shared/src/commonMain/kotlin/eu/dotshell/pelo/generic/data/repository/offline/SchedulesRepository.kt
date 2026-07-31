@@ -38,9 +38,16 @@ class SchedulesRepository private constructor(context: PlatformContext) : ApiSch
 
         fun trimCaches(level: Int) {
             // 20 = TRIM_MEMORY_UI_HIDDEN, 40 = TRIM_MEMORY_BACKGROUND (android ComponentCallbacks2).
-            // Best-effort and lock-free (a memory hint); the Raptor data is the source of truth.
-            if (level >= 20) {
-                runCatching { searchCache.clear() }
+            // Best-effort (a memory hint); the Raptor data is the source of truth, so skipping
+            // this costs nothing. Called from onTrimMemory, which is not a coroutine, hence
+            // tryLock rather than withLock — but it does need the lock: clearing with none while
+            // a suspending caller is mid-insertion is a race on a LinkedHashMap.
+            if (level < 20) return
+            if (!searchCacheMutex.tryLock()) return
+            try {
+                searchCache.clear()
+            } finally {
+                searchCacheMutex.unlock()
             }
         }
 
@@ -123,12 +130,16 @@ class SchedulesRepository private constructor(context: PlatformContext) : ApiSch
         return results
     }
 
-    override fun searchLinesByName(query: String): List<LineSearchResult> {
+    override suspend fun searchLinesByName(query: String): List<LineSearchResult> {
         return raptorRepository.searchLinesByName(query)
     }
 
     override fun getAllRouteNames(): List<String> {
-        return raptorRepository.searchLinesByName("").map { it.lineName }.distinct().sorted()
+        // Same names as before, without going through searchLinesByName(""), which wrapped each
+        // one in a LineSearchResult — a line-type classification apiece — only to be unwrapped
+        // again here. Stays non-suspend: resolveScheduleRouteName calls it several times per
+        // timetable load from non-suspend code.
+        return raptorRepository.currentPeriodRouteNames()
     }
 
     fun getAllBusLikeRouteNames(): List<String> {

@@ -1,5 +1,6 @@
 package eu.dotshell.pelo.generic.ui.screens.plan
 
+import androidx.compose.runtime.Immutable
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLeg
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
 import eu.dotshell.pelo.generic.service.NavigationSession
@@ -19,6 +20,7 @@ private const val REROUTE_PROMPT_AFTER_SECONDS = 25
  * wording out of here is what lets the overlay translate it — the previous version hard-coded
  * French sentences into the state, so an English device got a half-translated screen.
  */
+@Immutable
 sealed interface NavigationInstruction {
 
     /** Walk to [stopName]; [distanceMeters] is null until a fix says how far it is. */
@@ -43,6 +45,12 @@ sealed interface NavigationInstruction {
     data object InProgress : NavigationInstruction
 }
 
+/**
+ * @Immutable so the overlay can skip. Every property is a val; the type was inferred unstable only
+ * through its four JourneyLeg fields and the instruction. Note that guidance republishes a whole
+ * new instance every second — which is exactly the contract: a new value, not a mutated one.
+ */
+@Immutable
 data class NavigationModeUiState(
     val currentLeg: JourneyLeg?,
     /** The leg whose line badge is shown — the ride in progress, or the one being walked to. */

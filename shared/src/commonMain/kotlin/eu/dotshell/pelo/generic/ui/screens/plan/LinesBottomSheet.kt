@@ -37,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -55,7 +56,13 @@ import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import eu.dotshell.pelo.platform.StringProvider
 
-/** One LazyColumn row: a category title, or a single row of chips inside a category. */
+/**
+ * One LazyColumn row: a category title, or a single row of chips inside a category.
+ *
+ * @Immutable for ChipRow's list of lines; without it the chip row could not skip while scrolling,
+ * which is the one thing this sheet is measured on.
+ */
+@Immutable
 private sealed interface LinesListItem {
     data class Header(val categoryId: String) : LinesListItem
     data class ChipRow(

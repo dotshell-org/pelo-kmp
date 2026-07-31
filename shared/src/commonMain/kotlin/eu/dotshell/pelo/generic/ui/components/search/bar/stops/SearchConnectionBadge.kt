@@ -3,6 +3,7 @@ package eu.dotshell.pelo.generic.ui.components.search.bar.stops
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import eu.dotshell.pelo.generic.utils.graphics.LineIconResolver
@@ -12,9 +13,12 @@ import eu.dotshell.pelo.platform.StringProvider
 
 @Composable
 fun SearchConnectionBadge(lineName: String, sizeDp: Int = 30) {
-    val drawableName = LineIconResolver.getDrawableNameForLineName(lineName)
-    val drawableProvider = DrawableProvider(LocalPlatformContext.current)
-    val stringProvider = StringProvider(LocalPlatformContext.current)
+    // One of these per connection per search result, so allocating the providers and re-resolving
+    // the icon name on every recomposition happened across the whole visible list at once.
+    val context = LocalPlatformContext.current
+    val drawableProvider = remember(context) { DrawableProvider(context) }
+    val stringProvider = remember(context) { StringProvider(context) }
+    val drawableName = remember(lineName) { LineIconResolver.getDrawableNameForLineName(lineName) }
 
     if (drawableName.isNotBlank() && drawableProvider.hasDrawable(drawableName)) {
         Image(

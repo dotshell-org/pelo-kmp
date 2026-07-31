@@ -5,7 +5,7 @@ import eu.dotshell.pelo.generic.data.models.search.LineSearchResult
 
 interface SchedulesRepository {
     suspend fun searchStopsByName(query: String): List<StationSearchResult>
-    fun searchLinesByName(query: String): List<LineSearchResult>
+    suspend fun searchLinesByName(query: String): List<LineSearchResult>
     fun getAllRouteNames(): List<String>
     fun getHeadsigns(routeName: String): Map<Int, String>
     fun getDesserteForStop(stopName: String): String?

@@ -97,9 +97,10 @@ class MainActivity : ComponentActivity() {
                 // so background workers and repositories can run before the first activity starts.
 
                 // Parallel preloading - fire and forget (do NOT join)
+                // Warms the process-wide cache the view model will go on to use. It used to build
+                // a throwaway instance, so this decompression happened twice.
                 val cacheJob = launch {
-                    val cache = TransportCacheImpl(applicationContext)
-                    cache.preloadFromDisk()
+                    TransportCacheImpl.getInstance(applicationContext).preloadFromDisk()
                 }
                 
                 // Preload Raptor library in background (only needed for itinerary calculations)

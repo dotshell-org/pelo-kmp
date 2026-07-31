@@ -12,6 +12,7 @@ import eu.dotshell.pelo.platform.FileSystem
 import eu.dotshell.pelo.platform.Log
 import eu.dotshell.pelo.platform.PlatformContext
 import eu.dotshell.pelo.platform.Settings
+import eu.dotshell.pelo.platform.applicationContextOf
 import kotlin.concurrent.Volatile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -30,7 +31,7 @@ import kotlinx.serialization.json.Json
  * Cross-platform: gzip + file IO via okio ([GzipFileStore]) under the app cache
  * dir, timestamps via the [Settings] abstraction.
  */
-class TransportCacheImpl(context: PlatformContext) : TransportCache {
+class TransportCacheImpl private constructor(context: PlatformContext) : TransportCache {
 
     private class LineCacheSlot(
         val fileName: String,
@@ -73,6 +74,27 @@ class TransportCacheImpl(context: PlatformContext) : TransportCache {
 
     companion object {
         private const val TAG = "TransportCache"
+
+        @Volatile
+        private var INSTANCE: TransportCacheImpl? = null
+
+        /**
+         * The one cache for the process.
+         *
+         * Everything held in memory here — [stopsCache], [LineCacheSlot.memory] — is an instance
+         * field, so two instances share nothing. Four call sites used to build four of them, and
+         * the most expensive consequence was silent: MainActivity called preloadFromDisk() on a
+         * cache that was unreachable by the time the view model built its own, which then re-read
+         * and re-gunzipped stops, metro and tram lines from disk all over again.
+         *
+         * Constructing it is not free either (it reads config.json, opens Settings and creates the
+         * cache directory), which is a second reason not to do it four times.
+         *
+         * No `synchronized` in commonMain — a @Volatile double-check, as in SchedulesRepository
+         * and RaptorRepository. Built on the application context so no Activity is pinned.
+         */
+        fun getInstance(context: PlatformContext): TransportCacheImpl =
+            INSTANCE ?: TransportCacheImpl(applicationContextOf(context)).also { INSTANCE = it }
 
         private const val KEY_METRO_LINES_TIMESTAMP = "metro_lines_timestamp"
         private const val KEY_TRAM_LINES_TIMESTAMP = "tram_lines_timestamp"
@@ -168,14 +190,23 @@ class TransportCacheImpl(context: PlatformContext) : TransportCache {
     }
 
     private suspend fun loadLineCache(slot: LineCacheSlot): List<Feature>? {
-        if (slot.memory != null && isTimestampValid(slot.timestamp)) {
-            if (isInvalidLineCache(slot.memory.orEmpty())) {
-                slot.memory = null
-                slot.timestamp = 0L
-                invalidateLineCache(slot.fileName, slot.timestampKey)
-                return null
+        val memory = slot.memory
+        if (memory != null) {
+            if (isTimestampValid(slot.timestamp)) {
+                if (isInvalidLineCache(memory)) {
+                    slot.memory = null
+                    slot.timestamp = 0L
+                    invalidateLineCache(slot.fileName, slot.timestampKey)
+                    return null
+                }
+                return memory
             }
-            return slot.memory
+            // Expired. The disk copy was written by the same call that filled this field, with
+            // this timestamp, so it cannot be fresher — reading it would gunzip and parse a file
+            // already known to be stale, only to reject it. Drop the memory and refetch.
+            slot.memory = null
+            slot.timestamp = 0L
+            return null
         }
 
         val timestamp = settings.getLong(slot.timestampKey, 0)
@@ -232,8 +263,15 @@ class TransportCacheImpl(context: PlatformContext) : TransportCache {
     }
 
     override suspend fun getStops(): List<StopFeature>? = stopsMutex.withLock {
-        if (stopsCache != null && isTimestampValid(stopsTimestamp)) {
-            return@withLock stopsCache
+        if (stopsCache != null) {
+            if (isTimestampValid(stopsTimestamp)) {
+                return@withLock stopsCache
+            }
+            // Same reasoning as loadLineCache: the disk copy shares this timestamp, so it is
+            // stale too and re-reading it is wasted work.
+            stopsCache = null
+            stopsTimestamp = 0L
+            return@withLock null
         }
 
         val timestamp = settings.getLong(KEY_STOPS_TIMESTAMP, 0)

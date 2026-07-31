@@ -19,6 +19,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,7 +39,8 @@ fun StopSearchResultItem(
     onClick: () -> Unit,
     onOptionsClick: () -> Unit
 ) {
-    val strings = StringProvider(LocalPlatformContext.current)
+    val context = LocalPlatformContext.current
+    val strings = remember(context) { StringProvider(context) }
     ListItem(
         headlineContent = {
             Column(modifier = Modifier.padding(horizontal = 24.dp)) {
@@ -53,7 +55,11 @@ fun StopSearchResultItem(
                 val lineRules = provideTransportLineRules()
                 if (result.lines.isNotEmpty()) {
                     Spacer(modifier = Modifier.size(4.dp))
-                    val (strongLines, weakLines) = result.lines.partition { lineRules.isStrongLine(it) }
+                    // Runs once per result row, not once per recomposition of it: isStrongLine
+                    // normalises each name, and this is on the scroll path of the results list.
+                    val (strongLines, weakLines) = remember(result.lines, lineRules) {
+                        result.lines.partition { lineRules.isStrongLine(it) }
+                    }
                     if (strongLines.isNotEmpty()) {
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(4.dp),

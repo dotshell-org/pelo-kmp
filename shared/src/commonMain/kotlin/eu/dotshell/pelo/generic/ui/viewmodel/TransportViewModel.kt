@@ -4,7 +4,9 @@ import eu.dotshell.pelo.platform.ioDispatcher
 
 import androidx.lifecycle.ViewModel
 import eu.dotshell.pelo.platform.Log
+import eu.dotshell.pelo.platform.AppForegroundState
 import eu.dotshell.pelo.platform.PlatformContext
+import eu.dotshell.pelo.platform.isUnmeteredNetwork
 import androidx.lifecycle.viewModelScope
 import eu.dotshell.pelo.generic.data.models.stops.Favorite
 import eu.dotshell.pelo.generic.data.models.realtime.vehiclepositions.SimpleVehiclePosition
@@ -43,13 +45,18 @@ import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.plus
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -63,6 +70,12 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         private const val TAG = "TransportViewModel"
         // Set to false for production builds to skip string formatting overhead in hot paths
         private const val DEBUG_LOGGING = false
+
+        /**
+         * How long the offline tile prefetch waits before starting, so it competes with neither
+         * the first frame nor the initial line/stop/alert loads.
+         */
+        private const val OFFLINE_PREFETCH_DELAY_MS = 30_000L
     }
 
     private val transportApi: TransportApi = TransportServiceProvider.getTransportApi()
@@ -88,10 +101,13 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
     }
     private var vehiclePositionsJob: Job? = null
     private var globalLiveJob: Job? = null
+
+    /** The line [startLiveTracking] was asked for, so a backgrounded stream can be put back. */
+    private var trackedLineName: String? = null
     private val favoritesRepository = FavoritesRepository(context)
     val raptorRepository = RaptorRepository.getInstance(context)
     val offlineDataManager = OfflineDataManager(transportApi, context)
-    private val transportCache by lazy { eu.dotshell.pelo.generic.data.cache.TransportCacheImpl(context) }
+    private val transportCache by lazy { eu.dotshell.pelo.generic.data.cache.TransportCacheImpl.getInstance(context) }
     private val offlineRepository by lazy { eu.dotshell.pelo.generic.data.offline.OfflineRepository(context) }
     private val _linesState = MutableStateFlow<TransportLinesState>(TransportLinesState.Loading)
 
@@ -125,6 +141,29 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
 
     private val _isGlobalLiveEnabled = MutableStateFlow(false)
     override val isGlobalLiveEnabled: StateFlow<Boolean> = _isGlobalLiveEnabled.asStateFlow()
+
+    /**
+     * Whether the live layer currently has anything to show.
+     *
+     * PlanContent subscribed to both position lists purely to reach this one boolean, so every SSE
+     * push recomposed that whole subtree with the entire fleet in hand. Derived here instead, the
+     * lists stay subscribed only where they are actually drawn.
+     *
+     * Declared after the four flows it combines: these are property initialisers, so referring to
+     * one before its declaration leaves it null at construction time.
+     */
+    override val hasActiveVehicles: StateFlow<Boolean> = combine(
+        _isLiveTrackingEnabled,
+        _isGlobalLiveEnabled,
+        _vehiclePositions,
+        _globalVehiclePositions
+    ) { liveTracking, globalLive, positions, globalPositions ->
+        when {
+            liveTracking -> positions.isNotEmpty()
+            globalLive -> globalPositions.isNotEmpty()
+            else -> false
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     // Toggle to draw every line trace on the map (not only the strong ones),
     // mirroring the global-live button behaviour: on until tapped again.
@@ -190,31 +229,51 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
     init {
         // Load favorites first (synchronous SharedPrefs read, instant)
         loadFavorites()
-        viewModelScope.launch(ioDispatcher) {
-            while (true) {
-                offlineDataManager.refreshOfflineDataInfo()
-                val info = offlineDataManager.offlineDataInfo.value
-                if (!info.isAvailable) {
-                    try {
-                        offlineDataManager.downloadAllOfflineData()
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Auto-download failed: ${e.message}")
-                    }
-                }
-                
-                offlineDataManager.refreshOfflineDataInfo()
-                if (offlineDataManager.offlineDataInfo.value.isAvailable) {
-                    break // Download succeeded or was already available
-                }
-                
-                // Retry every 5 minutes if it failed
-                kotlinx.coroutines.delay(5 * 60 * 1000L)
-            }
-        }
+        prefetchOfflineTiles()
+        observeForegroundForLiveStreams()
         // Fire all async loads in parallel — each launches its own coroutine
         loadTransportLines()
         loadStops()
         loadTrafficAlerts()
+    }
+
+    /**
+     * Pulls the offline map tiles once, in the background, and only over a network that is free
+     * to use.
+     *
+     * This used to be a `while (true)` that fired the instant the view model was built and retried
+     * every five minutes. Three things were wrong with that. `OfflineDataInfo.isAvailable` is just
+     * `downloadedMapStyles.isNotEmpty()`, so it is false on every fresh install — meaning hundreds
+     * of megabytes of tiles left on whatever connection was to hand, nobody having asked. The
+     * download then competed with the first frame for the network and the disk. And a device that
+     * never reaches an unmetered network retried for as long as the app stayed open.
+     *
+     * The info refresh stays unconditional: the map style picker reads
+     * `offlineDataInfo.downloadedMapStyles` to know which styles work offline, whether or not
+     * anything is downloading today. Only the download itself is gated.
+     *
+     * On iOS this never runs: `isUnmeteredNetwork` is hardcoded to false there, because a real
+     * check needs NWPathMonitor and reports asynchronously.
+     */
+    private fun prefetchOfflineTiles() {
+        viewModelScope.launch(ioDispatcher) {
+            offlineDataManager.refreshOfflineDataInfo()
+            if (offlineDataManager.offlineDataInfo.value.isAvailable) return@launch
+            if (!isUnmeteredNetwork(context)) {
+                Log.i(TAG, "Offline tiles: skipped, network is metered or unknown")
+                return@launch
+            }
+            // Let the map, the lines and the first interactions have the device to themselves.
+            kotlinx.coroutines.delay(OFFLINE_PREFETCH_DELAY_MS)
+            try {
+                offlineDataManager.downloadAllOfflineData()
+            } catch (e: CancellationException) {
+                // Shutting down, not failing: let it propagate or the scope never finishes closing.
+                throw e
+            } catch (e: Exception) {
+                Log.w(TAG, "Offline tiles: prefetch failed: ${e.message}")
+            }
+        }
     }
 
     /**
@@ -745,7 +804,7 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
     override suspend fun searchAddresses(query: String): List<AddressSearchResult> =
         GeocodingRepository.getInstance().searchAddresses(query)
 
-    override fun searchLines(query: String): List<LineSearchResult> {
+    override suspend fun searchLines(query: String): List<LineSearchResult> {
         return schedulesRepository.searchLinesByName(query)
     }
 
@@ -1117,30 +1176,16 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
             stopGlobalLive()
         }
         vehiclePositionsJob?.cancel()
+        trackedLineName = lineName
         _isLiveTrackingEnabled.value = true
         _vehiclePositions.value = emptyList()
-
-        vehiclePositionsJob = viewModelScope.launch {
-            // Focused per-line stream (one request per poll); the filter stays
-            // as a safety net in case the backend returns more than the asked line.
-            vehiclePositionsRepository.streamVehiclePositionsByLine(lineName.trim()).collect { result ->
-                result.onSuccess { allPositions ->
-                    val requested = lineName.trim()
-                    val requestedNormalized = lineRules.normalizeForComparison(requested)
-
-                    _vehiclePositions.value = allPositions.filter {
-                        lineRules.normalizeForComparison(it.lineName) == requestedNormalized
-                    }
-                }.onFailure {
-                    Log.w("TransportViewModel", "Vehicle live stream error: ${it.message}")
-                }
-            }
-        }
+        vehiclePositionsJob = launchLineStream(lineName)
     }
 
     override fun stopLiveTracking() {
         vehiclePositionsJob?.cancel()
         vehiclePositionsJob = null
+        trackedLineName = null
         _isLiveTrackingEnabled.value = false
         _vehiclePositions.value = emptyList()
     }
@@ -1163,15 +1208,69 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         }
         _isGlobalLiveEnabled.value = true
         _globalVehiclePositions.value = emptyList()
+        globalLiveJob = launchGlobalStream()
+    }
 
-        globalLiveJob = viewModelScope.launch {
-            vehiclePositionsRepository.streamAllVehiclePositions().collect { result ->
-                result.onSuccess { allPositions ->
-                    _globalVehiclePositions.value = allPositions
-                }.onFailure {
-                    Log.w("TransportViewModel", "Global live stream error: ${it.message}")
+    private fun launchLineStream(lineName: String): Job = viewModelScope.launch(ioDispatcher) {
+        // Not a per-line subscription: SIRI publishes the whole fleet on one stream and the
+        // service filters it. This second pass narrows by the app's own line-name rules,
+        // which normalise where the service compares literally.
+        val requestedNormalized = lineRules.normalizeForComparison(lineName.trim())
+        vehiclePositionsRepository.streamVehiclePositionsByLine(lineName.trim()).collect { result ->
+            result.onSuccess { allPositions ->
+                _vehiclePositions.value = allPositions.filter {
+                    lineRules.normalizeForComparison(it.lineName) == requestedNormalized
                 }
+            }.onFailure {
+                Log.w("TransportViewModel", "Vehicle live stream error: ${it.message}")
             }
+        }
+    }
+
+    private fun launchGlobalStream(): Job = viewModelScope.launch(ioDispatcher) {
+        vehiclePositionsRepository.streamAllVehiclePositions().collect { result ->
+            result.onSuccess { allPositions ->
+                _globalVehiclePositions.value = allPositions
+            }.onFailure {
+                Log.w("TransportViewModel", "Global live stream error: ${it.message}")
+            }
+        }
+    }
+
+    /**
+     * Drops the vehicle streams while the app is not in front of the user, and puts back whichever
+     * was running when it returns.
+     *
+     * The enabled flags are left alone throughout: they carry the user's choice, and the map must
+     * still read as "live" when they come back. Only the subscriptions go. The last positions are
+     * kept too — they are what the map is currently drawing, and the first push after resuming
+     * replaces them.
+     *
+     * Nothing here fires on a screen change: this is app-wide foreground, so moving between the
+     * map and settings does not disturb the stream.
+     */
+    private fun observeForegroundForLiveStreams() {
+        AppForegroundState.start(context)
+        viewModelScope.launch {
+            AppForegroundState.isForeground.collect { foreground ->
+                if (foreground) resumeLiveStreams() else suspendLiveStreams()
+            }
+        }
+    }
+
+    private fun suspendLiveStreams() {
+        vehiclePositionsJob?.cancel()
+        vehiclePositionsJob = null
+        globalLiveJob?.cancel()
+        globalLiveJob = null
+    }
+
+    private fun resumeLiveStreams() {
+        if (_isLiveTrackingEnabled.value && vehiclePositionsJob == null) {
+            trackedLineName?.let { vehiclePositionsJob = launchLineStream(it) }
+        }
+        if (_isGlobalLiveEnabled.value && globalLiveJob == null) {
+            globalLiveJob = launchGlobalStream()
         }
     }
 
@@ -1290,9 +1389,25 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         return eu.dotshell.pelo.generic.ui.viewmodel.normalizeStopName(stopName)
     }
 
-    override fun onCleared() {
+    /**
+     * Releases everything this view model started.
+     *
+     * Exists because the teardown path was otherwise unreachable: [onCleared] is `protected` and
+     * `ViewModel.clear()` is `internal`, so application code cannot call either, and nothing owns
+     * this view model through a ViewModelStoreOwner. `TransportViewModelHolder` keeps it for the
+     * life of the process, so in normal operation this runs only from tests — but a leak that
+     * cannot even be closed by hand is worse than one that can.
+     *
+     * Safe to call more than once: cancelling an already-cancelled job or scope is a no-op.
+     */
+    fun dispose() {
         vehiclePositionsJob?.cancel()
         globalLiveJob?.cancel()
+        viewModelScope.cancel()
+    }
+
+    override fun onCleared() {
+        dispose()
         super.onCleared()
     }
 

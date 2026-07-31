@@ -1,5 +1,6 @@
 package eu.dotshell.pelo.generic.data.repository.itinerary.itinerary
 
+import androidx.compose.runtime.Immutable
 import kotlinx.serialization.Serializable
 
 /**
@@ -19,7 +20,12 @@ enum class JourneyLegKind {
  * Data class representing a leg of a journey.
  * A coordinate endpoint (walk leg from/to an address or GPS point) uses stopId "-1";
  * its lat/lon then come from the query point rather than a network stop.
+ *
+ * @Immutable for `intermediateStops`, the one property the compiler cannot infer as stable.
+ * Instability here propagated into both JourneyResult and NavigationModeUiState. The promise
+ * holds: all vals, IntermediateStop is primitives only, and the derived members read no clock.
  */
+@Immutable
 data class JourneyLeg(
     val fromStopId: String,
     val fromStopName: String,

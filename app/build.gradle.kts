@@ -35,7 +35,8 @@ if (localPropertiesFile.exists()) {
 android {
     signingConfigs {
         create("release") {
-            storeFile = file("/home/tristan/Pelo.jks")
+            storeFile = localProperties.getProperty("RELEASE_STORE_FILE")?.let { rootProject.file(it) }
+                ?: rootProject.file("Pelo.jks")
             storePassword = localProperties.getProperty("RELEASE_STORE_PASSWORD") ?: ""
             keyAlias = localProperties.getProperty("RELEASE_KEY_ALIAS") ?: "pelo-kmp"
             keyPassword = localProperties.getProperty("RELEASE_KEY_PASSWORD") ?: ""

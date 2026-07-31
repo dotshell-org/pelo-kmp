@@ -27,6 +27,13 @@ interface TransportViewModelInterface {
     val isOffline: StateFlow<Boolean>
     val isGlobalLiveEnabled: StateFlow<Boolean>
     val globalVehiclePositions: StateFlow<List<SimpleVehiclePosition>>
+
+    /**
+     * Whether the live layer has anything to show, for callers that need the fact but not the
+     * fleet — subscribing to the position lists just to test isNotEmpty() means recomposing on
+     * every SSE push.
+     */
+    val hasActiveVehicles: StateFlow<Boolean>
     val headsigns: StateFlow<Map<Int, String>>
     val availableDirections: StateFlow<List<Int>>
     val allSchedules: StateFlow<List<String>>
@@ -40,7 +47,7 @@ interface TransportViewModelInterface {
 
     suspend fun searchStops(query: String): List<StationSearchResult>
     suspend fun searchAddresses(query: String): List<AddressSearchResult>
-    fun searchLines(query: String): List<LineSearchResult>
+    suspend fun searchLines(query: String): List<LineSearchResult>
 
     fun loadAllLines()
     fun preloadStops()

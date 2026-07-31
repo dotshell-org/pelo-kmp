@@ -67,6 +67,9 @@ class JourneyCache private constructor(context: PlatformContext) {
         private const val MAX_DISK_CACHE_SIZE_BYTES = 5 * 1024 * 1024L
         private const val MAX_DISK_ENTRIES = 200
 
+        /** Writes between two disk-size sweeps. See [enforceDiskSizeLimitIfDue]. */
+        private const val DISK_SWEEP_EVERY = 20
+
         @Volatile
         private var INSTANCE: JourneyCache? = null
 
@@ -180,11 +183,31 @@ class JourneyCache private constructor(context: PlatformContext) {
         diskMutex.withLock {
             try {
                 GzipFileStore.writeGzip(getCacheFilePath(cacheKey), json.encodeToString(journeys))
-                enforceDiskSizeLimit()
+                enforceDiskSizeLimitIfDue()
             } catch (e: Exception) {
                 Log.w(TAG, "Failed to write cache to disk: ${e.message}")
             }
         }
+    }
+
+    /**
+     * The sweep lists the whole cache directory and asks the filesystem for two pieces of metadata
+     * per file, across up to [MAX_DISK_ENTRIES] of them. Running that after every single write was
+     * far more expensive than the write itself, and pointless: the limits cannot be exceeded by
+     * more than [DISK_SWEEP_EVERY] entries in between.
+     *
+     * Counter guarded by the caller's diskMutex. It starts due, so the first write of a session
+     * still trims a cache left oversized by the previous one.
+     */
+    private var writesSinceSweep: Int = DISK_SWEEP_EVERY
+
+    private fun enforceDiskSizeLimitIfDue() {
+        if (writesSinceSweep < DISK_SWEEP_EVERY) {
+            writesSinceSweep++
+            return
+        }
+        writesSinceSweep = 0
+        enforceDiskSizeLimit()
     }
 
     private fun readFromDiskPath(path: String): List<JourneyResult>? {
@@ -204,15 +227,20 @@ class JourneyCache private constructor(context: PlatformContext) {
             val files = GzipFileStore.list(cacheDir)
             if (files.isEmpty()) return
 
-            val sortedFiles = files.sortedBy { GzipFileStore.lastModified(it.toString()) }
-            var fileCount = sortedFiles.size
-            var totalSize = sortedFiles.sumOf { GzipFileStore.size(it.toString()) }
+            // Size read once per file and carried along: it used to be asked for a second time
+            // inside the eviction loop, so every sweep cost two metadata calls per entry.
+            val oldestFirst = files
+                .map { it.toString() }
+                .sortedBy { GzipFileStore.lastModified(it) }
+                .map { it to GzipFileStore.size(it) }
+            var fileCount = oldestFirst.size
+            var totalSize = oldestFirst.sumOf { (_, size) -> size }
 
-            for (path in sortedFiles) {
+            for ((path, size) in oldestFirst) {
                 if (fileCount <= MAX_DISK_ENTRIES && totalSize <= MAX_DISK_CACHE_SIZE_BYTES) break
-                totalSize -= GzipFileStore.size(path.toString())
+                totalSize -= size
                 fileCount--
-                GzipFileStore.delete(path.toString())
+                GzipFileStore.delete(path)
             }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to enforce disk size limit: ${e.message}")
@@ -221,12 +249,21 @@ class JourneyCache private constructor(context: PlatformContext) {
 
     /**
      * Trim memory under pressure. [level] is the Android `ComponentCallbacks2` trim level
-     * (20 = UI_HIDDEN, 40 = BACKGROUND). Best-effort and lock-free (a memory hint), so the
-     * disk cache always remains as the source of truth.
+     * (20 = UI_HIDDEN, 40 = BACKGROUND). The disk cache always remains as the source of truth,
+     * so skipping a trim costs nothing.
+     *
+     * Called from onTrimMemory, which is not a coroutine, so the mutex is taken with tryLock
+     * rather than withLock. It used to clear the map with no lock at all, while suspending
+     * callers were free to be halfway through an insertion or an eviction on the same
+     * LinkedHashMap — a data race on a structure that is not thread-safe.
      */
     fun trimMemory(level: Int) {
-        if (level >= 20) {
-            runCatching { memoryCache.clear() }
+        if (level < 20) return
+        if (!memoryMutex.tryLock()) return  // busy: this is a hint, not an obligation
+        try {
+            memoryCache.clear()
+        } finally {
+            memoryMutex.unlock()
         }
     }
 

@@ -33,8 +33,9 @@ fun DepartureListItem(
     departureTime: String,
     onClick: () -> Unit
 ) {
-    val drawableProvider = DrawableProvider(LocalPlatformContext.current)
-    val strings = StringProvider(LocalPlatformContext.current)
+    val context = LocalPlatformContext.current
+    val drawableProvider = remember(context) { DrawableProvider(context) }
+    val strings = remember(context) { StringProvider(context) }
     val drawableName = remember(lineName) {
         LineIconResolver.getDrawableNameForLineName(lineName)
     }
@@ -76,17 +77,20 @@ fun DepartureListItem(
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1
                 )
+                // Resolved once: getDepartureColor converts an Instant to local time on each call,
+                // and this ran twice per row.
+                val departureColor = DepartureManager.getDepartureColor(departureTime)
                 Text(
                     text = DepartureManager.formatDisplayTime(departureTime),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
-                    color = DepartureManager.getDepartureColor(departureTime)
+                    color = departureColor
                 )
                 DepartureManager.formatRelativeDeparture(departureTime, strings)?.let { relativeText ->
                     Text(
                         text = relativeText,
                         style = MaterialTheme.typography.bodySmall,
-                        color = DepartureManager.getDepartureColor(departureTime)
+                        color = departureColor
                     )
                 }
             }

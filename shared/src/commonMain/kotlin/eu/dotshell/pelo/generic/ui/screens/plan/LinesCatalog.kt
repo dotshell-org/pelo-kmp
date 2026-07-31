@@ -14,6 +14,7 @@ import eu.dotshell.pelo.platform.DrawableProvider
 import eu.dotshell.pelo.platform.LocalPlatformContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.runtime.Immutable
 import org.jetbrains.compose.resources.DrawableResource
 
 /**
@@ -21,6 +22,7 @@ import org.jetbrains.compose.resources.DrawableResource
  * lookup work. [icon] is null when the line has no dedicated drawable (coloured fallback badge),
  * and [alertKey] is the pre-uppercased key used against the traffic-alert map.
  */
+@Immutable
 data class LineEntry(
     val name: String,
     val icon: DrawableResource?,
