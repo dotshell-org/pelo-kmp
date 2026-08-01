@@ -25,16 +25,21 @@ object NavigationLocationBus {
 }
 
 /**
- * The instruction currently on screen, so the platform's ongoing notification can show it.
- * Activity and service share a process, so a plain flow is enough; the UI owns the wording
- * (it is the side that can resolve string resources for the active locale).
+ * The session as a glanceable surface shows it, for the platform code that renders it outside the
+ * app — on Android, the navigation foreground service's ongoing notification.
+ *
+ * Published by [NavigationModeController] from its own scope, not from the composition. That is
+ * the whole point: an Activity that is not on screen stops recomposing, and this is precisely the
+ * state that has to keep moving once the traveller has put their phone away.
+ *
+ * Activity and service share a process, so a plain flow is enough. Null means no session.
  */
-object NavigationNotificationBridge {
+object NavigationGlanceBridge {
 
-    private val _instruction = MutableStateFlow<String?>(null)
-    val instruction: StateFlow<String?> = _instruction
+    private val _state = MutableStateFlow<NavigationLiveActivityState?>(null)
+    val state: StateFlow<NavigationLiveActivityState?> = _state
 
-    fun setInstruction(text: String?) {
-        _instruction.value = text
+    fun publish(state: NavigationLiveActivityState?) {
+        _state.value = state
     }
 }

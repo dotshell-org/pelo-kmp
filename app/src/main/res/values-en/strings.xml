@@ -5,4 +5,7 @@
     <string name="navigation_mode_notification_title">Navigation under way</string>
     <string name="navigation_mode_notification_text">Pelo stays visible on the lock screen and keeps your position up to date.</string>
     <string name="navigation_mode_notification_stop">Stop</string>
+    <string name="navigation_mode_notification_destination">%1$s · arriving %2$s</string>
+    <string name="navigation_mode_chip_minutes">%1$d min</string>
+    <string name="navigation_mode_chip_arrived">Arrived</string>
 </resources>

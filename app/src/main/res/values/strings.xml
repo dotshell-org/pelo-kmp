@@ -29,5 +29,10 @@
     <string name="navigation_mode_notification_title">Navigation en cours</string>
     <string name="navigation_mode_notification_text">Pelo reste visible sur l\'écran verrouillé et met à jour votre position.</string>
     <string name="navigation_mode_notification_stop">Arrêter</string>
+    <!-- Second line of the navigation notification: destination, then arrival time. -->
+    <string name="navigation_mode_notification_destination">%1$s · arrivée %2$s</string>
+    <!-- Status bar chip. A few characters wide, so no unit beyond the abbreviation. -->
+    <string name="navigation_mode_chip_minutes">%1$d min</string>
+    <string name="navigation_mode_chip_arrived">Arrivé</string>
     <string name="zone_label">Zone %s</string>
 </resources>

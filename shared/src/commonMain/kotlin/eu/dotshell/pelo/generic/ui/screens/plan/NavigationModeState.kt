@@ -3,7 +3,11 @@ package eu.dotshell.pelo.generic.ui.screens.plan
 import androidx.compose.runtime.Immutable
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLeg
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
+import eu.dotshell.pelo.generic.service.NavigationLiveActivityState
+import eu.dotshell.pelo.generic.service.NavigationRouteSegment
+import eu.dotshell.pelo.generic.service.NavigationSegmentKind
 import eu.dotshell.pelo.generic.service.NavigationSession
+import eu.dotshell.pelo.generic.utils.LineColorHelper
 
 private const val DAY_SECONDS = 24 * 3600
 
@@ -168,6 +172,119 @@ fun buildNavigationModeUiState(session: NavigationSession): NavigationModeUiStat
         isDeadReckoning = progress.isDeadReckoning,
     )
 }
+
+/**
+ * The same session reduced to what a glanceable surface shows: the journey drawn as consecutive
+ * segments, how far along them the traveller is, and the sentence to read.
+ *
+ * Pure, like [buildNavigationModeUiState], and for the same reason — it runs in a foreground
+ * service and in a Live Activity push, neither of which can reach a composition. That is why
+ * [instructionText] arrives already resolved and [lineColor] is injected: the default reaches into
+ * the loaded app config, which a unit test has no business needing.
+ */
+fun buildNavigationLiveActivityState(
+    ui: NavigationModeUiState,
+    journey: JourneyResult,
+    instructionText: String,
+    lineColor: (String) -> Int? = { LineColorHelper.getColorForLineString(it) },
+): NavigationLiveActivityState {
+    val reference = journey.departureTime
+    val segments = mutableListOf<NavigationRouteSegment>()
+    val transferOffsets = mutableListOf<Int>()
+
+    // The last ride, so a change can be told apart from simply getting off at the end.
+    val lastRideIndex = journey.legs.indexOfLast { !it.isWalking }
+
+    var cursor = reference
+    var offset = 0
+
+    journey.legs.forEachIndexed { index, leg ->
+        val departure = normalizeTimeAroundReference(leg.departureTime, reference)
+        val arrival = normalizeTimeAroundReference(leg.arrivalTime, reference)
+
+        // Standing at a stop waiting for a departure is time spent on this journey. Leaving it out
+        // would make the segments sum to less than the trip, and every renderer would then place
+        // the tracker ahead of where the traveller actually is.
+        val wait = (departure - cursor).coerceAtLeast(0)
+        if (wait > 0) {
+            segments += NavigationRouteSegment(wait, NavigationSegmentKind.WAIT, null)
+            offset += wait
+        }
+
+        val duration = (arrival - departure).coerceAtLeast(0)
+        segments += NavigationRouteSegment(
+            seconds = duration,
+            kind = if (leg.isWalking) NavigationSegmentKind.WALK else NavigationSegmentKind.RIDE,
+            colorArgb = if (leg.isWalking) null else leg.routeName?.let(lineColor),
+        )
+        offset += duration
+        cursor = departure + duration
+
+        // Marked where the traveller gets off, not where they board again: alighting is the
+        // moment that needs acting on, and the two are a walk and a wait apart.
+        if (!leg.isWalking && index < lastRideIndex) transferOffsets += offset
+    }
+
+    // Only reachable on inconsistent data, where the journey outlasts its own last leg. Kept so
+    // the segments still sum to the trip, which is what makes the progress below exact.
+    val tail = (normalizeTimeAroundReference(journey.arrivalTime, reference) - cursor)
+        .coerceAtLeast(0)
+    if (tail > 0) {
+        segments += NavigationRouteSegment(tail, NavigationSegmentKind.WAIT, null)
+        offset += tail
+    }
+
+    return NavigationLiveActivityState(
+        instruction = instructionText,
+        lineName = ui.displayedLeg?.routeName,
+        remainingMinutes = (ui.remainingSeconds + 59) / 60,
+        arrivalTimeText = ui.arrivalTimeText,
+        isArrived = ui.isArrived,
+        destination = journey.legs.lastOrNull()?.toStopName.orEmpty(),
+        segments = segments,
+        transferOffsetsSeconds = transferOffsets,
+        // Derived from the remaining time rather than the clock, so this stays free of one: a
+        // journey started before its departure clamps to zero, an arrival clamps to the end.
+        progressSeconds = (offset - ui.remainingSeconds).coerceIn(0, offset),
+        totalSeconds = offset,
+    )
+}
+
+/**
+ * Everything a glanceable surface would actually notice changing, and nothing else.
+ *
+ * The session republishes once a second so its countdown counts down. Reposting a notification or
+ * pushing a Live Activity at that rate would be waste the platform eventually starts throttling —
+ * and none of it would be visible: the minute is the finest thing on show, apart from the bar,
+ * which is quantised here to a percent of the journey.
+ */
+data class NavigationGlanceKey(
+    val instruction: NavigationInstruction,
+    val lineName: String?,
+    val remainingMinutes: Int,
+    val isArrived: Boolean,
+    val progressPercent: Int,
+)
+
+fun navigationGlanceKey(ui: NavigationModeUiState, journey: JourneyResult): NavigationGlanceKey {
+    val total = journeyDurationSeconds(journey)
+    return NavigationGlanceKey(
+        instruction = ui.instruction,
+        lineName = ui.displayedLeg?.routeName,
+        remainingMinutes = (ui.remainingSeconds + 59) / 60,
+        isArrived = ui.isArrived,
+        progressPercent = if (total <= 0) {
+            0
+        } else {
+            (total - ui.remainingSeconds).coerceIn(0, total) * 100 / total
+        },
+    )
+}
+
+/** The journey's own length in seconds, wrap-safe across midnight. Never negative. */
+fun journeyDurationSeconds(journey: JourneyResult): Int =
+    (normalizeTimeAroundReference(journey.arrivalTime, journey.departureTime) - journey.departureTime)
+        .coerceAtLeast(0)
 
 /**
  * Index-based rather than value-based lookup: a journey can hold two structurally equal legs
