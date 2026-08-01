@@ -22,7 +22,31 @@ final class NavigationLiveActivityController: NavigationLiveActivityHandler {
     private var activity: Any?
 
     func start(state: NavigationLiveActivityState) {
-        guard #available(iOS 16.1, *) else { return }
+        onMain {
+            guard #available(iOS 16.1, *) else { return }
+            self.requestActivity(state: state)
+        }
+    }
+
+    func update(state: NavigationLiveActivityState) {
+        onMain {
+            guard #available(iOS 16.1, *) else { return }
+            guard let running = self.currentActivity else { return }
+            Task { await running.update(using: state.asContentState) }
+        }
+    }
+
+    func end() {
+        onMain {
+            guard #available(iOS 16.1, *) else { return }
+            guard let running = self.currentActivity else { return }
+            self.activity = nil
+            Task { await running.end(dismissalPolicy: .immediate) }
+        }
+    }
+
+    @available(iOS 16.1, *)
+    private func requestActivity(state: NavigationLiveActivityState) {
         // Already running: treat a second start as an update, so a reroute — which restarts the
         // session — carries on in the same activity instead of stacking a new one.
         guard currentActivity == nil else {
@@ -31,7 +55,7 @@ final class NavigationLiveActivityController: NavigationLiveActivityHandler {
         }
         guard ActivityAuthorizationInfo().areActivitiesEnabled else { return }
 
-        let attributes = PeloNavigationAttributes(destination: state.arrivalTimeText)
+        let attributes = PeloNavigationAttributes(destination: state.destination)
         do {
             activity = try Activity.request(
                 attributes: attributes,
@@ -44,15 +68,16 @@ final class NavigationLiveActivityController: NavigationLiveActivityHandler {
         }
     }
 
-    func update(state: NavigationLiveActivityState) {
-        guard #available(iOS 16.1, *), let running = currentActivity else { return }
-        Task { await running.update(using: state.asContentState) }
-    }
-
-    func end() {
-        guard #available(iOS 16.1, *), let running = currentActivity else { return }
-        activity = nil
-        Task { await running.end(dismissalPolicy: .immediate) }
+    /// The shared controller drives this from its own coroutine scope — a background dispatcher —
+    /// where it used to be a Compose effect on the main thread. Requesting and mutating an
+    /// activity is a UI operation; getting back on the main thread costs nothing and removes the
+    /// question.
+    private func onMain(_ block: @escaping () -> Void) {
+        if Thread.isMainThread {
+            block()
+        } else {
+            DispatchQueue.main.async(execute: block)
+        }
     }
 
     @available(iOS 16.1, *)
@@ -69,7 +94,36 @@ private extension NavigationLiveActivityState {
             lineName: lineName,
             remainingMinutes: Int(remainingMinutes),
             arrivalTime: arrivalTimeText,
-            isArrived: isArrived
+            isArrived: isArrived,
+            segments: segments.map { PeloNavigationAttributes.Segment(from: $0) },
+            transferOffsetsSeconds: transferOffsetsSeconds.map { Int(truncating: $0) },
+            progressSeconds: Int(progressSeconds),
+            totalSeconds: Int(totalSeconds)
         )
+    }
+}
+
+@available(iOS 16.1, *)
+private extension PeloNavigationAttributes.Segment {
+    init(from segment: NavigationRouteSegment) {
+        self.init(
+            seconds: Int(segment.seconds),
+            kind: Kind(kotlinName: segment.kind.name),
+            colorArgb: segment.colorArgb.map { Int(truncating: $0) }
+        )
+    }
+}
+
+@available(iOS 16.1, *)
+private extension PeloNavigationAttributes.Segment.Kind {
+    /// Matched on the Kotlin enum's own `name` rather than on a bridged case. How Kotlin/Native
+    /// spells an exported enum entry in Swift is the compiler's business and can change; the name
+    /// written in the Kotlin source is part of the contract.
+    init(kotlinName: String) {
+        switch kotlinName {
+        case "WALK": self = .walk
+        case "WAIT": self = .wait
+        default: self = .ride
+        }
     }
 }
