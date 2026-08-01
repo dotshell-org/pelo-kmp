@@ -171,7 +171,6 @@ import eu.dotshell.pelo.generic.utils.location.LocationPermissionSignal
 import eu.dotshell.pelo.generic.utils.location.LocationProvider
 import eu.dotshell.pelo.generic.utils.location.HeadingProvider
 import eu.dotshell.pelo.generic.service.NavigationLiveActivity
-import eu.dotshell.pelo.generic.service.NavigationLiveActivityState
 import eu.dotshell.pelo.generic.service.NavigationLocationBus
 import eu.dotshell.pelo.generic.service.NavigationModeController
 import eu.dotshell.pelo.generic.service.NavigationModePlatform
@@ -183,6 +182,7 @@ import eu.dotshell.pelo.generic.ui.screens.plan.NavigationSheetContent
 import eu.dotshell.pelo.generic.ui.screens.plan.NavigationVoiceGuidance
 import eu.dotshell.pelo.generic.ui.screens.plan.NavigationSheetPeekContentHeight
 import eu.dotshell.pelo.generic.ui.screens.plan.SheetDragHandleHeight
+import eu.dotshell.pelo.generic.ui.screens.plan.buildNavigationLiveActivityState
 import eu.dotshell.pelo.generic.ui.screens.plan.buildNavigationModeUiState
 import eu.dotshell.pelo.generic.ui.screens.plan.displayText
 import eu.dotshell.pelo.generic.utils.geo.GeometryUtils
@@ -1432,19 +1432,18 @@ private fun RootScaffold(
                 // it is pushed when something a viewer would notice changes — roughly the minute
                 // ticking over, or a new instruction — not on every one-second tick, which would
                 // burn through the platform's update budget for nothing.
-                val liveActivityState = NavigationLiveActivityState(
-                    instruction = instructionText,
-                    lineName = overlayState.displayedLeg?.routeName,
-                    remainingMinutes = (overlayState.remainingSeconds + 59) / 60,
-                    arrivalTimeText = overlayState.arrivalTimeText,
-                    isArrived = overlayState.isArrived,
-                )
+                val glanceJourney = navigationSession.journey
+                val liveActivityState = remember(overlayState, instructionText, glanceJourney) {
+                    glanceJourney?.let {
+                        buildNavigationLiveActivityState(overlayState, it, instructionText)
+                    }
+                }
                 DisposableEffect(Unit) {
-                    NavigationLiveActivity.start(liveActivityState)
+                    liveActivityState?.let { NavigationLiveActivity.start(it) }
                     onDispose { NavigationLiveActivity.end() }
                 }
                 LaunchedEffect(liveActivityState) {
-                    NavigationLiveActivity.update(liveActivityState)
+                    liveActivityState?.let { NavigationLiveActivity.update(it) }
                 }
                 NavigationModeOverlay(
                     state = if (rerouteDismissed) overlayState.copy(canReroute = false) else overlayState,
