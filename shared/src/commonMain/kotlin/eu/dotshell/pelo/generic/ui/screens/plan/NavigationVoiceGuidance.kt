@@ -35,7 +35,9 @@ fun NavigationVoiceGuidance(
     }
 
     val cue = remember(state) { navigationVoiceCueFor(state) }
-    // Resolved in composition: string resources are not readable from inside the effect.
+    // Resolved in composition rather than inside the effect. It could go either way now that
+    // NavigationInstruction.resolveText() exists, but here the screen is on — reading the same
+    // resources the card just read is both cheaper and guaranteed to agree with it.
     val spoken = cue?.instruction?.displayText()
 
     LaunchedEffect(cue?.key, isEnabled) {
