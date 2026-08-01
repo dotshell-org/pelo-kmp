@@ -27,8 +27,8 @@ targets:
       path: Info.plist
       properties:
         CFBundleDisplayName: Pelo
-        CFBundleShortVersionString: "1.1.4"
-        CFBundleVersion: "10"
+        CFBundleShortVersionString: "1.1.5"
+        CFBundleVersion: "11"
         CADisableMinimumFrameDurationOnPhone: true
         # Without this the system refuses every Activity.request, silently.
         NSSupportsLiveActivities: true
@@ -122,8 +122,8 @@ targets:
         CFBundleDisplayName: Pelo Navigation
         # iOS refuses an embedded extension whose version does not match its containing app.
         # Keep these in step with the iosApp target above on every release bump.
-        CFBundleShortVersionString: "1.1.4"
-        CFBundleVersion: "10"
+        CFBundleShortVersionString: "1.1.5"
+        CFBundleVersion: "11"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     settings:
