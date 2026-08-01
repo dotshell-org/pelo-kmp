@@ -7,6 +7,13 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!--
+        Android 16 Live Updates: without this, setRequestPromotedOngoing() is ignored and the
+        navigation notification never reaches the status bar chip (nor HyperIsland, which reads the
+        same signal). Normal permission, granted at install, no runtime prompt. Written out in full
+        because the constant only exists in the API 36.1 SDK and this module compiles against 36.
+    -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <!-- Foreground service for navigation mode: keeps location tracking alive while
          journey guidance runs in the background (NavigationModeForegroundService). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"

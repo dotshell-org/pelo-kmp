@@ -1,0 +1,17 @@
+<!--
+    Small icon for the navigation notification, and the tracker that rides the progress bar.
+
+    Monochrome and transparent on purpose: the system masks a notification's small icon to a flat
+    silhouette, so the launcher icon that used to be passed here came out as a white blob. This is
+    also what shows in the status bar chip once the notification is promoted.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,2L4.5,20.29l0.71,0.71L12,18l6.79,3 0.71,-0.71L12,2z" />
+</vector>

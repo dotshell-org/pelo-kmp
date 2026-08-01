@@ -10,8 +10,10 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
@@ -172,11 +174,34 @@ class NavigationModeForegroundService : Service() {
     private fun observeGlanceState() {
         if (notificationJob != null) return
         notificationJob = serviceScope.launch {
+            var diagnosed = false
             NavigationGlanceBridge.state.collectLatest { state ->
-                val manager = getSystemService(NotificationManager::class.java)
-                manager?.notify(NOTIFICATION_ID, buildForegroundNotification(state))
+                val notification = buildForegroundNotification(state)
+                getSystemService(NotificationManager::class.java)
+                    ?.notify(NOTIFICATION_ID, notification)
+                if (state != null && !diagnosed) {
+                    diagnosed = true
+                    logPromotionDiagnostics(notification)
+                }
             }
         }
+    }
+
+    /**
+     * Whether this notification is one the system would promote, and whether we are allowed to ask.
+     *
+     * Worth a log line because the two failure modes are indistinguishable from the outside: an
+     * OEM whose bubble does not yet read the standard Android 16 signal looks exactly like a
+     * notification we built wrong.
+     */
+    private fun logPromotionDiagnostics(notification: Notification) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) return
+        val manager = getSystemService(NotificationManager::class.java)
+        Log.i(
+            TAG,
+            "Live Update: promotable=${NotificationCompat.hasPromotableCharacteristics(notification)}" +
+                ", allowed=${manager?.canPostPromotedNotifications()}"
+        )
     }
 
     /**
@@ -255,10 +280,17 @@ class NavigationModeForegroundService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(getString(R.string.navigation_mode_notification_title))
-            .setContentText(state?.instruction ?: getString(R.string.navigation_mode_notification_text))
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+            // A monochrome glyph: the system masks a small icon to a flat silhouette, so the
+            // launcher icon this used to pass came out as a white blob — and it is this icon that
+            // shows in the status bar chip once the notification is promoted.
+            .setSmallIcon(R.drawable.ic_nav_notification)
+            // The instruction, not a fixed sentence. A promoted notification is required to carry
+            // a title, and this is the one line worth reading at a glance.
+            .setContentTitle(
+                state?.instruction ?: getString(R.string.navigation_mode_notification_title)
+            )
+            .setContentText(subtitleFor(state))
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -270,7 +302,87 @@ class NavigationModeForegroundService : Service() {
                 getString(R.string.navigation_mode_notification_stop),
                 stopPendingIntent
             )
-            .build()
+
+        // Android 16 Live Update. Guarded rather than left to the compat layer: ProgressStyle only
+        // has an implementation from API 36, and a template that renders as nothing would be worse
+        // than the plain notification it replaces.
+        if (state != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+            builder
+                .setRequestPromotedOngoing(true)
+                .setShortCriticalText(chipTextFor(state))
+            progressStyleFor(state)?.let(builder::setStyle)
+        }
+
+        return builder.build()
+    }
+
+    private fun subtitleFor(state: NavigationLiveActivityState?): String =
+        if (state == null || state.destination.isBlank()) {
+            getString(R.string.navigation_mode_notification_text)
+        } else {
+            getString(
+                R.string.navigation_mode_notification_destination,
+                state.destination,
+                state.arrivalTimeText,
+            )
+        }
+
+    /** The status bar chip: a few characters wide, so the countdown and nothing else. */
+    private fun chipTextFor(state: NavigationLiveActivityState): String =
+        if (state.isArrived) {
+            getString(R.string.navigation_mode_chip_arrived)
+        } else {
+            getString(R.string.navigation_mode_chip_minutes, state.remainingMinutes)
+        }
+
+    /**
+     * The journey drawn as a bar: one segment per leg in its line's own colour, a mark where the
+     * traveller changes, and a tracker where they are now.
+     */
+    private fun progressStyleFor(
+        state: NavigationLiveActivityState,
+    ): NotificationCompat.ProgressStyle? {
+        // Zero-length segments are dropped rather than padded to a second: they contribute nothing
+        // to the sum, so progress stays on exactly the scale it was computed against.
+        val segments = state.segments.filter { it.seconds > 0 }
+        if (segments.isEmpty() || state.totalSeconds <= 0) return null
+
+        val trackerColor = ContextCompat.getColor(this, R.color.nav_progress_tracker)
+        val style = NotificationCompat.ProgressStyle()
+            // Each leg keeps its line's colour instead of being repainted by how far along the
+            // traveller is. Showing the itinerary is the whole point of the bar.
+            .setStyledByProgress(false)
+            .setProgress(state.progressSeconds)
+            .setProgressTrackerIcon(
+                IconCompat.createWithResource(this, R.drawable.ic_nav_notification)
+                    .setTint(trackerColor)
+            )
+            .setProgressEndIcon(
+                IconCompat.createWithResource(this, R.drawable.ic_nav_destination)
+                    .setTint(trackerColor)
+            )
+
+        segments.forEach { segment ->
+            style.addProgressSegment(
+                NotificationCompat.ProgressStyle.Segment(segment.seconds)
+                    .setColor(colorFor(segment))
+            )
+        }
+
+        val transferColor = ContextCompat.getColor(this, R.color.nav_transfer_point)
+        state.transferOffsetsSeconds.forEach { offset ->
+            style.addProgressPoint(
+                NotificationCompat.ProgressStyle.Point(offset).setColor(transferColor)
+            )
+        }
+        return style
+    }
+
+    private fun colorFor(segment: NavigationRouteSegment): Int = when (segment.kind) {
+        NavigationSegmentKind.WALK -> ContextCompat.getColor(this, R.color.nav_segment_walk)
+        NavigationSegmentKind.WAIT -> ContextCompat.getColor(this, R.color.nav_segment_wait)
+        NavigationSegmentKind.RIDE -> segment.colorArgb
+            ?: ContextCompat.getColor(this, R.color.nav_segment_ride_fallback)
     }
 
     private fun createNotificationChannel() {
@@ -293,6 +405,7 @@ class NavigationModeForegroundService : Service() {
         const val ACTION_START = "eu.dotshell.pelo.action.navigation.START"
         const val ACTION_STOP = "eu.dotshell.pelo.action.navigation.STOP"
 
+        private const val TAG = "NavigationService"
         private const val CHANNEL_ID = "navigation_mode_channel"
         private const val NOTIFICATION_ID = 7411
 

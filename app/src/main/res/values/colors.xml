@@ -9,4 +9,18 @@
     -->
     <color name="splash_background">#FFFFFFFF</color>
 
+    <!--
+        The journey's progress bar in the navigation notification. Deliberately mid-tone and
+        saturated rather than split into light/night variants: the bar is drawn over a background
+        whose theme the app does not control, and these read on both. Worth revisiting once the
+        promoted notification has actually been seen on a device.
+    -->
+    <color name="nav_segment_walk">#FF8E8E93</color>
+    <color name="nav_segment_wait">#FFC7C7CC</color>
+    <!-- A ride whose line has no colour of its own — rare, and still a ride, so not a grey. -->
+    <color name="nav_segment_ride_fallback">#FF546E7A</color>
+    <!-- Where to get off and change. Chosen to stand out against any operator's line colour. -->
+    <color name="nav_transfer_point">#FFFF6D00</color>
+    <color name="nav_progress_tracker">#FF2962FF</color>
+
 </resources>
