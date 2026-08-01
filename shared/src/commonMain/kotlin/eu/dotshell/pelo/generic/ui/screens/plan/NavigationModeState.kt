@@ -251,6 +251,42 @@ fun buildNavigationLiveActivityState(
 }
 
 /**
+ * Everything a glanceable surface would actually notice changing, and nothing else.
+ *
+ * The session republishes once a second so its countdown counts down. Reposting a notification or
+ * pushing a Live Activity at that rate would be waste the platform eventually starts throttling —
+ * and none of it would be visible: the minute is the finest thing on show, apart from the bar,
+ * which is quantised here to a percent of the journey.
+ */
+data class NavigationGlanceKey(
+    val instruction: NavigationInstruction,
+    val lineName: String?,
+    val remainingMinutes: Int,
+    val isArrived: Boolean,
+    val progressPercent: Int,
+)
+
+fun navigationGlanceKey(ui: NavigationModeUiState, journey: JourneyResult): NavigationGlanceKey {
+    val total = journeyDurationSeconds(journey)
+    return NavigationGlanceKey(
+        instruction = ui.instruction,
+        lineName = ui.displayedLeg?.routeName,
+        remainingMinutes = (ui.remainingSeconds + 59) / 60,
+        isArrived = ui.isArrived,
+        progressPercent = if (total <= 0) {
+            0
+        } else {
+            (total - ui.remainingSeconds).coerceIn(0, total) * 100 / total
+        },
+    )
+}
+
+/** The journey's own length in seconds, wrap-safe across midnight. Never negative. */
+fun journeyDurationSeconds(journey: JourneyResult): Int =
+    (normalizeTimeAroundReference(journey.arrivalTime, journey.departureTime) - journey.departureTime)
+        .coerceAtLeast(0)
+
+/**
  * Index-based rather than value-based lookup: a journey can hold two structurally equal legs
  * (a there-and-back loop), and `indexOf` would collapse them onto the first one.
  */

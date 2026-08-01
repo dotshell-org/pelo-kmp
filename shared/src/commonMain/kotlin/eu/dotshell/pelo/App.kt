@@ -170,11 +170,9 @@ import eu.dotshell.pelo.generic.utils.location.GeoPoint
 import eu.dotshell.pelo.generic.utils.location.LocationPermissionSignal
 import eu.dotshell.pelo.generic.utils.location.LocationProvider
 import eu.dotshell.pelo.generic.utils.location.HeadingProvider
-import eu.dotshell.pelo.generic.service.NavigationLiveActivity
 import eu.dotshell.pelo.generic.service.NavigationLocationBus
 import eu.dotshell.pelo.generic.service.NavigationModeController
 import eu.dotshell.pelo.generic.service.NavigationModePlatform
-import eu.dotshell.pelo.generic.service.NavigationNotificationBridge
 import eu.dotshell.pelo.generic.service.NavigationSession
 import eu.dotshell.pelo.generic.service.NavigationVoicePreference
 import eu.dotshell.pelo.generic.ui.screens.plan.NavigationModeOverlay
@@ -182,9 +180,7 @@ import eu.dotshell.pelo.generic.ui.screens.plan.NavigationSheetContent
 import eu.dotshell.pelo.generic.ui.screens.plan.NavigationVoiceGuidance
 import eu.dotshell.pelo.generic.ui.screens.plan.NavigationSheetPeekContentHeight
 import eu.dotshell.pelo.generic.ui.screens.plan.SheetDragHandleHeight
-import eu.dotshell.pelo.generic.ui.screens.plan.buildNavigationLiveActivityState
 import eu.dotshell.pelo.generic.ui.screens.plan.buildNavigationModeUiState
-import eu.dotshell.pelo.generic.ui.screens.plan.displayText
 import eu.dotshell.pelo.generic.utils.geo.GeometryUtils
 import eu.dotshell.pelo.generic.utils.location.LocationPermissionManager
 import eu.dotshell.pelo.platform.DrawableProvider
@@ -1420,31 +1416,10 @@ private fun RootScaffold(
                         alertsForLine = viewModel::getAlertsForLine,
                     )
                 }
-                val instructionText = overlayState.instruction.displayText()
-                LaunchedEffect(instructionText) {
-                    NavigationNotificationBridge.setInstruction(instructionText)
-                }
-                DisposableEffect(Unit) {
-                    onDispose { NavigationNotificationBridge.setInstruction(null) }
-                }
-
-                // Same guidance, glanceable outside the app. A data class as the effect key means
-                // it is pushed when something a viewer would notice changes — roughly the minute
-                // ticking over, or a new instruction — not on every one-second tick, which would
-                // burn through the platform's update budget for nothing.
-                val glanceJourney = navigationSession.journey
-                val liveActivityState = remember(overlayState, instructionText, glanceJourney) {
-                    glanceJourney?.let {
-                        buildNavigationLiveActivityState(overlayState, it, instructionText)
-                    }
-                }
-                DisposableEffect(Unit) {
-                    liveActivityState?.let { NavigationLiveActivity.start(it) }
-                    onDispose { NavigationLiveActivity.end() }
-                }
-                LaunchedEffect(liveActivityState) {
-                    liveActivityState?.let { NavigationLiveActivity.update(it) }
-                }
+                // The ongoing notification and the Live Activity are fed by
+                // NavigationModeController, from its own scope. They used to be driven from here,
+                // which meant they stopped the moment this composition stopped recomposing —
+                // backgrounded, which is when they are the only guidance left.
                 NavigationModeOverlay(
                     state = if (rerouteDismissed) overlayState.copy(canReroute = false) else overlayState,
                     showRecenterButton = !isFollowingUser,

@@ -50,6 +50,9 @@ data class NavigationLiveActivityState(
  * Android already has one — the foreground service's ongoing notification — so this exists for
  * iOS, where nothing survived leaving the app. The common code drives it either way; the Android
  * side is a no-op rather than a second, competing notification.
+ *
+ * Every call arrives on [NavigationModeController]'s own scope, which is a background dispatcher,
+ * not the main thread. An implementation that needs the main thread has to hop there itself.
  */
 expect object NavigationLiveActivity {
 

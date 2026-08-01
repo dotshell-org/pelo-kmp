@@ -181,4 +181,46 @@ class NavigationLiveActivityStateTest {
     fun `the destination is where the journey ends, not the time it ends at`() {
         assertEquals("Part-Dieu", stateAt(8 * 3600 + 12 * 60).destination)
     }
+
+    private fun keyAt(now: Int) = navigationGlanceKey(
+        ui = buildNavigationModeUiState(
+            NavigationSession(
+                isActive = true,
+                journey = journey,
+                progress = NavigationProgress(legIndex = 1, stopIndex = 0, stopCount = 2),
+                hasFreshFix = true,
+                nowSeconds = now,
+            )
+        )!!,
+        journey = journey,
+    )
+
+    /**
+     * The session republishes every second. Without this the notification would be reposted at that
+     * rate and the Live Activity pushed just as often, for a picture nobody could tell apart.
+     */
+    @Test
+    fun `a tick that changes nothing visible produces the same key`() {
+        assertEquals(keyAt(8 * 3600 + 12 * 60), keyAt(8 * 3600 + 12 * 60 + 1))
+    }
+
+    @Test
+    fun `crossing a minute changes the key`() {
+        // 08:11:00 leaves 19 min, 08:11:01 leaves 18 min 59 s — which rounds up to 19 as well.
+        val before = keyAt(8 * 3600 + 11 * 60)
+        val after = keyAt(8 * 3600 + 12 * 60)
+
+        assertEquals(19, before.remainingMinutes)
+        assertEquals(18, after.remainingMinutes)
+        assertTrue(before != after)
+    }
+
+    @Test
+    fun `the bar advances a percent at a time, not a second at a time`() {
+        // A 30-minute journey: one percent is 18 seconds.
+        assertEquals(keyAt(8 * 3600 + 60).progressPercent, keyAt(8 * 3600 + 70).progressPercent)
+        assertTrue(
+            keyAt(8 * 3600 + 60).progressPercent < keyAt(8 * 3600 + 80).progressPercent
+        )
+    }
 }

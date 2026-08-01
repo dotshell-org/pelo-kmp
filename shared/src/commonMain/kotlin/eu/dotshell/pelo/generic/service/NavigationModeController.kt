@@ -6,6 +6,11 @@ import eu.dotshell.pelo.generic.data.models.navigation.NavigationProgress
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
 import eu.dotshell.pelo.generic.data.telemetry.TelemetryEmitter
 import eu.dotshell.pelo.generic.data.telemetry.TripDetector
+import eu.dotshell.pelo.generic.ui.screens.plan.NavigationGlanceKey
+import eu.dotshell.pelo.generic.ui.screens.plan.buildNavigationLiveActivityState
+import eu.dotshell.pelo.generic.ui.screens.plan.buildNavigationModeUiState
+import eu.dotshell.pelo.generic.ui.screens.plan.navigationGlanceKey
+import eu.dotshell.pelo.generic.ui.screens.plan.resolveText
 import eu.dotshell.pelo.generic.utils.geo.GeometryUtils
 import eu.dotshell.pelo.generic.utils.location.GeoPoint
 import eu.dotshell.pelo.generic.utils.navigation.NavigationProgressTracker
@@ -52,6 +57,10 @@ class NavigationModeController(
 
     val session: StateFlow<NavigationSession> = _session
 
+    init {
+        observeGlanceState()
+    }
+
     private var tripDetector: TripDetector? = null
     private var tripDetectorInitJob: Job? = null
     private var tickerJob: Job? = null
@@ -96,6 +105,10 @@ class NavigationModeController(
     fun dispose() {
         tickerJob?.cancel()
         tickerJob = null
+        // Done here rather than left to the observer below: cancelling the scope kills it before it
+        // ever sees the session go away, and a Live Activity nobody can update would outlive us.
+        NavigationGlanceBridge.publish(null)
+        NavigationLiveActivity.end()
         // Leaving composition is not "the user finished their trip", but the in-memory session is
         // gone either way: leaving the flag set would strand the foreground service with nothing
         // able to switch it off.
@@ -140,6 +153,47 @@ class NavigationModeController(
             hasFreshFix = isFresh,
             nowSeconds = now,
         )
+    }
+
+    /**
+     * Mirror the session onto every glanceable surface, from this controller's own scope.
+     *
+     * It used to be done from the composition, which looked reasonable and was not: an Activity
+     * that leaves the screen has its Compose frame clock paused, so recomposition stops and the
+     * derived state stops with it. The notification and the Live Activity froze on whatever
+     * instruction was showing when the traveller pocketed their phone — the exact moment they
+     * become the only thing left to read.
+     */
+    private fun observeGlanceState() {
+        scope.launch {
+            var lastKey: NavigationGlanceKey? = null
+            _session.collect { session ->
+                val journey = session.journey
+                val ui = journey?.let { buildNavigationModeUiState(session) }
+                if (journey == null || ui == null) {
+                    if (lastKey != null) {
+                        lastKey = null
+                        NavigationGlanceBridge.publish(null)
+                        NavigationLiveActivity.end()
+                    }
+                    return@collect
+                }
+
+                // Quantised, so a one-second tick that changes nothing visible costs nothing.
+                val key = navigationGlanceKey(ui, journey)
+                if (key == lastKey) return@collect
+                val wasShowing = lastKey != null
+                lastKey = key
+
+                val state = buildNavigationLiveActivityState(
+                    ui = ui,
+                    journey = journey,
+                    instructionText = ui.instruction.resolveText(),
+                )
+                NavigationGlanceBridge.publish(state)
+                if (wasShowing) NavigationLiveActivity.update(state) else NavigationLiveActivity.start(state)
+            }
+        }
     }
 
     private fun startTicker() {

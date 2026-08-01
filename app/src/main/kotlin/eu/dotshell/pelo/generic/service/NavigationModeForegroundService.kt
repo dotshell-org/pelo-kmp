@@ -89,7 +89,7 @@ class NavigationModeForegroundService : Service() {
                 // under way and pinned the screen awake with no session able to switch it off.
                 NavigationModeStateStore.setNavigationActive(this, true)
                 startTracking()
-                observeInstruction()
+                observeGlanceState()
                 initializeTripDetector()
                 return START_STICKY
             }
@@ -168,13 +168,13 @@ class NavigationModeForegroundService : Service() {
         locationCallback = null
     }
 
-    /** Mirror the on-screen instruction into the ongoing notification. */
-    private fun observeInstruction() {
+    /** Mirror the live session into the ongoing notification. */
+    private fun observeGlanceState() {
         if (notificationJob != null) return
         notificationJob = serviceScope.launch {
-            NavigationNotificationBridge.instruction.collectLatest { text ->
+            NavigationGlanceBridge.state.collectLatest { state ->
                 val manager = getSystemService(NotificationManager::class.java)
-                manager?.notify(NOTIFICATION_ID, buildForegroundNotification(text))
+                manager?.notify(NOTIFICATION_ID, buildForegroundNotification(state))
             }
         }
     }
@@ -234,7 +234,7 @@ class NavigationModeForegroundService : Service() {
         }
     }
 
-    private fun buildForegroundNotification(instruction: String?): Notification {
+    private fun buildForegroundNotification(state: NavigationLiveActivityState?): Notification {
         val launchIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
@@ -258,7 +258,7 @@ class NavigationModeForegroundService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(getString(R.string.navigation_mode_notification_title))
-            .setContentText(instruction ?: getString(R.string.navigation_mode_notification_text))
+            .setContentText(state?.instruction ?: getString(R.string.navigation_mode_notification_text))
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
