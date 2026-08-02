@@ -496,7 +496,9 @@ fun InlineItinerarySheetContent(
 
             if (journeys.isEmpty()) {
                 errorText = "Aucun itineraire trouve"
-            } else {
+            }
+
+            run {
                 // Telemetry: emit itinerary.calculated with a compact leg skeleton per option
                 // (line + boarding/alighting stop + times). Intermediate stops are omitted — they
                 // are recomputable from the timetable (dataset_version + service_date). Most
@@ -504,6 +506,12 @@ fun InlineItinerarySheetContent(
                 // references the picked option by signature. Walk legs to/from a coordinate
                 // endpoint omit their stop name (it can be the raw address) — the geohash on
                 // origin/dest is the only endpoint hint that leaves the device.
+                //
+                // Emitted for an empty result too, and that is the whole point: a search the engine
+                // could not serve is the one observation nothing else in the system records. This
+                // used to sit in an `else`, so `options` was never empty on arrival, `unserved_count`
+                // could never increment, and the "transport deserts" analytics — the map of places
+                // the network fails to reach — was structurally empty rather than merely quiet.
                 val nowIso = Clock.System.now().toString()
                 val depSecondsAtCalc = selectedTimeSeconds
                 val optionDetails = journeys.map { journey ->
