@@ -74,9 +74,14 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
         eu.dotshell.pelo.platform.Settings(context, "traffic_alerts_cache"),
         eu.dotshell.pelo.generic.data.offline.OfflineRepository(context)
     )
+    val alertDeviceIdProvider by lazy {
+        eu.dotshell.pelo.generic.data.alerts.AlertDeviceIdProvider(context)
+    }
     val userStopAlertsRepository by lazy {
         UserStopAlertsRepository(
-            transportApi as? eu.dotshell.pelo.generic.data.network.UserStopAlertsApi
+            api = transportApi as? eu.dotshell.pelo.generic.data.network.UserStopAlertsApi,
+            deviceIdProvider = alertDeviceIdProvider,
+            warningPenaltySeconds = TransportServiceProvider.getRealtimeConfig().alertWarningPenaltySeconds
         )
     }
     private val vehiclePositionsRepository = VehiclePositionsRepository(vehiclePositionsService)

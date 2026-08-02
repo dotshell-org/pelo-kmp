@@ -636,13 +636,17 @@ class RaptorRepository private constructor(private val context: PlatformContext)
         destinationStopIds: List<Int>,
         departureTimeSeconds: Int? = null,
         date: LocalDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date,
-        blockedRouteNames: Set<String> = emptySet()
+        blockedRouteNames: Set<String> = emptySet(),
+        blockedStopNames: Set<String> = emptySet(),
+        stopPenaltySecondsByName: Map<String, Int> = emptyMap()
     ): List<JourneyResult> = getOptimizedPaths(
         origin = Location.StopIds(originStopIds),
         destination = Location.StopIds(destinationStopIds),
         departureTimeSeconds = departureTimeSeconds,
         date = date,
-        blockedRouteNames = blockedRouteNames
+        blockedRouteNames = blockedRouteNames,
+        blockedStopNames = blockedStopNames,
+        stopPenaltySecondsByName = stopPenaltySecondsByName
     )
 
     /**
@@ -661,6 +665,8 @@ class RaptorRepository private constructor(private val context: PlatformContext)
         departureTimeSeconds: Int? = null,
         date: LocalDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date,
         blockedRouteNames: Set<String> = emptySet(),
+        blockedStopNames: Set<String> = emptySet(),
+        stopPenaltySecondsByName: Map<String, Int> = emptyMap(),
         originLabel: String? = null,
         destinationLabel: String? = null,
         walking: WalkingParams = WalkingParams.DEFAULT
@@ -687,7 +693,9 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                     destination.ids,
                     getRoundedDepartureTime(depTime),
                     date,
-                    blockedRouteNames
+                    blockedRouteNames,
+                    blockedStopNames,
+                    stopPenaltySecondsByName
                 )
             } else null
 
@@ -713,7 +721,9 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                     destination = destination,
                     departureTime = depTime,
                     walking = walking,
-                    blockedRouteNames = blockedRouteNames
+                    blockedRouteNames = blockedRouteNames,
+                    blockedStopIds = resolveStopIdsByName(blockedStopNames),
+                    stopPenaltySeconds = resolvePenaltiesByName(stopPenaltySecondsByName)
                 ) ?: emptyList()
                 computed to stopsByIndex
             }
@@ -752,14 +762,18 @@ class RaptorRepository private constructor(private val context: PlatformContext)
         arrivalTimeSeconds: Int,
         searchWindowMinutes: Int = 120,
         date: LocalDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date,
-        blockedRouteNames: Set<String> = emptySet()
+        blockedRouteNames: Set<String> = emptySet(),
+        blockedStopNames: Set<String> = emptySet(),
+        stopPenaltySecondsByName: Map<String, Int> = emptyMap()
     ): List<JourneyResult> = getOptimizedPathsArriveBy(
         origin = Location.StopIds(originStopIds),
         destination = Location.StopIds(destinationStopIds),
         arrivalTimeSeconds = arrivalTimeSeconds,
         searchWindowMinutes = searchWindowMinutes,
         date = date,
-        blockedRouteNames = blockedRouteNames
+        blockedRouteNames = blockedRouteNames,
+        blockedStopNames = blockedStopNames,
+        stopPenaltySecondsByName = stopPenaltySecondsByName
     )
 
     /**
@@ -774,6 +788,8 @@ class RaptorRepository private constructor(private val context: PlatformContext)
         searchWindowMinutes: Int = 120,
         date: LocalDate = Clock.System.now().toLocalDateTime(TimeZone.currentSystemDefault()).date,
         blockedRouteNames: Set<String> = emptySet(),
+        blockedStopNames: Set<String> = emptySet(),
+        stopPenaltySecondsByName: Map<String, Int> = emptyMap(),
         originLabel: String? = null,
         destinationLabel: String? = null,
         walking: WalkingParams = WalkingParams.DEFAULT
@@ -801,7 +817,9 @@ class RaptorRepository private constructor(private val context: PlatformContext)
                     arrivalTime = arrivalTimeSeconds,
                     searchWindowMinutes = searchWindowMinutes,
                     walking = walking,
-                    blockedRouteNames = blockedRouteNames
+                    blockedRouteNames = blockedRouteNames,
+                    blockedStopIds = resolveStopIdsByName(blockedStopNames),
+                    stopPenaltySeconds = resolvePenaltiesByName(stopPenaltySecondsByName)
                 ) ?: emptyList()
                 computed to stopsByIndex
             }
@@ -842,7 +860,9 @@ class RaptorRepository private constructor(private val context: PlatformContext)
         destIds: List<Int>,
         time: Int,
         date: LocalDate,
-        blockedRouteNames: Set<String>
+        blockedRouteNames: Set<String>,
+        blockedStopNames: Set<String>,
+        stopPenaltySecondsByName: Map<String, Int>
     ): String {
         val sb = StringBuilder(64)
 
@@ -874,7 +894,53 @@ class RaptorRepository private constructor(private val context: PlatformContext)
             sb.append(sortedBlocked[i])
         }
 
+        // Live disruptions belong in the key as much as the blocked lines do: without them a
+        // journey computed while a stop was closed would be replayed from cache once it reopened,
+        // and vice versa.
+        sb.append('|')
+        val sortedBlockedStops = blockedStopNames.sorted()
+        for (i in sortedBlockedStops.indices) {
+            if (i > 0) sb.append(',')
+            sb.append(sortedBlockedStops[i])
+        }
+
+        sb.append('|')
+        val sortedPenalties = stopPenaltySecondsByName.entries.sortedBy { it.key }
+        for (i in sortedPenalties.indices) {
+            if (i > 0) sb.append(',')
+            sb.append(sortedPenalties[i].key)
+            sb.append(':')
+            sb.append(sortedPenalties[i].value)
+        }
+
         return sb.toString()
+    }
+
+    /**
+     * Resolves stop *names* to every timetable stop id carrying that name.
+     *
+     * Deliberately fans out: a name like "Bellecour" covers several physical stops (platforms,
+     * directions, modes), and closing one of them while leaving the others open would be a
+     * disruption nobody reported.
+     */
+    private fun resolveStopIdsByName(names: Collection<String>): Set<Int> {
+        if (names.isEmpty()) return emptySet()
+        val out = mutableSetOf<Int>()
+        for (name in names) {
+            stopIdsByNormalizedName[SearchUtils.normalizeForSearch(name)]?.let(out::addAll)
+        }
+        return out
+    }
+
+    /** Same resolution as [resolveStopIdsByName], keeping each name's penalty on all its ids. */
+    private fun resolvePenaltiesByName(penalties: Map<String, Int>): Map<Int, Int> {
+        if (penalties.isEmpty()) return emptyMap()
+        val out = mutableMapOf<Int, Int>()
+        for ((name, seconds) in penalties) {
+            val ids = stopIdsByNormalizedName[SearchUtils.normalizeForSearch(name)] ?: continue
+            for (id in ids) out[id] = maxOf(out[id] ?: 0, seconds)
+        }
+        return out
     }
 
     /**

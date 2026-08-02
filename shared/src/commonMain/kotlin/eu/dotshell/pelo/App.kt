@@ -1301,17 +1301,39 @@ private fun RootScaffold(
                     )
                 }
 
-            val initialStop = alertReportInitialStopName?.let { name ->
+            // While navigating, the app already knows exactly where the traveller is and what they
+            // are riding. Pre-filling both spares them the search *and* gives the report the line
+            // context that lets it count for the whole line rather than one isolated stop.
+            val navigationLeg = navigationSession.journey
+                ?.legs
+                ?.getOrNull(navigationSession.progress.legIndex)
+                ?.takeIf { isNavigating && !it.isWalking }
+
+            val navigationStopName = navigationLeg?.let { leg ->
+                val chain = buildList {
+                    add(leg.fromStopName)
+                    leg.intermediateStops.forEach { add(it.stopName) }
+                    add(leg.toStopName)
+                }
+                chain.getOrNull(navigationSession.progress.stopIndex)
+            }
+
+            val initialStop = (alertReportInitialStopName ?: navigationStopName)?.let { name ->
                 eu.dotshell.pelo.generic.data.models.search.StationSearchResult(
                     stopName = name,
                     stopId = null,
                     lines = alertReportInitialLines
                 )
             }
+            val initialLine = navigationLeg?.routeName
+                ?.takeIf { it.isNotBlank() }
+                ?.let { eu.dotshell.pelo.generic.data.models.search.LineSearchResult(lineName = it) }
+
             AlertReportBottomSheet(
                 viewModel = viewModel,
                 onDismiss = { showAlertReport = false },
                 initialStop = initialStop,
+                initialLine = initialLine,
                 nearestStopCandidate = nearestStopCandidate
             )
         }

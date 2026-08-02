@@ -8,7 +8,9 @@ import eu.dotshell.pelo.generic.data.models.stops.StopGeometry
 import eu.dotshell.pelo.generic.data.models.stops.StopProperties
 import eu.dotshell.pelo.generic.data.models.lines.MultiLineStringGeometry
 import eu.dotshell.pelo.generic.data.models.lines.TransportLineProperties
-import eu.dotshell.pelo.generic.data.models.realtime.alerts.community.UserStopAlertsResponse
+import eu.dotshell.pelo.generic.data.alerts.AlertDeviceIdProvider
+import eu.dotshell.pelo.generic.data.models.realtime.alerts.community.CommunityAlert
+import eu.dotshell.pelo.generic.data.models.realtime.alerts.community.CommunityAlertsResponse
 import eu.dotshell.pelo.generic.data.models.realtime.alerts.official.TrafficAlertsResponse
 import eu.dotshell.pelo.generic.data.network.transport.TransportApi
 import eu.dotshell.pelo.generic.data.network.transport.TransportLinesQuery
@@ -28,6 +30,7 @@ import io.ktor.client.plugins.logging.Logging
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
+import io.ktor.client.request.post
 import io.ktor.http.HttpHeaders
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.async
@@ -217,17 +220,39 @@ class LyonKtorClient(
         return TrafficAlertMapper.mapResponseToGeneric(lyon)
     }
 
-    // ─── User stop alerts (UserStopAlertsApi) ─────────────────────────────────
+    // ─── Community alerts (UserStopAlertsApi) ─────────────────────────────────
 
-    override suspend fun getUserStopAlerts(stopIds: List<String>): UserStopAlertsResponse {
-        if (stopIds.isEmpty()) return emptyMap()
+    override suspend fun getStopAlerts(stopIds: List<String>): CommunityAlertsResponse =
+        fetchAlerts("stops", "stopIds", stopIds)
+
+    override suspend fun getLineAlerts(lineIds: List<String>): CommunityAlertsResponse =
+        fetchAlerts("lines", "lineIds", lineIds)
+
+    private suspend fun fetchAlerts(
+        path: String,
+        parameterName: String,
+        ids: List<String>
+    ): CommunityAlertsResponse {
+        if (ids.isEmpty()) return emptyMap()
         val timestampMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
-        return httpClient.get("${TRAFFIC_ALERTS_BASE_URL}pelo/v1/users-alerts/stops") {
+        return httpClient.get("${TRAFFIC_ALERTS_BASE_URL}pelo/v1/users-alerts/$path") {
             header(HttpHeaders.CacheControl, "no-cache")
             header("Pragma", "no-cache")
-            stopIds.forEach { parameter("stopIds", it) }
+            ids.forEach { parameter(parameterName, it) }
             parameter("_ts", timestampMs)
         }.body()
+    }
+
+    override suspend fun voteOnAlert(alertId: String, confirm: Boolean, deviceId: String): CommunityAlert? {
+        val verb = if (confirm) "upvote" else "downvote"
+        return try {
+            httpClient.post("${TRAFFIC_ALERTS_BASE_URL}pelo/v1/users-alerts/$alertId/$verb") {
+                header(AlertDeviceIdProvider.HEADER, deviceId)
+            }.body()
+        } catch (e: Exception) {
+            Log.w("LyonKtorClient", "Vote on alert $alertId failed: ${e.message}")
+            null
+        }
     }
 
     // ─── Line fetching helpers ────────────────────────────────────────────────
