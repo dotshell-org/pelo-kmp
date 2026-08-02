@@ -77,11 +77,20 @@ class UserStopAlertsRepository(
         const val DEFAULT_STALE_AFTER_MINUTES = 30
     }
 
+    /**
+     * Alerts this device answered in the current session.
+     *
+     * The server is the authority — it stamps [CommunityAlert.viewerHasVoted] — but a vote and the
+     * next fetch are two round trips, and in between the alert would come back unflagged and be
+     * asked again. This closes that window.
+     */
+    private val answeredAlertIds = mutableSetOf<String>()
+
     suspend fun getStopAlerts(stopIds: List<String>): CommunityAlertsResponse =
-        fetchChunked(stopIds) { api?.getStopAlerts(it) }
+        fetchChunked(stopIds) { api?.getStopAlerts(it, deviceIdProvider?.currentOrRotate()) }
 
     suspend fun getLineAlerts(lineIds: List<String>): CommunityAlertsResponse =
-        fetchChunked(lineIds) { api?.getLineAlerts(it) }
+        fetchChunked(lineIds) { api?.getLineAlerts(it, deviceIdProvider?.currentOrRotate()) }
 
     private suspend fun fetchChunked(
         ids: List<String>,
@@ -191,6 +200,7 @@ class UserStopAlertsRepository(
      */
     suspend fun vote(alertId: String, confirm: Boolean): CommunityAlert? = withContext(ioDispatcher) {
         val deviceId = deviceIdProvider?.currentOrRotate() ?: return@withContext null
+        answeredAlertIds.add(alertId)
         api?.voteOnAlert(alertId, confirm, deviceId)
     }
 
@@ -206,12 +216,19 @@ class UserStopAlertsRepository(
         unconfirmed: List<CommunityAlert>
     ): List<NavigationAlertPrompt> {
         val now = Clock.System.now()
+
+        // Never ask twice. An alert this device has voted on is settled as far as it is concerned;
+        // re-offering it turns a one-tap question into a loop.
+        fun CommunityAlert.isAnswered() = viewerHasVoted || id in answeredAlertIds
+
         val stale = confirmed.filter { alert ->
+            if (alert.isAnswered()) return@filter false
             val updatedAt = runCatching { Instant.parse(alert.updatedAt) }.getOrNull() ?: return@filter false
             (now - updatedAt).inWholeMinutes >= staleAfterMinutes
         }
 
-        return unconfirmed.map { NavigationAlertPrompt(it, NavigationAlertPromptKind.LOW_KARMA_CONFIRM) } +
+        return unconfirmed.filterNot { it.isAnswered() }
+            .map { NavigationAlertPrompt(it, NavigationAlertPromptKind.LOW_KARMA_CONFIRM) } +
             stale.map { NavigationAlertPrompt(it, NavigationAlertPromptKind.HIGH_KARMA_STILL_THERE) }
     }
 

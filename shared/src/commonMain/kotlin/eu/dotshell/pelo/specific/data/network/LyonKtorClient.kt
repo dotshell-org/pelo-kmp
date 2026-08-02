@@ -222,22 +222,24 @@ class LyonKtorClient(
 
     // ─── Community alerts (UserStopAlertsApi) ─────────────────────────────────
 
-    override suspend fun getStopAlerts(stopIds: List<String>): CommunityAlertsResponse =
-        fetchAlerts("stops", "stopIds", stopIds)
+    override suspend fun getStopAlerts(stopIds: List<String>, deviceId: String?): CommunityAlertsResponse =
+        fetchAlerts("stops", "stopIds", stopIds, deviceId)
 
-    override suspend fun getLineAlerts(lineIds: List<String>): CommunityAlertsResponse =
-        fetchAlerts("lines", "lineIds", lineIds)
+    override suspend fun getLineAlerts(lineIds: List<String>, deviceId: String?): CommunityAlertsResponse =
+        fetchAlerts("lines", "lineIds", lineIds, deviceId)
 
     private suspend fun fetchAlerts(
         path: String,
         parameterName: String,
-        ids: List<String>
+        ids: List<String>,
+        deviceId: String?
     ): CommunityAlertsResponse {
         if (ids.isEmpty()) return emptyMap()
         val timestampMs = kotlinx.datetime.Clock.System.now().toEpochMilliseconds()
         return httpClient.get("${TRAFFIC_ALERTS_BASE_URL}pelo/v1/users-alerts/$path") {
             header(HttpHeaders.CacheControl, "no-cache")
             header("Pragma", "no-cache")
+            deviceId?.let { header(AlertDeviceIdProvider.HEADER, it) }
             ids.forEach { parameter(parameterName, it) }
             parameter("_ts", timestampMs)
         }.body()

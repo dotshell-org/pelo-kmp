@@ -130,6 +130,7 @@ import eu.dotshell.pelo.generic.ui.screens.plan.LINES_SHEET_FIRST_SCREEN_ICONS
 import eu.dotshell.pelo.generic.ui.screens.plan.LineIconWarmup
 import eu.dotshell.pelo.generic.ui.screens.plan.LinesBottomSheet
 import eu.dotshell.pelo.generic.ui.screens.plan.AlertReportBottomSheet
+import eu.dotshell.pelo.generic.ui.screens.plan.NavigationAlertConfirmation
 import eu.dotshell.pelo.generic.ui.screens.plan.MapStyleSelectionSheet
 import eu.dotshell.pelo.generic.ui.screens.plan.StationSheetContent
 import eu.dotshell.pelo.generic.ui.screens.plan.itinerary.InlineItinerarySheetContent
@@ -1337,6 +1338,12 @@ private fun RootScaffold(
                 nearestStopCandidate = nearestStopCandidate
             )
         }
+
+        NavigationAlertConfirmation(
+            viewModel = viewModel,
+            session = navigationSession,
+            isNavigating = isNavigating
+        )
 
         shownNavigationAlert?.let { alert ->
             val alertStrings = StringProvider(LocalPlatformContext.current)

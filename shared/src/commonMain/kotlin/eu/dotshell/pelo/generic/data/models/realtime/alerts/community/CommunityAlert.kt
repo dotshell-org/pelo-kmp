@@ -58,7 +58,14 @@ data class CommunityAlert(
     val status: AlertStatus = AlertStatus.UNCONFIRMED,
     val karma: Int = 0,
     val createdAt: String = "",
-    val updatedAt: String = ""
+    val updatedAt: String = "",
+    /**
+     * This device has already had its say on this alert.
+     *
+     * Server-computed, and the only reliable source: the vote lives in the backend, so without it
+     * the app re-offers a question it has already answered on every refresh.
+     */
+    val viewerHasVoted: Boolean = false
 ) {
     /** True when the alert should change how a journey is computed at all. */
     val affectsRouting: Boolean

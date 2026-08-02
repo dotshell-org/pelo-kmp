@@ -10,14 +10,18 @@ import eu.dotshell.pelo.generic.data.models.realtime.alerts.community.CommunityA
  * fully-local networks simply don't implement it and the feature degrades to "no alerts".
  */
 interface UserStopAlertsApi {
-    suspend fun getStopAlerts(stopIds: List<String>): CommunityAlertsResponse
+    /**
+     * @param deviceId sent so the response can mark the alerts this device already voted on.
+     *        Null simply means those flags come back false.
+     */
+    suspend fun getStopAlerts(stopIds: List<String>, deviceId: String? = null): CommunityAlertsResponse
 
     /**
      * Alerts attached to whole lines, including those reported at one of their stops — trouble on
      * a low-traffic line shows up here long before any single stop of it accumulates enough
      * reports to stand out on its own.
      */
-    suspend fun getLineAlerts(lineIds: List<String>): CommunityAlertsResponse
+    suspend fun getLineAlerts(lineIds: List<String>, deviceId: String? = null): CommunityAlertsResponse
 
     /**
      * Confirms or refutes an alert. Returns the updated alert, or null when the call failed.

@@ -172,9 +172,6 @@ fun InlineItinerarySheetContent(
 
     var journeys by remember { mutableStateOf<List<JourneyResult>>(emptyList()) }
     var journeysAvoidingAlerts by remember { mutableStateOf<List<AvoidedJourneyUi>>(emptyList()) }
-    // Alerts on this journey that nobody has vouched for yet. Surfaced to the traveller, who is
-    // in the best position to settle them, rather than silently trusted or silently dropped.
-    var pendingAlertConfirmations by remember { mutableStateOf<List<NavigationAlertPrompt>>(emptyList()) }
     var selectedJourney by remember { mutableStateOf<JourneyResult?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
@@ -573,11 +570,9 @@ fun InlineItinerarySheetContent(
                     viewModel.userStopAlertsRepository.disruptionsFor(stopNames, lineNames)
                 }
 
-                // Unconfirmed reports never move an itinerary; they are offered to the traveller
-                // instead, whose answer is what decides whether they ever will.
-                if (currentVersion == recalcVersion) {
-                    pendingAlertConfirmations = disruptions.pendingConfirmations
-                }
+                // Unconfirmed reports never move an itinerary. They are put to the traveller during
+                // navigation, once they are standing at the stop and can actually look — see
+                // NavigationAlertConfirmation.
                 if (disruptions.isEmpty) return@launch
 
                 // A line-wide warning becomes a penalty at the stops this journey boards it.
@@ -888,35 +883,6 @@ fun InlineItinerarySheetContent(
 
 
 
-                    // Asked of the one person who can see the answer, while they can see it: the
-                    // traveller about to ride through the reported trouble. One question at a time
-                    // — a queue of them is a form, and nobody fills in a form to catch a tram.
-                    pendingAlertConfirmations.firstOrNull()?.let { prompt ->
-                        item(key = "alert_prompt_${prompt.alert.id}") {
-                            AlertConfirmationCard(
-                                prompt = prompt,
-                                onAnswer = { confirm ->
-                                    val answered = prompt.alert.id
-                                    // Dropped from the list before the call returns: the traveller
-                                    // has answered, and making them wait on the network to see it
-                                    // acknowledged is how a zero-friction prompt stops being one.
-                                    pendingAlertConfirmations =
-                                        pendingAlertConfirmations.filterNot { it.alert.id == answered }
-                                    coroutineScope.launch {
-                                        viewModel.userStopAlertsRepository.vote(answered, confirm)
-                                        recalc()
-                                    }
-                                },
-                                onDismiss = {
-                                    val dismissed = prompt.alert.id
-                                    pendingAlertConfirmations =
-                                        pendingAlertConfirmations.filterNot { it.alert.id == dismissed }
-                                }
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-                    }
-
                     if (journeysAvoidingAlerts.isNotEmpty()) {
                         items(journeysAvoidingAlerts, key = { "${journeySignature(it.journey)}_${it.label}" }) { avoidedJourney ->
                             CompactJourneyCard(
@@ -1031,111 +997,3 @@ private fun journeySignature(journey: JourneyResult): String {
  */
 private fun journeySignatureId(journey: JourneyResult): String =
     journeySignature(journey).encodeUtf8().sha256().hex().take(16)
-
-/**
- * The one-tap confirmation prompt: the collaborative half of the alert system.
- *
- * The system deliberately does not decide on its own whether a lone report is true. It asks the
- * traveller who is about to ride through it, because they are the only one who can actually look —
- * and it asks in a way that costs one tap, since a prompt that costs more than that gets dismissed
- * unread and stops being evidence of anything.
- */
-@Composable
-private fun AlertConfirmationCard(
-    prompt: NavigationAlertPrompt,
-    onAnswer: (Boolean) -> Unit,
-    onDismiss: () -> Unit
-) {
-    val where = prompt.alert.stopId ?: prompt.alert.lineId.orEmpty()
-    val what = alertTypeLabel(prompt.alert.type)
-    val question = when (prompt.kind) {
-        NavigationAlertPromptKind.LOW_KARMA_CONFIRM ->
-            if (where.isBlank()) "Confirmez-vous : $what ?" else "Confirmez-vous : $what à $where ?"
-        NavigationAlertPromptKind.HIGH_KARMA_STILL_THERE ->
-            if (where.isBlank()) "$what : toujours d'actualité ?" else "$what à $where : toujours d'actualité ?"
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.secondaryContainer)
-            .padding(horizontal = 16.dp, vertical = 12.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = question,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = "Ignorer",
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            AlertAnswerButton(label = "Oui", isPrimary = true, onClick = { onAnswer(true) })
-            AlertAnswerButton(label = "Non", isPrimary = false, onClick = { onAnswer(false) })
-        }
-    }
-}
-
-@Composable
-private fun AlertAnswerButton(
-    label: String,
-    isPrimary: Boolean,
-    onClick: () -> Unit
-) {
-    val container = if (isPrimary) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
-    val content = if (isPrimary) {
-        MaterialTheme.colorScheme.onPrimary
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant
-    }
-
-    Box(
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(container)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 8.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            color = content,
-            fontWeight = FontWeight.SemiBold
-        )
-    }
-}
-
-/** Human wording for an alert type id, falling back to the raw id for types added server-side. */
-private fun alertTypeLabel(type: String): String = when (type.lowercase()) {
-    "closure" -> "arrêt fermé"
-    "delay" -> "retard"
-    "elevator" -> "ascenseur hors service"
-    "crowding" -> "forte affluence"
-    "works" -> "travaux"
-    "strike" -> "grève"
-    "fire" -> "incendie"
-    "interruption" -> "interruption"
-    "congestion" -> "trafic élevé"
-    else -> type
-}
