@@ -70,6 +70,12 @@ android {
         }
         debug {
             isMinifyEnabled = false
+            // Own applicationId so a debug build installs alongside the Play Store one instead of
+            // demanding its uninstall — which would take the favourites and trip history with it,
+            // since those live only on the device. `namespace` is untouched, so the manifest's
+            // fully-qualified class names still resolve.
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
         }
     }
     compileOptions {

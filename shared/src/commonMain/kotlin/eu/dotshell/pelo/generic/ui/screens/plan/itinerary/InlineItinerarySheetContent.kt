@@ -7,6 +7,7 @@ import eu.dotshell.pelo.platform.ioDispatcher
 import eu.dotshell.pelo.platform.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import eu.dotshell.pelo.generic.ui.theme.isAppInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,7 +50,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import eu.dotshell.pelo.generic.data.models.realtime.alerts.community.UserStopAlert
+import eu.dotshell.pelo.generic.data.models.navigation.NavigationAlertPrompt
+import eu.dotshell.pelo.generic.data.models.navigation.NavigationAlertPromptKind
+import eu.dotshell.pelo.generic.data.models.realtime.alerts.community.CommunityAlert
+import eu.dotshell.pelo.generic.service.TransportServiceProvider
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.ItineraryPreferencesRepository
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyLegKind
 import eu.dotshell.pelo.generic.data.repository.itinerary.itinerary.JourneyResult
@@ -161,6 +165,11 @@ fun InlineItinerarySheetContent(
     var showTimePicker by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
 
+    // What one WARNING-level alert costs the stop it hits, read once from the network config.
+    val warningPenaltySeconds = remember {
+        TransportServiceProvider.getRealtimeConfig().alertWarningPenaltySeconds
+    }
+
     var journeys by remember { mutableStateOf<List<JourneyResult>>(emptyList()) }
     var journeysAvoidingAlerts by remember { mutableStateOf<List<AvoidedJourneyUi>>(emptyList()) }
     var selectedJourney by remember { mutableStateOf<JourneyResult?>(null) }
@@ -212,7 +221,9 @@ fun InlineItinerarySheetContent(
             date: LocalDate,
             blockedNames: Set<String>,
             overrideTimeSeconds: Int? = null,
-            walking: WalkingParams = WalkingParams.DEFAULT
+            walking: WalkingParams = WalkingParams.DEFAULT,
+            blockedStopNames: Set<String> = emptySet(),
+            stopPenaltySecondsByName: Map<String, Int> = emptyMap()
         ): List<JourneyResult> {
             return withContext(ioDispatcher) {
                 if (timeMode == TimeMode.ARRIVAL) {
@@ -223,6 +234,8 @@ fun InlineItinerarySheetContent(
                         searchWindowMinutes = 120,
                         date = date,
                         blockedRouteNames = blockedNames,
+                        blockedStopNames = blockedStopNames,
+                        stopPenaltySecondsByName = stopPenaltySecondsByName,
                         originLabel = departureStop?.name,
                         destinationLabel = arrivalStop?.name,
                         walking = walking
@@ -234,6 +247,8 @@ fun InlineItinerarySheetContent(
                         departureTimeSeconds = overrideTimeSeconds ?: selectedTimeSeconds,
                         date = date,
                         blockedRouteNames = blockedNames,
+                        blockedStopNames = blockedStopNames,
+                        stopPenaltySecondsByName = stopPenaltySecondsByName,
                         originLabel = departureStop?.name,
                         destinationLabel = arrivalStop?.name,
                         walking = walking
@@ -254,73 +269,72 @@ fun InlineItinerarySheetContent(
             return names
         }
 
-        fun extractRouteNamesAtProblematicStops(
+        fun extractLineNames(journey: JourneyResult): Set<String> =
+            journey.legs.mapNotNullTo(mutableSetOf()) { leg ->
+                if (leg.isWalking) null else leg.routeName?.takeIf { it.isNotBlank() }
+            }
+
+        /**
+         * Places a line-wide warning on the stops where a journey actually boards that line.
+         *
+         * A warning reported against a whole line has no stop of its own. Penalising every stop it
+         * serves would slow down itineraries that merely cross the line's territory; charging the
+         * boarding stop is what makes "this line is having a bad day" cost something to the people
+         * who would actually get on it.
+         */
+        fun penaltiesForWarnedLines(
             allJourneys: List<JourneyResult>,
-            problematicStops: Set<String>
-        ): Set<String> {
-            if (problematicStops.isEmpty()) return emptySet()
+            warnedLines: Set<String>,
+            penaltySeconds: Int
+        ): Map<String, Int> {
+            if (warnedLines.isEmpty() || penaltySeconds <= 0) return emptyMap()
 
-            val normalizedProblematic = problematicStops.map(SearchUtils::normalizeStopKey).toSet()
-
-            val blockedNames = mutableSetOf<String>()
+            val normalizedWarned = warnedLines.map { it.lowercase() }.toSet()
+            val out = mutableMapOf<String, Int>()
             allJourneys.forEach { journey ->
                 journey.legs.forEach { leg ->
                     if (leg.isWalking) return@forEach
-                    val touchesProblematicStop =
-                        normalizedProblematic.contains(SearchUtils.normalizeStopKey(leg.fromStopName)) ||
-                            normalizedProblematic.contains(SearchUtils.normalizeStopKey(leg.toStopName)) ||
-                            leg.intermediateStops.any {
-                                normalizedProblematic.contains(SearchUtils.normalizeStopKey(it.stopName))
-                            }
-                    if (touchesProblematicStop && !leg.routeName.isNullOrBlank()) {
-                        blockedNames.add(leg.routeName)
+                    val routeName = leg.routeName?.takeIf { it.isNotBlank() } ?: return@forEach
+                    if (routeName.lowercase() in normalizedWarned) {
+                        out[leg.fromStopName] = maxOf(out[leg.fromStopName] ?: 0, penaltySeconds)
                     }
                 }
             }
-            return blockedNames
+            return out
         }
 
-        fun journeyTouchesProblematicStop(
+        fun journeyTouchesBlockedStop(
             journey: JourneyResult,
-            problematicStops: Set<String>
+            blockedStops: Set<String>
         ): Boolean {
-            if (problematicStops.isEmpty()) return false
+            if (blockedStops.isEmpty()) return false
 
-            val normalizedProblematic = problematicStops.map(SearchUtils::normalizeStopKey).toSet()
+            val normalizedBlocked = blockedStops.map(SearchUtils::normalizeStopKey).toSet()
             return journey.legs.any { leg ->
                 if (leg.isWalking) return@any false
-                normalizedProblematic.contains(SearchUtils.normalizeStopKey(leg.fromStopName)) ||
-                    normalizedProblematic.contains(SearchUtils.normalizeStopKey(leg.toStopName)) ||
+                normalizedBlocked.contains(SearchUtils.normalizeStopKey(leg.fromStopName)) ||
+                    normalizedBlocked.contains(SearchUtils.normalizeStopKey(leg.toStopName)) ||
                     leg.intermediateStops.any {
-                        normalizedProblematic.contains(SearchUtils.normalizeStopKey(it.stopName))
+                        normalizedBlocked.contains(SearchUtils.normalizeStopKey(it.stopName))
                     }
             }
         }
 
-        fun buildAvoidedLabel(problematicDetails: Map<String, List<UserStopAlert>>): String {
-            if (problematicDetails.isEmpty()) return "Alertes utilisateur évitées"
-
-            val topEntry = problematicDetails
-                .entries
-                .maxByOrNull { (_, alerts) -> alerts.maxOfOrNull { it.karma } ?: Int.MIN_VALUE }
-                ?: return "Alertes utilisateur évitées"
-
-            val stopName = topEntry.key
-            val topAlertType = topEntry.value.maxByOrNull { it.karma }?.type?.lowercase()
-
-            return when (topAlertType) {
-                "closure" -> "Arret ferme évité à $stopName"
-                "delay" -> "Retard évité à $stopName"
-                "elevator" -> "Ascenseur HS évité à $stopName"
-                "crowding" -> "Forte foule évitée à $stopName"
-                "works" -> "Travaux évités à $stopName"
-                "strike" -> "Greve évitée à $stopName"
-                "fire" -> "Incendie évité à $stopName"
-                "interruption" -> "Interruption évitée à $stopName"
-                "congestion" -> "Trafic eleve évité à $stopName"
-                "incident" -> "Incident évité à $stopName"
-                "security" -> "Alerte securite évitée à $stopName"
-                else -> "Alerte utilisateur évitée à $stopName"
+        fun labelForAlert(alert: CommunityAlert): String {
+            val where = alert.stopId ?: alert.lineId ?: return "Alerte utilisateur évitée"
+            return when (alert.type.lowercase()) {
+                "closure" -> "Arret ferme évité à $where"
+                "delay" -> "Retard évité à $where"
+                "elevator" -> "Ascenseur HS évité à $where"
+                "crowding" -> "Forte foule évitée à $where"
+                "works" -> "Travaux évités à $where"
+                "strike" -> "Greve évitée à $where"
+                "fire" -> "Incendie évité à $where"
+                "interruption" -> "Interruption évitée à $where"
+                "congestion" -> "Trafic eleve évité à $where"
+                "incident" -> "Incident évité à $where"
+                "security" -> "Alerte securite évitée à $where"
+                else -> "Alerte utilisateur évitée à $where"
             }
         }
 
@@ -549,58 +563,57 @@ fun InlineItinerarySheetContent(
         avoidAlertsJob = coroutineScope.launch {
             try {
                 val stopNames = journeysSnapshot.flatMap { extractStopNames(it) }.distinct()
-                if (stopNames.isEmpty()) return@launch
+                val lineNames = journeysSnapshot.flatMap { extractLineNames(it) }.distinct()
+                if (stopNames.isEmpty() && lineNames.isEmpty()) return@launch
 
-                Log.d(
-                    "InlineItinerary",
-                    "Alert-avoidance input stops (${stopNames.size}): ${stopNames.joinToString()}"
-                )
-
-                val problematicDetails = withContext(ioDispatcher) {
-                    viewModel.userStopAlertsRepository.getProblematicAlertDetails(stopNames)
+                val disruptions = withContext(ioDispatcher) {
+                    viewModel.userStopAlertsRepository.disruptionsFor(stopNames, lineNames)
                 }
-                val problematicStops = problematicDetails.keys
-                Log.d(
-                    "InlineItinerary",
-                    "Problematic stops after threshold filter (${problematicStops.size}): ${problematicStops.joinToString()}"
-                )
 
-                val routeNamesToAvoid = extractRouteNamesAtProblematicStops(
+                // Unconfirmed reports never move an itinerary. They are put to the traveller during
+                // navigation, once they are standing at the stop and can actually look — see
+                // NavigationAlertConfirmation.
+                if (disruptions.isEmpty) return@launch
+
+                // A line-wide warning becomes a penalty at the stops this journey boards it.
+                val penalties = disruptions.stopPenaltySeconds.toMutableMap()
+                penaltiesForWarnedLines(
                     allJourneys = journeysSnapshot,
-                    problematicStops = problematicStops
-                )
+                    warnedLines = disruptions.warnedLineNames,
+                    penaltySeconds = warningPenaltySeconds
+                ).forEach { (stop, seconds) ->
+                    penalties[stop] = maxOf(penalties[stop] ?: 0, seconds)
+                }
+
                 Log.d(
                     "InlineItinerary",
-                    "Route names to avoid (${routeNamesToAvoid.size}): ${routeNamesToAvoid.joinToString()}"
+                    "Disruptions on this journey: blocked stops=${disruptions.blockedStopNames}, " +
+                        "blocked lines=${disruptions.blockedLineNames}, penalties=$penalties"
                 )
 
-                if (routeNamesToAvoid.isEmpty()) return@launch
-
-                val blockedForAvoided = blockedSnapshot + routeNamesToAvoid
+                // One run, with the disruptions applied inside the engine rather than a whole line
+                // banned around them: a closed stop is skipped, a slow one costs time, and an
+                // itinerary with no alternative survives instead of disappearing.
                 val avoidedJourneys = calculateJourneys(
                     origin = originLocation,
                     destination = destinationLocation,
                     date = dateSnapshot,
-                    blockedNames = blockedForAvoided
+                    blockedNames = blockedSnapshot + disruptions.blockedLineNames,
+                    blockedStopNames = disruptions.blockedStopNames,
+                    stopPenaltySecondsByName = penalties
                 )
 
+                val label = disruptions.mostSevereAlert()
+                    ?.let(::labelForAlert)
+                    ?: "Alertes utilisateur évitées"
+
+                val baselineSignatures = journeysSnapshot.map(::journeySignature).toHashSet()
                 val seenAvoidedSignatures = mutableSetOf<String>()
-                val label = buildAvoidedLabel(problematicDetails)
-                val recalculatedAvoided = avoidedJourneys
-                    .filter { !journeyTouchesProblematicStop(it, problematicStops) }
-                    .filter {
-                        val sig = journeySignature(it)
-                        seenAvoidedSignatures.add(sig)
-                    }
-
-                val baselineAvoided = journeysSnapshot
-                    .filter { !journeyTouchesProblematicStop(it, problematicStops) }
-                    .filter {
-                        val sig = journeySignature(it)
-                        seenAvoidedSignatures.add(sig)
-                    }
-
-                val nextAvoided = (recalculatedAvoided + baselineAvoided)
+                val nextAvoided = avoidedJourneys
+                    // A route identical to one already shown is not an alternative.
+                    .filter { journeySignature(it) !in baselineSignatures }
+                    .filter { !journeyTouchesBlockedStop(it, disruptions.blockedStopNames) }
+                    .filter { seenAvoidedSignatures.add(journeySignature(it)) }
                     .map { AvoidedJourneyUi(journey = it, label = label) }
 
                 if (currentVersion != recalcVersion) return@launch

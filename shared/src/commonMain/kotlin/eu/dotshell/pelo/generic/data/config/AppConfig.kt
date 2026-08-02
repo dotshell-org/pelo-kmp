@@ -38,7 +38,15 @@ data class DatasetUpdateConfigData(
 data class RealtimeConfigData(
     val trafficAlertsEnabled: Boolean = true,
     val vehiclePositionsEnabled: Boolean = true,
-    val userStopAlertsEnabled: Boolean = true
+    val userStopAlertsEnabled: Boolean = true,
+    /**
+     * What one WARNING-level alert costs the stop it was reported at, in the routing engine.
+     *
+     * Five minutes is enough to lose against a comparable alternative without inventing a
+     * disruption where there is none: an itinerary with no other option keeps being proposed,
+     * only with an honest reason to look at the next one.
+     */
+    val alertWarningPenaltySeconds: Int = 300
 )
 
 @Serializable

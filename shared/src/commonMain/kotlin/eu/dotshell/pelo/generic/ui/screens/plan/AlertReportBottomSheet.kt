@@ -100,13 +100,14 @@ fun AlertReportBottomSheet(
     viewModel: TransportViewModelInterface,
     onDismiss: () -> Unit,
     initialStop: StationSearchResult? = null,
+    initialLine: LineSearchResult? = null,
     nearestStopCandidate: StationSearchResult? = null
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalPlatformContext.current
     val strings = StringProvider(context)
     var selectedStop by remember { mutableStateOf<StationSearchResult?>(initialStop) }
-    var selectedLine by remember { mutableStateOf<LineSearchResult?>(null) }
+    var selectedLine by remember { mutableStateOf<LineSearchResult?>(initialLine) }
     var showSearchFullscreen by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var showErrorDialog by remember { mutableStateOf(false) }
@@ -259,7 +260,13 @@ fun AlertReportBottomSheet(
                                 )
                             }
                         }
-                    } else if (selectedStopLocal != null) {
+                    }
+
+                    // Both can be set at once when reporting while navigating: the app knows the
+                    // stop *and* the line being ridden, and sending the pair is what lets the
+                    // report count for the line rather than staying pinned to one quiet stop.
+                    if (selectedStopLocal != null) {
+                        if (selectedLineLocal != null) Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             text = selectedStopLocal.stopName,
                             style = MaterialTheme.typography.headlineSmall,

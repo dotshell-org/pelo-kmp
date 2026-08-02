@@ -325,12 +325,25 @@ val AccentColor = BrandOrange
 val AccentColorShade = BrandOrangeDark
 
 /**
- * The blue of the user's position on the map, and of the controls that act on it — starting
- * navigation, above all. Named because those have to stay the same blue: the map dot used to
- * hardcode it while the "Démarrer" button was [PrimaryColor], which is black, and therefore
- * invisible against a dark bottom sheet.
+ * The blue of the user's position on the map. Named because the dot used to hardcode it.
+ *
+ * It no longer doubles as the colour of the controls that act on that position — see
+ * [NavigationActionColor]. The two were briefly unified to stop the "Démarrer" button being
+ * [PrimaryColor] (black) and therefore invisible on a dark bottom sheet; that was a fix for the
+ * button's contrast, never a claim that this blue belonged to the charte.
  */
 val UserLocationColor = Blue500
+
+/**
+ * The primary "go" action: starting navigation.
+ *
+ * [Emerald700] rather than a darker emerald because the button is a filled pill that has to hold
+ * its own against both the sand light sheet and the [DarkSheetSurface] dark one. At 5.5:1 against
+ * its white label it clears AA, and at 3.2:1 against the dark sheet it clears the 3:1 that
+ * non-text UI needs — Emerald800 would look richer and fall to 2.3:1 there, which is the exact
+ * disappearing act the black button was replaced for.
+ */
+val NavigationActionColor = Emerald700
 
 // Neutral (non-bluish) dark gray used for bottom sheets in dark mode, so they read as a
 // distinct surface above the pure-black navbar and map rather than blending into them.
