@@ -1,0 +1,33 @@
+{
+  "fill": {
+    "automatic-gradient": "extended-srgb:0.69804,0.40000,0.20000,1.00000"
+  },
+  "groups": [
+    {
+      "layers": [
+        {
+          "glass": true,
+          "image-name": "mark.png",
+          "name": "Marque Pelo"
+        }
+      ],
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
+      },
+      "specular": true,
+      "translucency": {
+        "enabled": true,
+        "value": 0.35
+      }
+    }
+  ],
+  "supported-platforms": {
+    "circles": [
+      "watchOS"
+    ],
+    "squares": [
+      "macOS"
+    ]
+  }
+}
