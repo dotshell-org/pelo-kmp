@@ -2,7 +2,12 @@
 //
 // Source of truth is the in-app mark (composeResources/drawable/pelo_mark_dark.png):
 // white ink on black. Its ink is lifted into an alpha mask, trimmed to the mark's
-// bounding box, then redrawn centered on the brand dark (#1D1D1B) for each target.
+// bounding box, then redrawn centered on Bellecour terracotta for each target.
+//
+// Colours come from the 2026 brand book: Bellecour #B26633 behind, Façade lyonnaise
+// #F7F1DC for the ink. Only the two colours are ours to choose — the mark's geometry is
+// off limits under the book's "interdits", which is why this script recolours a master
+// rather than redrawing anything.
 //
 // Sizing — the whole point of this script. Every launcher shows the icon inside a tile,
 // and the ink is scaled to TILE_RATIO of that tile's width everywhere, so the mark reads
@@ -23,12 +28,14 @@ let TILE_RATIO = 0.72
 /// An adaptive layer is 108dp, of which only the centre 72dp is guaranteed to be visible.
 let ADAPTIVE_RATIO = TILE_RATIO * 72.0 / 108.0
 
-let BRAND_DARK = (r: 0x1D / 255.0, g: 0x1D / 255.0, b: 0x1B / 255.0)
-let WHITE = (r: 1.0, g: 1.0, b: 1.0)
+/// Bellecour — the brand terracotta, and the only background the app icon may use.
+let BELLECOUR = (r: 0xB2 / 255.0, g: 0x66 / 255.0, b: 0x33 / 255.0)
+/// Façade lyonnaise — the warm off-white the mark is drawn in on terracotta.
+let FACADE = (r: 0xF7 / 255.0, g: 0xF1 / 255.0, b: 0xDC / 255.0)
 let BLACK = (r: 0.0, g: 0.0, b: 0.0)
 
-let MASTER = "app/src/commonMain/composeResources/drawable/pelo_mark_dark.png"
-let RES = "app/src/androidMain/res"
+let MASTER = "shared/src/commonMain/composeResources/drawable/pelo_mark_dark.png"
+let RES = "app/src/main/res"
 let DENSITIES = [("mdpi", 1.0), ("hdpi", 1.5), ("xhdpi", 2.0), ("xxhdpi", 3.0), ("xxxhdpi", 4.0)]
 
 typealias RGB = (r: Double, g: Double, b: Double)
@@ -178,21 +185,21 @@ func render(to path: String, size: Int, ratio: Double, tile: Tile, color: RGB) {
 
 // iOS ships one 1024 master; it must stay opaque and alpha-free.
 render(to: "iosApp/Assets.xcassets/AppIcon.appiconset/appicon-1024.png",
-       size: 1024, ratio: TILE_RATIO, tile: .square(BRAND_DARK), color: WHITE)
+       size: 1024, ratio: TILE_RATIO, tile: .square(BELLECOUR), color: FACADE)
 
 for (density, scale) in DENSITIES {
     // Legacy launcher icons, 48dp, used below API 26 (minSdk is 24).
     let legacy = Int(48 * scale)
     render(to: "\(RES)/mipmap-\(density)/ic_launcher.png",
-           size: legacy, ratio: TILE_RATIO, tile: .square(BRAND_DARK), color: WHITE)
+           size: legacy, ratio: TILE_RATIO, tile: .square(BELLECOUR), color: FACADE)
     render(to: "\(RES)/mipmap-\(density)/ic_launcher_round.png",
-           size: legacy, ratio: TILE_RATIO, tile: .circle(BRAND_DARK), color: WHITE)
+           size: legacy, ratio: TILE_RATIO, tile: .circle(BELLECOUR), color: FACADE)
 
     // Adaptive layers, 108dp. The background is a solid colour drawable, so only the
     // foreground and the themed-icon monochrome are rasterized.
     let adaptive = Int(108 * scale)
     render(to: "\(RES)/drawable-\(density)/ic_launcher_foreground.png",
-           size: adaptive, ratio: ADAPTIVE_RATIO, tile: .bare, color: WHITE)
+           size: adaptive, ratio: ADAPTIVE_RATIO, tile: .bare, color: FACADE)
     render(to: "\(RES)/drawable-\(density)/ic_launcher_monochrome.png",
            size: adaptive, ratio: ADAPTIVE_RATIO, tile: .bare, color: BLACK)
 }
