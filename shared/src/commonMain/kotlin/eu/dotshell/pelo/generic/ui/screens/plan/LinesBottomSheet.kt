@@ -268,7 +268,6 @@ fun LinesBottomSheet(
                                     "Soyeuse" -> strings["category_soyeuse"]
                                     "Zone Industrielle" -> strings["category_zone_industrielle"]
                                     "Bus" -> strings["category_bus"]
-                                    "Cars du Rhône TCL unifié" -> strings["category_cars_du_rhone"]
                                     "Junior Direct" -> strings["category_junior_direct"]
                                     else -> item.categoryId
                                 }

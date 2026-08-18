@@ -28,7 +28,9 @@ import sys
 import xml.etree.ElementTree as ET
 
 SVG_NS = "{http://www.w3.org/2000/svg}"
-OUT_DIR = os.path.join("app", "src", "commonMain", "composeResources", "drawable")
+# The badges live in the shared module; `app` only carries the Android entry point. This path
+# followed the module when the code moved, and the tool did not.
+OUT_DIR = os.path.join("shared", "src", "commonMain", "composeResources", "drawable")
 
 # Compose resource file names are Kotlin-accessor safe: lowercase alphanumerics
 # and underscores only, never leading with a digit.

@@ -207,7 +207,6 @@ private fun categorizeLines(lines: List<String>): List<LineCategory> {
     val soyeuses = mutableListOf<LineEntry>()
     val navettes = mutableListOf<LineEntry>()
     val zi = mutableListOf<LineEntry>()
-    val carsDuRhone = mutableListOf<LineEntry>()
     val bus = mutableListOf<LineEntry>()
 
     linesWithIcon.forEach { entry ->
@@ -231,10 +230,9 @@ private fun categorizeLines(lines: List<String>): List<LineCategory> {
             upperLine.startsWith("S") -> soyeuses.add(entry)
             upperLine.startsWith("ZI") -> zi.add(entry)
             upperLine.startsWith("N") -> navettes.add(entry)
-            upperLine.length >= 3 && upperLine != "128" && upperLine.all { it.isDigit() } -> carsDuRhone.add(
-                entry
-            )
-
+            // Three-digit lines used to be split off as "Cars du Rhône TCL unifié". The network
+            // finished absorbing them, so they are buses like any other and the number no longer
+            // says anything about who runs them.
             else -> bus.add(entry)
         }
     }
@@ -263,7 +261,6 @@ private fun categorizeLines(lines: List<String>): List<LineCategory> {
         addCategory("Soyeuse", soyeuses)
         addCategory("Zone Industrielle", zi)
         addCategory("Bus", bus)
-        addCategory("Cars du Rhône TCL unifié", carsDuRhone)
         addCategory("Junior Direct", jd)
     }
 }
