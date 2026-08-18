@@ -125,6 +125,9 @@ class RaptorRepository private constructor(private val context: PlatformContext)
         private const val PERIOD_SUNDAY = "sunday"
         private const val PERIOD_SCHOOL_ON_WEEKDAYS = "school_on_weekdays"
         private const val PERIOD_SCHOOL_OFF_WEEKDAYS = "school_off_weekdays"
+        private val ALL_PERIODS = listOf(
+            PERIOD_SATURDAY, PERIOD_SUNDAY, PERIOD_SCHOOL_ON_WEEKDAYS, PERIOD_SCHOOL_OFF_WEEKDAYS
+        )
 
         // In-memory journey caching is handled by [journeyDiskCache] (JourneyCache), which has
         // its own 30-min memory LRU on top of the daily disk cache — so no separate L1 here.
@@ -373,6 +376,25 @@ class RaptorRepository private constructor(private val context: PlatformContext)
      */
     fun getAllRouteNames(): Set<String> =
         indexFor(PERIOD_SCHOOL_ON_WEEKDAYS).sortedRouteNames.toSet()
+
+    /**
+     * Every route name that has a timetable, in any of the four periods.
+     *
+     * The catalogue question, as opposed to [currentPeriodRouteNames]'s "what runs today". A line
+     * is worth showing if some period schedules it: a Sunday-only line is real on a Tuesday, it
+     * simply is not running.
+     *
+     * Names that reach the app from anywhere else — the drawn network, a stop's desserte — are not
+     * evidence a line still exists. Both outlived TCL's August 2026 renumbering by months, leaving
+     * retired numbers in the lines sheet that opened onto an empty timetable. The binaries are the
+     * only source that knows, because a line with no trips is not written into them at all.
+     *
+     * Each period's index is built on first use, so the first call pays for the three periods that
+     * are not active. Call it off the main thread.
+     */
+    fun scheduledRouteNames(): Set<String> = buildSet {
+        for (period in ALL_PERIODS) addAll(indexFor(period).sortedRouteNames)
+    }
 
     /**
      * Distinct, sorted route names of the ACTIVE period.

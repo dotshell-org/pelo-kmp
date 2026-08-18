@@ -857,11 +857,26 @@ class TransportViewModel(private val context: PlatformContext) : ViewModel(), Tr
             else -> emptyList()
         }
 
+        /*
+         * A line is only offered if some period actually schedules it.
+         *
+         * The two sources above describe the network as drawn and as written on stop signs, and
+         * both lag reality: after TCL's August 2026 renumbering they still carried 2, 3, 5 to 27,
+         * C3, C7, S1, N80 and the rest of the retired numbers months later, so the lines sheet
+         * listed lines whose timetable was empty and whose page opened onto nothing. The binaries
+         * are the arbiter — a line with no trips is not written into them at all.
+         *
+         * Falls back to the unfiltered list while the schedules are still loading, so the sheet is
+         * populated at first paint rather than empty.
+         */
+        val scheduled = raptorRepository.scheduledRouteNames().mapTo(HashSet()) { it.uppercase() }
+
         val aggregated = (linesFromLoadedFeatures + linesFromStops)
             .asSequence()
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .distinctBy { it.uppercase() }
+            .filter { scheduled.isEmpty() || it.uppercase() in scheduled }
             .toList()
 
         cachedAvailableLines = AvailableLinesCache(currentUiState, currentStopsState, aggregated)
